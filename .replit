@@ -60,3 +60,5 @@ channel = "stable-25_05"
 [userenv.shared]
 SUPABASE_URL = "https://ldgbbbxqfwgufhvnvojy.supabase.co"
 SUPABASE_ANON_KEY = "sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX"
+VITE_SUPABASE_URL = "https://ldgbbbxqfwgufhvnvojy.supabase.co"
+VITE_SUPABASE_ANON_KEY = "sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX"
