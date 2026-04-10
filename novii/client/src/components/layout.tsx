@@ -157,12 +157,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       dir={direction}
     >
       
-      {/* Navigation Sidebar */}
+      {/* Navigation Sidebar — fixed overlay so it never pushes content */}
+      <div className="order-1 hidden lg:block w-20 flex-shrink-0" />
       <aside 
         onMouseEnter={() => setIsSidebarExpanded(true)}
         onMouseLeave={() => setIsSidebarExpanded(false)}
         className={cn(
-          "order-1 hidden lg:flex flex-col h-screen sticky top-0 z-50 border-e border-border/40 transition-all duration-300 ease-in-out overflow-hidden",
+          "hidden lg:flex flex-col h-screen fixed top-0 start-0 z-50 bg-background border-e border-border/40 transition-all duration-300 ease-in-out overflow-hidden",
           isSidebarExpanded ? "w-72 p-6" : "w-20 p-3"
         )}
       >
