@@ -1,6 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVideoPlayer } from '@/lib/video';
-import { useBackgroundMusic } from '@/lib/useBackgroundMusic';
 import { Scene1 } from './video_scenes/Scene1';
 import { Scene2 } from './video_scenes/Scene2';
 import { Scene3 } from './video_scenes/Scene3';
@@ -33,7 +32,6 @@ const orb2Positions = [
 
 export default function VideoTemplate() {
   const { currentScene } = useVideoPlayer({ durations: SCENE_DURATIONS });
-  useBackgroundMusic();
 
   return (
     <div
