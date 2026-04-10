@@ -29,7 +29,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd novii && npm run dev"
+args = "cd novii && PORT=5000 pnpm run dev"
 waitForPort = 5000
 
 [agent]
