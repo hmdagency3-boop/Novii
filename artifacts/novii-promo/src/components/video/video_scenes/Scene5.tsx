@@ -52,17 +52,11 @@ export function Scene5() {
             className="absolute inset-0 rounded-2xl blur-2xl"
             style={{ background: 'linear-gradient(135deg, #7c3aed88, #ec489988)' }}
           />
-          <div
-            className="relative w-full h-full rounded-2xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #7c3aed, #ec4899)' }}
-          >
-            <span
-              className="font-black text-white"
-              style={{ fontSize: '2.8vw', fontFamily: 'var(--font-display)' }}
-            >
-              N
-            </span>
-          </div>
+          <img
+            src={`${import.meta.env.BASE_URL}novii_logo.png`}
+            alt="Novii"
+            className="relative w-full h-full rounded-2xl object-cover shadow-2xl"
+          />
         </motion.div>
 
         {/* Novii title */}

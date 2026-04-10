@@ -61,18 +61,11 @@ export function Scene3() {
               className="flex items-center justify-between px-3 py-2 shrink-0"
               style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
             >
-              <span
-                className="font-black"
-                style={{
-                  fontSize: '1.4vw',
-                  fontFamily: 'var(--font-display)',
-                  background: 'linear-gradient(90deg, #a78bfa, #f9a8d4)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}
-              >
-                Novii
-              </span>
+              <img
+                src={`${import.meta.env.BASE_URL}novii_logo.png`}
+                alt="Novii"
+                style={{ width: '1.8vw', height: '1.8vw', borderRadius: '0.4vw', objectFit: 'cover' }}
+              />
               <div className="flex gap-1">
                 {['#7c3aed', '#ec4899'].map((c, i) => (
                   <div key={i} className="rounded-full" style={{ width: '1vw', height: '1vw', background: c }} />

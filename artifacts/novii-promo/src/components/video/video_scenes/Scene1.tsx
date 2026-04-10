@@ -25,7 +25,7 @@ export function Scene1() {
       transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
     >
       <div className="relative z-10 text-center" dir="rtl">
-        {/* Logo circle */}
+        {/* Logo */}
         <motion.div
           className="mx-auto mb-8 relative"
           style={{ width: '10vw', height: '10vw' }}
@@ -34,20 +34,14 @@ export function Scene1() {
           transition={{ type: 'spring', stiffness: 260, damping: 20 }}
         >
           <div
-            className="absolute inset-0 rounded-3xl blur-2xl opacity-80"
+            className="absolute inset-0 rounded-3xl blur-2xl opacity-70"
             style={{ background: 'radial-gradient(circle, #7c3aed, #ec4899)' }}
           />
-          <div
-            className="relative w-full h-full rounded-3xl flex items-center justify-center shadow-2xl"
-            style={{ background: 'linear-gradient(135deg, #7c3aed, #ec4899)' }}
-          >
-            <span
-              className="text-white font-black"
-              style={{ fontSize: '3.5vw', fontFamily: 'var(--font-display)' }}
-            >
-              N
-            </span>
-          </div>
+          <img
+            src={`${import.meta.env.BASE_URL}novii_logo.png`}
+            alt="Novii"
+            className="relative w-full h-full rounded-3xl object-cover shadow-2xl"
+          />
         </motion.div>
 
         {/* Title chars */}
