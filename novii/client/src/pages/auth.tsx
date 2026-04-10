@@ -255,7 +255,7 @@ export default function AuthPage() {
 
   return (
     <div className={cn(
-      "min-h-screen bg-gradient-to-br from-background via-background to-background flex items-center justify-center p-4 relative overflow-hidden",
+      "min-h-screen bg-gradient-to-br from-background via-background to-background flex items-start sm:items-center justify-center p-4 pt-8 sm:pt-4 relative overflow-x-hidden overflow-y-auto",
       "dark"
     )} dir={isRTL ? "rtl" : "ltr"}>
       {/* Animated background gradients */}
@@ -333,17 +333,17 @@ export default function AuthPage() {
             <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-purple-500 to-pink-500 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
             
             {/* Main form container */}
-            <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl p-8 space-y-6 shadow-2xl">
+            <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl p-5 sm:p-8 space-y-4 sm:space-y-6 shadow-2xl">
               {/* Header */}
-              <div className="text-center space-y-4">
+              <div className="text-center space-y-2 sm:space-y-4">
                 <div className="flex justify-center mb-2 animate-in zoom-in duration-500">
                   <div className="relative group">
                     <div className="absolute -inset-3 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 rounded-full blur-xl opacity-40 group-hover:opacity-60 transition-opacity duration-300 animate-pulse"></div>
-                    <img src={logo} alt="Novii" className="relative w-24 h-24 md:w-28 md:h-28 rounded-3xl shadow-2xl object-contain bg-black/20 p-2" />
+                    <img src={logo} alt="Novii" className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-3xl shadow-2xl object-contain bg-black/20 p-2" />
                   </div>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                  <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 bg-clip-text text-transparent animate-in fade-in slide-in-from-top-4 duration-700 delay-100">
+                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 bg-clip-text text-transparent animate-in fade-in slide-in-from-top-4 duration-700 delay-100">
                     Novii
                   </h1>
                   <div className="h-1 w-16 bg-gradient-to-r from-pink-500 to-cyan-500 rounded-full animate-in fade-in duration-700 delay-200"></div>
@@ -356,14 +356,14 @@ export default function AuthPage() {
               {/* Form Content */}
               {!isLogin ? (
                 <>
-                  <form onSubmit={handleSubmit} className="space-y-3.5 overflow-visible">
+                  <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-3.5 overflow-visible">
                     <Input
                       type="email"
                       placeholder={t.auth.mobile_or_email}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
+                      className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
                       dir="ltr"
                     />
 
@@ -373,7 +373,7 @@ export default function AuthPage() {
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       required
-                      className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
+                      className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
                     />
 
                     <Input
@@ -382,7 +382,7 @@ export default function AuthPage() {
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       required
-                      className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
+                      className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
                       dir="ltr"
                     />
 
@@ -393,22 +393,22 @@ export default function AuthPage() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
+                        className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
                         dir="ltr"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute left-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
 
-                    <div className="space-y-2 pt-2">
+                    <div className="space-y-1.5">
                       <label className="text-xs font-medium text-muted-foreground">{language.code === 'ar' ? 'الجنس' : 'Gender'}</label>
                       <Select value={gender} onValueChange={setGender}>
-                        <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-11 text-sm hover:border-primary/50 transition-colors">
+                        <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-9 sm:h-11 text-sm hover:border-primary/50 transition-colors">
                           <SelectValue placeholder={language.code === 'ar' ? 'اختر الجنس' : 'Select gender'} />
                         </SelectTrigger>
                         <SelectContent className="bg-card border-border" side="bottom" align="start" sideOffset={8}>
@@ -425,7 +425,7 @@ export default function AuthPage() {
                       </Select>
                     </div>
 
-                    <div className="space-y-2 pt-2">
+                    <div className="space-y-1.5">
                       <label className="text-xs font-medium text-muted-foreground">{t.auth.date_of_birth}</label>
                       <div className="grid grid-cols-3 gap-2">
                         <Select value={birthMonth} onValueChange={setBirthMonth}>
@@ -469,13 +469,13 @@ export default function AuthPage() {
                       </div>
                     </div>
 
-                    <p className="text-xs text-muted-foreground leading-relaxed pt-1">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       {t.auth.dob_info2}
                     </p>
 
                     <Button
                       type="submit"
-                      className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300 mt-4"
+                      className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-10 sm:h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300"
                       disabled={isLoading}
                     >
                       {isLoading ? (
@@ -576,7 +576,7 @@ export default function AuthPage() {
           </div>
 
           {/* Toggle Form */}
-          <div className="mt-6 bg-card/50 backdrop-blur-md border border-border/50 rounded-xl p-4 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+          <div className="mt-3 sm:mt-6 bg-card/50 backdrop-blur-md border border-border/50 rounded-xl p-3 sm:p-4 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
             <p className="text-sm text-muted-foreground">
               {isLogin ? t.auth.no_account : t.auth.have_account}
               <button
@@ -599,7 +599,7 @@ export default function AuthPage() {
           </div>
 
           {/* Footer */}
-          <div className="mt-8 text-center">
+          <div className="mt-3 sm:mt-8 text-center pb-4">
             <p className="text-xs text-muted-foreground">
               {t.auth.copyright}
             </p>
