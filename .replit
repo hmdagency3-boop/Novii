@@ -58,5 +58,5 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-SUPABASE_URL = "https://anyxcvhpgvqdjrsuthch.supabase.co"
-SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFueXhjdmhwZ3ZxZGpyc3V0aGNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2MTc4NzgsImV4cCI6MjA3OTE5Mzg3OH0.BWLD5Ely45GTItNx5MZSEGH7yLIEr_As_XmJXeyczxs"
+SUPABASE_URL = "https://ldgbbbxqfwgufhvnvojy.supabase.co"
+SUPABASE_ANON_KEY = "sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX"
