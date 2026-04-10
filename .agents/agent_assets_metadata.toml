@@ -1,0 +1,20 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "pOaEfqPX-mZ9FcR3Fwoqi"
+uri = "file://novii/client/public/assets/auth-laptop-main.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "jEgVU6gHDt7FNqJOZlnqd"
+uri = "file://novii/client/public/assets/auth-laptop-2.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "I0tztjSeo3B80WtA05muq"
+uri = "file://novii/client/public/assets/auth-laptop-3.png"
+type = "image"
+title = "generated_image"
