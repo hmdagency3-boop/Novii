@@ -1,14 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import * as schema from "@shared/schema";
 
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    "SUPABASE_URL and SUPABASE_ANON_KEY must be set."
-  );
-}
+const supabaseUrl = process.env.SUPABASE_URL || 'https://ldgbbbxqfwgufhvnvojy.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX';
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
