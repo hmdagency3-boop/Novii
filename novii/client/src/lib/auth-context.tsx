@@ -17,18 +17,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-async function callBackendAuth(endpoint: string, body: object): Promise<any> {
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-  const res = await fetch(`${baseUrl}/api/auth/${endpoint}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Authentication failed");
-  return data;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -41,11 +29,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
 
     const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (isMounted) {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (isMounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
+      } catch {
+        if (isMounted) setLoading(false);
       }
     };
 
@@ -67,25 +59,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const data = await callBackendAuth("signup", { email, password });
-    if (data.session) {
-      await supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      });
-    } else if (data.user) {
-      setUser(data.user);
-    }
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw new Error(error.message);
+    if (data.user) setUser(data.user);
+    if (data.session) setSession(data.session);
   };
 
   const signIn = async (email: string, password: string) => {
-    const data = await callBackendAuth("signin", { email, password });
-    if (data.session) {
-      await supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      });
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+    if (data.user) setUser(data.user);
+    if (data.session) setSession(data.session);
   };
 
   const signOut = async () => {
@@ -100,17 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (db.name) indexedDB.deleteDatabase(db.name);
           }
         } catch (e) {}
-      }
-
-      const token = session?.access_token;
-      if (token) {
-        await fetch("/api/auth/signout", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }).catch(() => {});
       }
 
       await supabase.auth.signOut();
