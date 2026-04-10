@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { useEffect, useState } from "react";
+import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as ShadcnToaster } from "@/components/ui/toaster";
@@ -29,25 +29,102 @@ import Admin from "@/pages/admin";
 import FollowersDetail from "@/pages/followers-detail";
 import ResetPassword from "@/pages/reset-password";
 import ProtectedLayout from "@/components/protected-layout";
-import Splash from "@/pages/splash";
 
-function Router() {
-  const [, setLocation] = useLocation();
+function SplashOverlay() {
+  const [visible, setVisible] = useState(true);
+  const [mounted, setMounted] = useState(true);
 
   useEffect(() => {
-    const shown = sessionStorage.getItem("splashShown");
-    if (!shown) {
-      sessionStorage.setItem("splashShown", "1");
-      setLocation("/splash");
-    }
+    const fadeTimer = setTimeout(() => setVisible(false), 2200);
+    const unmountTimer = setTimeout(() => setMounted(false), 2700);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(unmountTimer);
+    };
   }, []);
 
+  if (!mounted) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        backgroundColor: "#000",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "space-between",
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.5s ease",
+        pointerEvents: visible ? "all" : "none",
+      }}
+    >
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div
+          style={{
+            width: 90,
+            height: 90,
+            borderRadius: 22,
+            background: "linear-gradient(135deg, #9333ea 0%, #ec4899 50%, #06b6d4 100%)",
+            padding: 3,
+            boxShadow: "0 0 48px rgba(147,51,234,0.45)",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: 19,
+              background: "#060010",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 46,
+                fontWeight: 900,
+                lineHeight: 1,
+                background: "linear-gradient(135deg, #c084fc, #f472b6, #67e8f9)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              N
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ paddingBottom: 40, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+        <span style={{ fontSize: 11, color: "#4b5563", fontFamily: "sans-serif" }}>from</span>
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: 0.5,
+            fontFamily: "sans-serif",
+            background: "linear-gradient(135deg, #a855f7, #ec4899, #06b6d4)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          Novii
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function Router() {
   return (
     <Switch>
-      <Route path="/splash" component={Splash}/>
       <Route path="/auth" component={AuthPage}/>
       <Route path="/reset-password" component={ResetPassword}/>
-      
+
       <Route path="/">
         <ProtectedLayout>
           <Home />
@@ -118,13 +195,22 @@ function Router() {
           <FollowersDetail />
         </ProtectedLayout>
       </Route>
-      
+
       <Route component={NotFound} />
     </Switch>
   );
 }
 
 function App() {
+  const [showSplash, setShowSplash] = useState(() => {
+    const shown = sessionStorage.getItem("splashShown");
+    if (!shown) {
+      sessionStorage.setItem("splashShown", "1");
+      return true;
+    }
+    return false;
+  });
+
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <LanguageProvider>
@@ -136,6 +222,7 @@ function App() {
               <GlobalMessageListener />
               <TimeTracker />
               <VisitorDetector />
+              {showSplash && <SplashOverlay />}
               <Router />
             </TooltipProvider>
           </AuthProvider>
