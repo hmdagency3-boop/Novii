@@ -62,41 +62,11 @@ function SplashOverlay() {
       }}
     >
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div
-          style={{
-            width: 90,
-            height: 90,
-            borderRadius: 22,
-            background: "linear-gradient(135deg, #9333ea 0%, #ec4899 50%, #06b6d4 100%)",
-            padding: 3,
-            boxShadow: "0 0 48px rgba(147,51,234,0.45)",
-          }}
-        >
-          <div
-            style={{
-              width: "100%",
-              height: "100%",
-              borderRadius: 19,
-              background: "#060010",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <span
-              style={{
-                fontSize: 46,
-                fontWeight: 900,
-                lineHeight: 1,
-                background: "linear-gradient(135deg, #c084fc, #f472b6, #67e8f9)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              N
-            </span>
-          </div>
-        </div>
+        <img
+          src="/assets/novii_app_logo.png"
+          alt="Novii"
+          style={{ width: 96, height: 96, objectFit: "contain" }}
+        />
       </div>
 
       <div style={{ paddingBottom: 40, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
