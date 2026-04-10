@@ -315,14 +315,55 @@ export default function AuthPage() {
             </div>
           </div>
 
-          {/* Floating elements */}
+          {/* Laptop collage */}
           <div className="relative w-80 h-80 animate-in zoom-in duration-700 delay-300">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-pink-500/20 rounded-full blur-2xl"></div>
-            <img
-              src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400&h=400&fit=crop"
-              alt="Friends"
-              className="relative w-full h-full rounded-full object-cover shadow-2xl border-2 border-primary/30"
-            />
+            {/* Glow */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/25 to-pink-500/25 rounded-3xl blur-3xl"></div>
+
+            {/* Main large image — center */}
+            <div className="absolute inset-4 rounded-2xl overflow-hidden shadow-2xl border border-primary/20 z-20">
+              <img
+                src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=500&h=500&fit=crop"
+                alt="Person using Novii on laptop"
+                className="w-full h-full object-cover"
+              />
+              {/* Overlay with Novii branding */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-3">
+                <div className="flex items-center gap-1.5">
+                  <img src={logo} alt="Novii" className="w-5 h-5 rounded-md object-contain" />
+                  <span className="text-white text-xs font-semibold">Novii</span>
+                  <span className="text-white/50 text-xs">· الآن</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Top-left small image */}
+            <div className="absolute -top-3 -left-3 w-28 h-28 rounded-xl overflow-hidden shadow-xl border border-cyan-500/30 z-30 animate-in fade-in slide-in-from-left-4 duration-700 delay-500">
+              <img
+                src="https://images.unsplash.com/photo-1525130413817-d45c1d127c42?w=200&h=200&fit=crop"
+                alt="User on Novii"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent" />
+            </div>
+
+            {/* Bottom-right small image */}
+            <div className="absolute -bottom-3 -right-3 w-28 h-28 rounded-xl overflow-hidden shadow-xl border border-pink-500/30 z-30 animate-in fade-in slide-in-from-right-4 duration-700 delay-700">
+              <img
+                src="https://images.unsplash.com/photo-1551434678-e076c223a692?w=200&h=200&fit=crop"
+                alt="Team using Novii"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-tl from-pink-500/20 to-transparent" />
+            </div>
+
+            {/* Active users badge */}
+            <div className="absolute -top-2 -right-2 z-40 bg-card/90 backdrop-blur border border-border/50 rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-700 delay-700">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-xs font-medium text-foreground">
+                {language.code === 'ar' ? 'مستخدمون نشطون' : 'Active now'}
+              </span>
+            </div>
           </div>
         </div>
 
