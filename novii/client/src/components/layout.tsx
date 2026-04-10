@@ -153,7 +153,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div 
-      className="min-h-screen bg-background text-foreground flex flex-col lg:flex-row justify-center transition-colors duration-300"
+      className="h-screen bg-background text-foreground flex flex-col lg:flex-row justify-center transition-colors duration-300 overflow-hidden"
       dir={direction}
     >
       
@@ -300,14 +300,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main Content Area - REMOVED MAX-WIDTH CONSTRAINT HERE to let pages control themselves */}
+      {/* Main Content Area */}
       <main className={cn(
-        "order-2 flex-1 w-full border-x border-border/40 min-h-screen transition-colors duration-300",
+        "order-2 flex-1 w-full border-x border-border/40 h-full overflow-y-auto overflow-x-hidden transition-colors duration-300",
         !chatActive && "pb-20 md:pb-0",
-        // Only apply max-width if it's the Home feed to keep it centered relative to suggestions
-        // Actually, let's just let Home handle its own width too.
-        // Just ensure we don't overflow horizontally.
-        "overflow-x-hidden"
       )}>
         
         {/* Mobile Header */}
@@ -390,7 +386,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Right Sidebar (Suggestions) - Only visible on Home Page */}
       {isHome && (
-        <div className="order-3 hidden xl:block border-s border-border/40 w-96 sticky top-0 h-screen">
+        <div className="order-3 hidden xl:block border-s border-border/40 w-96 h-full overflow-y-auto">
             <SuggestionsSidebar />
         </div>
       )}
