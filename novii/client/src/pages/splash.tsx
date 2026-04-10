@@ -1,58 +1,86 @@
-import { useEffect } from "react";
-import { useRouter } from "wouter";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
+import { supabase } from "@/lib/supabase";
 
 export default function SplashScreen() {
-  const router = useRouter();
+  const [, setLocation] = useLocation();
+  const [fading, setFading] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (router && router[1]) {
-        router[1]("/");
+    const timer = setTimeout(async () => {
+      setFading(true);
+      await new Promise(r => setTimeout(r, 400));
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setLocation(session ? "/" : "/auth");
+      } catch {
+        setLocation("/auth");
       }
-    }, 3500);
-
+    }, 2500);
     return () => clearTimeout(timer);
-  }, [router]);
+  }, [setLocation]);
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-black via-purple-900 to-black flex flex-col items-center justify-center overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-purple-500 to-pink-500 opacity-20 rounded-full blur-3xl animate-blob" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-br from-cyan-500 to-purple-500 opacity-20 rounded-full blur-3xl animate-blob" style={{ animationDelay: "2s" }} />
-      </div>
-
-      <div className="relative z-10 flex flex-col items-center justify-center gap-8">
-        <div className="relative w-32 h-32 md:w-40 md:h-40 animate-in fade-in zoom-in duration-700">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-pink-500 to-cyan-500 rounded-3xl blur-2xl opacity-75 animate-pulse" />
-          <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-cyan-500 rounded-3xl p-1">
-            <div className="bg-black rounded-2xl w-full h-full flex items-center justify-center">
-              <span className="text-6xl md:text-7xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent animate-pulse">
-                N
-              </span>
-            </div>
+    <div
+      className="fixed inset-0 flex flex-col"
+      style={{
+        backgroundColor: "#000",
+        opacity: fading ? 0 : 1,
+        transition: "opacity 0.4s ease",
+      }}
+    >
+      <div className="flex-1 flex items-center justify-center">
+        <div
+          style={{
+            width: 90,
+            height: 90,
+            borderRadius: 22,
+            background: "linear-gradient(135deg, #9333ea 0%, #ec4899 50%, #06b6d4 100%)",
+            padding: 3,
+            boxShadow: "0 0 40px rgba(147,51,234,0.4)",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: 19,
+              background: "#0a0010",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 44,
+                fontWeight: 900,
+                lineHeight: 1,
+                background: "linear-gradient(135deg, #c084fc, #f472b6, #67e8f9)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              N
+            </span>
           </div>
         </div>
+      </div>
 
-        <div className="text-center space-y-4 animate-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: "300ms" }}>
-          <h1 className="text-6xl md:text-7xl font-black tracking-tighter bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
-            Novii
-          </h1>
-          <p className="text-lg md:text-xl text-transparent bg-gradient-to-r from-purple-300 to-cyan-300 bg-clip-text font-semibold">
-            Creative Platform
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 mt-8 animate-in fade-in duration-700" style={{ animationDelay: "600ms" }}>
-          <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 animate-bounce" />
-          <div className="w-2 h-2 rounded-full bg-gradient-to-r from-pink-500 to-cyan-500 animate-bounce" style={{ animationDelay: "150ms" }} />
-          <div className="w-2 h-2 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 animate-bounce" style={{ animationDelay: "300ms" }} />
-        </div>
-
-        <div className="text-center mt-12 max-w-md px-4 animate-in fade-in duration-1000" style={{ animationDelay: "900ms" }}>
-          <p className="text-sm md:text-base text-gray-400">
-            Share special moments with your closest friends
-          </p>
-        </div>
+      <div className="pb-10 flex flex-col items-center gap-0.5">
+        <span style={{ fontSize: 11, color: "#4b5563" }}>from</span>
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: 0.5,
+            background: "linear-gradient(135deg, #a855f7, #ec4899, #06b6d4)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          Novii
+        </span>
       </div>
     </div>
   );

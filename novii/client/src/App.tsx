@@ -1,4 +1,5 @@
-import { Switch, Route } from "wouter";
+import { useEffect } from "react";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as ShadcnToaster } from "@/components/ui/toaster";
@@ -31,6 +32,16 @@ import ProtectedLayout from "@/components/protected-layout";
 import Splash from "@/pages/splash";
 
 function Router() {
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    const shown = sessionStorage.getItem("splashShown");
+    if (!shown) {
+      sessionStorage.setItem("splashShown", "1");
+      setLocation("/splash");
+    }
+  }, []);
+
   return (
     <Switch>
       <Route path="/splash" component={Splash}/>
