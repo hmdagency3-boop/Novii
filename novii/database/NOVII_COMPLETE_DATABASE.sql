@@ -1359,7 +1359,7 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage Policies - متاح للجميع قراءة المحتوى العام
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- ملاحظة: storage.objects مملوك لـ supabase_storage_admin ولا يحتاج تفعيل RLS يدوياً
 
 CREATE POLICY "Public bucket access - avatars"
   ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
