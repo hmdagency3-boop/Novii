@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://novii.app/sitemap.xml
+Sitemap: https://novii.netlify.app/sitemap.xml
