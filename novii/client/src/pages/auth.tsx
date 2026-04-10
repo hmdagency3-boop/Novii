@@ -254,12 +254,9 @@ export default function AuthPage() {
   };
 
   return (
-    <div className={cn(
-      "min-h-screen bg-gradient-to-br from-background via-background to-background flex items-start sm:items-center justify-center p-4 pt-8 sm:pt-4 relative overflow-x-hidden overflow-y-auto",
-      "dark"
-    )} dir={isRTL ? "rtl" : "ltr"}>
+    <div className={cn("dark fixed inset-0 overflow-y-auto overflow-x-hidden bg-gradient-to-br from-background via-background to-background")} dir={isRTL ? "rtl" : "ltr"}>
       {/* Animated background gradients */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
         {/* Gradient orbs with animations */}
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-pink-500/40 via-purple-500/30 to-transparent rounded-full blur-3xl opacity-60 animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-cyan-500/30 via-purple-500/20 to-transparent rounded-full blur-3xl opacity-50 animate-pulse delay-1000"></div>
@@ -267,8 +264,11 @@ export default function AuthPage() {
         <div className="absolute bottom-1/4 left-1/4 w-72 h-72 bg-gradient-to-tr from-cyan-500/15 to-purple-500/15 rounded-full blur-3xl opacity-30 animate-blob delay-2000"></div>
       </div>
 
+      {/* Inner scroll wrapper */}
+      <div className="relative min-h-full flex flex-col items-center justify-start sm:justify-center p-4 pt-8 sm:pt-4">
+
       {/* Language Toggle */}
-      <div className="absolute top-6 right-6 z-20">
+      <div className="fixed top-6 right-6 z-20">
         <Button
           onClick={() => setLanguage(language.code === 'ar' ? 'en' : 'ar')}
           variant="outline"
@@ -606,6 +606,7 @@ export default function AuthPage() {
           </div>
         </div>
       </div>
+      </div> {/* end inner scroll wrapper */}
 
       {/* Forgot Password Modal */}
       {showForgotPassword && (
