@@ -51,7 +51,7 @@ function SplashOverlay() {
         position: "fixed",
         inset: 0,
         zIndex: 9999,
-        backgroundColor: "#000",
+        background: "hsl(240,10%,3.9%)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -59,21 +59,44 @@ function SplashOverlay() {
         opacity: visible ? 1 : 0,
         transition: "opacity 0.5s ease",
         pointerEvents: visible ? "all" : "none",
+        overflow: "hidden",
       }}
     >
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {/* Background blobs — same style as auth page */}
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        <div style={{
+          position: "absolute", top: "-10rem", right: "-10rem",
+          width: 380, height: 380, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(236,72,153,0.35) 0%, transparent 70%)",
+          filter: "blur(40px)", animation: "splashBlob 7s ease-in-out infinite",
+        }} />
+        <div style={{
+          position: "absolute", bottom: "-10rem", left: "-10rem",
+          width: 380, height: 380, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(6,182,212,0.28) 0%, transparent 70%)",
+          filter: "blur(40px)", animation: "splashBlob 7s ease-in-out infinite 2s",
+        }} />
+        <div style={{
+          position: "absolute", top: "35%", left: "35%",
+          width: 300, height: 300, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(147,51,234,0.22) 0%, transparent 70%)",
+          filter: "blur(40px)", animation: "splashBlob 7s ease-in-out infinite 4s",
+        }} />
+      </div>
+
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
         <img
           src="/assets/novii_logo_new.png"
           alt="Novii"
-          style={{ width: 96, height: 96, objectFit: "contain" }}
+          style={{ width: 100, height: 100, objectFit: "contain" }}
         />
       </div>
 
-      <div style={{ paddingBottom: 40, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-        <span style={{ fontSize: 11, color: "#4b5563", fontFamily: "sans-serif" }}>from</span>
+      <div style={{ paddingBottom: 44, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, position: "relative" }}>
+        <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "sans-serif" }}>from</span>
         <span
           style={{
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: 700,
             letterSpacing: 0.5,
             fontFamily: "sans-serif",
@@ -85,6 +108,14 @@ function SplashOverlay() {
           Novii
         </span>
       </div>
+
+      <style>{`
+        @keyframes splashBlob {
+          0%,100% { transform: translate(0,0) scale(1); }
+          33%      { transform: translate(20px,-30px) scale(1.1); }
+          66%      { transform: translate(-15px,15px) scale(0.95); }
+        }
+      `}</style>
     </div>
   );
 }
