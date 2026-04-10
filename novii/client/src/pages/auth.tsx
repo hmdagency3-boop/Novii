@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Lock, Loader2, Languages, Sparkles, ArrowRight, Heart, X } from "lucide-react";
+import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/lib/language-context";
@@ -599,7 +600,12 @@ export default function AuthPage() {
           </div>
 
           {/* Footer */}
-          <div className="mt-3 sm:mt-8 text-center pb-4">
+          <div className="mt-3 sm:mt-8 text-center pb-4 space-y-1">
+            <Link href="/features">
+              <span className="text-xs text-primary/70 hover:text-primary cursor-pointer transition-colors">
+                {isRTL ? "اكتشف مميزات Novii ←" : "Discover Novii Features →"}
+              </span>
+            </Link>
             <p className="text-xs text-muted-foreground">
               {t.auth.copyright}
             </p>

@@ -28,6 +28,7 @@ import PostPage from "@/pages/post";
 import Admin from "@/pages/admin";
 import FollowersDetail from "@/pages/followers-detail";
 import ResetPassword from "@/pages/reset-password";
+import FeaturesPage from "@/pages/features";
 import ProtectedLayout from "@/components/protected-layout";
 
 function SplashOverlay() {
@@ -125,6 +126,7 @@ function Router() {
     <Switch>
       <Route path="/auth" component={AuthPage}/>
       <Route path="/reset-password" component={ResetPassword}/>
+      <Route path="/features" component={FeaturesPage}/>
 
       <Route path="/">
         <ProtectedLayout>
