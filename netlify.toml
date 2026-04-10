@@ -1,0 +1,23 @@
+[build]
+  command = "pnpm install && cd novii && pnpm run build"
+  publish = "novii/dist/public"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# كل طلبات /api/* تروح للـ Serverless Function
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
+  force = true
+
+# SPA fallback — كل الروابط الأخرى → index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
