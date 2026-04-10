@@ -1,0 +1,31 @@
+kind = "video"
+previewPath = "/novii-promo/"
+title = "Novii - فيديو إعلاني"
+version = "1.0.0"
+id = "artifacts/novii-promo"
+router = "path"
+
+[[integratedSkills]]
+name = "video-js"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/novii-promo/" ]
+localPort = 23846
+
+[services.development]
+run = "pnpm --filter @workspace/novii-promo run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/novii-promo", "run", "build" ]
+publicDir = "artifacts/novii-promo/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23846"
+BASE_PATH = "/novii-promo/"

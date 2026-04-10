@@ -36,3 +36,9 @@ id = "j6jo3rtC8tieaBJeVP6jb"
 uri = "file://novii/client/public/assets/screen-person-3.png"
 type = "image"
 title = "generated_image"
+
+[[generated]]
+id = "LlzE3Ik0YsbW3OayYIHHA"
+uri = "file://artifacts/novii-promo/public/images/abstract_bg.png"
+type = "image"
+title = "Abstract purple pink cyan background"
