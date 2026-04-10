@@ -15,7 +15,6 @@ import Home from "@/pages/home";
 import Create from "@/pages/create";
 import Profile from "@/pages/profile";
 import UserProfile from "@/pages/user-profile";
-import BadgesDemo from "@/pages/badges-demo";
 import Explore from "@/pages/explore";
 import Search from "@/pages/search";
 import Reels from "@/pages/reels";
@@ -23,9 +22,7 @@ import Settings from "@/pages/settings";
 import Messages from "@/pages/messages";
 import Notifications from "@/pages/notifications";
 import Mentions from "@/pages/mentions";
-import DevTasks from "@/pages/dev-tasks";
 import AuthPage from "@/pages/auth";
-import FixCounts from "@/pages/fix-counts";
 import PostPage from "@/pages/post";
 import Admin from "@/pages/admin";
 import FollowersDetail from "@/pages/followers-detail";
@@ -88,16 +85,6 @@ function Router() {
       <Route path="/mentions">
         <ProtectedLayout>
           <Mentions />
-        </ProtectedLayout>
-      </Route>
-      <Route path="/tasks">
-        <ProtectedLayout>
-          <DevTasks />
-        </ProtectedLayout>
-      </Route>
-      <Route path="/fix-counts">
-        <ProtectedLayout>
-          <FixCounts />
         </ProtectedLayout>
       </Route>
       <Route path="/create">
