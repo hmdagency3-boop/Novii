@@ -202,14 +202,7 @@ function Router() {
 }
 
 function App() {
-  const [showSplash, setShowSplash] = useState(() => {
-    const shown = sessionStorage.getItem("splashShown");
-    if (!shown) {
-      sessionStorage.setItem("splashShown", "1");
-      return true;
-    }
-    return false;
-  });
+  const [showSplash] = useState(true);
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
