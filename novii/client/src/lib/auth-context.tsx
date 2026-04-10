@@ -17,6 +17,17 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function callBackendAuth(endpoint: string, body: object): Promise<any> {
+  const res = await fetch(`/api/auth/${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Authentication failed");
+  return data;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -29,7 +40,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
 
     const initAuth = async () => {
-      // Get initial session
       const { data: { session } } = await supabase.auth.getSession();
       if (isMounted) {
         setSession(session);
@@ -56,69 +66,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
+    const data = await callBackendAuth("signup", { email, password });
+    if (data.session) {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+    } else if (data.user) {
+      setUser(data.user);
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ 
-      email, 
-      password 
-    });
-    if (error) throw error;
+    const data = await callBackendAuth("signin", { email, password });
+    if (data.session) {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+    }
   };
 
   const signOut = async () => {
     try {
-      console.log('🔄 Starting sign out process...');
-      
-      // Clear all cached data and local storage
-      console.log('🧹 Clearing browser cache and storage...');
-      
-      // Clear localStorage
       localStorage.clear();
-      
-      // Clear sessionStorage
       sessionStorage.clear();
-      
-      // Clear IndexedDB (used by React Query)
+
       if ('indexedDB' in window && 'databases' in indexedDB) {
         try {
           const dbs = await (indexedDB as any).databases();
           for (const db of dbs) {
-            if (db.name) {
-              indexedDB.deleteDatabase(db.name);
-            }
+            if (db.name) indexedDB.deleteDatabase(db.name);
           }
-        } catch (e) {
-          console.log('Could not clear IndexedDB:', e);
-        }
+        } catch (e) {}
       }
-      
-      console.log('✅ Cache cleared');
-      
-      // Sign out from Supabase
-      console.log('🔐 Signing out from Supabase...');
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      console.log('✅ Signed out successfully');
-      
-      // Reset local state
+
+      const token = session?.access_token;
+      if (token) {
+        await fetch("/api/auth/signout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }).catch(() => {});
+      }
+
+      await supabase.auth.signOut();
       setUser(null);
       setSession(null);
       setIsBanned(false);
       setBanMessage(null);
-      
-      console.log('✅ Local state reset');
-      
-      // Hard reload to clear all state
-      console.log('🔄 Reloading page...');
-      window.location.href = '/auth';
+      window.location.href = "/auth";
     } catch (error) {
-      console.error('❌ Error during sign out:', error);
-      // Force redirect anyway
-      window.location.href = '/auth';
+      window.location.href = "/auth";
     }
   };
 

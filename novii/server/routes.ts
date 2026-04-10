@@ -41,6 +41,85 @@ function arrayToUUID(arr: any): string {
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
+  const authSupabase = createClient(
+    'https://ldgbbbxqfwgufhvnvojy.supabase.co',
+    'sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX'
+  );
+
+  // ===== Server-side Auth Routes (browser calls backend → backend calls Supabase) =====
+
+  app.post("/api/auth/signup", async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) return res.status(400).json({ error: "Email and password are required" });
+      const { data, error } = await authSupabase.auth.signUp({ email, password });
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ user: data.user, session: data.session });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/auth/signin", async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) return res.status(400).json({ error: "Email and password are required" });
+      const { data, error } = await authSupabase.auth.signInWithPassword({ email, password });
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ user: data.user, session: data.session });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/auth/signout", async (req: Request, res: Response) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (token) {
+        const client = createClient(
+          'https://ldgbbbxqfwgufhvnvojy.supabase.co',
+          'sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX',
+          { global: { headers: { Authorization: `Bearer ${token}` } } }
+        );
+        await client.auth.signOut();
+      }
+      return res.json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/auth/user", async (req: Request, res: Response) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.json({ user: null });
+      const client = createClient(
+        'https://ldgbbbxqfwgufhvnvojy.supabase.co',
+        'sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX',
+        { global: { headers: { Authorization: `Bearer ${token}` } } }
+      );
+      const { data, error } = await client.auth.getUser();
+      if (error) return res.json({ user: null });
+      return res.json({ user: data.user });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const { email, redirectTo } = req.body;
+      if (!email) return res.status(400).json({ error: "Email is required" });
+      const { error } = await authSupabase.auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ===================================================================
+
   // Check username availability and validity (using Supabase)
   app.post("/api/auth/check-username", async (req: Request, res: Response) => {
     try {

@@ -139,11 +139,16 @@ export default function AuthPage() {
 
     setIsSendingReset(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: forgotPasswordEmail,
+          redirectTo: `${window.location.origin}/reset-password`,
+        }),
       });
-
-      if (error) throw error;
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to send reset link");
 
       toast({
         title: language.code === 'ar' ? "✅ تم إرسال الرابط" : "✅ Link Sent",
