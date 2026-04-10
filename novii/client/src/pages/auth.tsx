@@ -315,53 +315,114 @@ export default function AuthPage() {
             </div>
           </div>
 
-          {/* Laptop collage */}
-          <div className="relative w-80 h-80 animate-in zoom-in duration-700 delay-300">
-            {/* Glow */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/25 to-pink-500/25 rounded-3xl blur-3xl"></div>
+          {/* Phone Mockup + floating cards */}
+          <div className="relative flex items-center justify-center w-full animate-in zoom-in duration-700 delay-300" style={{height: '420px'}}>
 
-            {/* Main large image — center */}
-            <div className="absolute inset-4 rounded-2xl overflow-hidden shadow-2xl border border-primary/20 z-20">
-              <img
-                src="/assets/screen-laptop-main.png"
-                alt="Novii app on laptop"
-                className="w-full h-full object-cover"
-              />
-              {/* Overlay with Novii branding */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-3">
-                <div className="flex items-center gap-1.5">
-                  <img src={logo} alt="Novii" className="w-5 h-5 rounded-md object-contain" />
-                  <span className="text-white text-xs font-semibold">Novii</span>
-                  <span className="text-white/50 text-xs">· الآن</span>
+            {/* Glow behind phone */}
+            <div className="absolute w-52 h-52 bg-gradient-to-br from-primary/40 via-pink-500/30 to-cyan-500/20 rounded-full blur-3xl" />
+
+            {/* Phone frame */}
+            <div className="relative z-20 w-44 h-[340px] rounded-[2.5rem] bg-zinc-900 shadow-[0_0_0_2px_rgba(139,92,246,0.4),0_32px_64px_rgba(0,0,0,0.7)] border border-white/10 flex flex-col overflow-hidden">
+              {/* Notch */}
+              <div className="flex justify-center pt-2 pb-1 shrink-0">
+                <div className="w-16 h-1.5 bg-zinc-700 rounded-full" />
+              </div>
+
+              {/* Screen content — mini Novii UI */}
+              <div className="flex-1 bg-[#0d0d14] flex flex-col overflow-hidden">
+                {/* Top bar */}
+                <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5 shrink-0">
+                  <span className="text-[8px] font-bold bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent">Novii</span>
+                  <div className="flex gap-1">
+                    <div className="w-3 h-3 rounded-full bg-white/10 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                    </div>
+                    <div className="w-3 h-3 rounded-full bg-white/10 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-pink-400" />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Stories row */}
+                <div className="flex gap-1.5 px-2 py-1.5 shrink-0">
+                  {['violet','pink','cyan','purple'].map((c, i) => (
+                    <div key={i} className={`w-7 h-7 rounded-full border-2 ${i === 0 ? 'border-violet-500' : i === 1 ? 'border-pink-500' : i === 2 ? 'border-cyan-500' : 'border-purple-500'} bg-white/5 shrink-0`} />
+                  ))}
+                </div>
+
+                {/* Posts feed */}
+                <div className="flex-1 overflow-hidden flex flex-col gap-1.5 px-2 pb-2">
+                  {[
+                    {color:'violet', likes:'1.2K', wide: false},
+                    {color:'pink', likes:'847', wide: true},
+                    {color:'cyan', likes:'3.4K', wide: false},
+                  ].map((post, i) => (
+                    <div key={i} className="bg-white/5 rounded-lg overflow-hidden shrink-0">
+                      {/* Post header */}
+                      <div className="flex items-center gap-1.5 p-1.5">
+                        <div className={`w-4 h-4 rounded-full bg-gradient-to-br ${i===0?'from-violet-500 to-purple-600':i===1?'from-pink-500 to-rose-600':'from-cyan-500 to-blue-600'}`} />
+                        <div className="flex-1">
+                          <div className="h-1 w-10 bg-white/20 rounded-full" />
+                        </div>
+                        <div className="w-1 h-1 rounded-full bg-white/20" />
+                      </div>
+                      {/* Image placeholder */}
+                      <div className={`h-12 bg-gradient-to-br ${i===0?'from-violet-900/60 to-purple-900/40':i===1?'from-pink-900/60 to-rose-900/40':'from-cyan-900/60 to-blue-900/40'} mx-1.5 rounded-md`} />
+                      {/* Interactions */}
+                      <div className="flex items-center gap-2 px-1.5 py-1">
+                        <div className={`w-2.5 h-2.5 ${i===0?'text-violet-400':i===1?'text-pink-400':'text-cyan-400'}`}>♥</div>
+                        <span className={`text-[6px] ${i===0?'text-violet-400':i===1?'text-pink-400':'text-cyan-400'}`}>{post.likes}</span>
+                        <div className="w-2.5 h-2.5 text-white/30 text-[6px]">💬</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bottom nav */}
+                <div className="flex justify-around items-center px-2 py-1.5 border-t border-white/5 shrink-0">
+                  {['⌂','⊙','＋','♡','◯'].map((icon, i) => (
+                    <div key={i} className={`text-[10px] ${i===0?'text-violet-400':'text-white/30'}`}>{icon}</div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Home indicator */}
+              <div className="flex justify-center py-1.5 shrink-0 bg-zinc-900">
+                <div className="w-10 h-1 bg-zinc-600 rounded-full" />
               </div>
             </div>
 
-            {/* Top-left small image */}
-            <div className="absolute -top-3 -left-3 w-28 h-28 rounded-xl overflow-hidden shadow-xl border border-cyan-500/30 z-30 animate-in fade-in slide-in-from-left-4 duration-700 delay-500">
-              <img
-                src="/assets/screen-person-2.png"
-                alt="User on Novii"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent" />
+            {/* Floating card — new follower */}
+            <div className="absolute top-6 -left-4 z-30 bg-card/90 backdrop-blur-md border border-violet-500/30 rounded-2xl px-3 py-2 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-700 delay-500 flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-white text-xs shrink-0">م</div>
+              <div>
+                <p className="text-[10px] font-semibold text-foreground">متابع جديد</p>
+                <p className="text-[9px] text-muted-foreground">محمد أحمد بدأ يتابعك</p>
+              </div>
             </div>
 
-            {/* Bottom-right small image */}
-            <div className="absolute -bottom-3 -right-3 w-28 h-28 rounded-xl overflow-hidden shadow-xl border border-pink-500/30 z-30 animate-in fade-in slide-in-from-right-4 duration-700 delay-700">
-              <img
-                src="/assets/screen-person-3.png"
-                alt="Team using Novii"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-tl from-pink-500/20 to-transparent" />
+            {/* Floating card — likes */}
+            <div className="absolute bottom-12 -right-6 z-30 bg-card/90 backdrop-blur-md border border-pink-500/30 rounded-2xl px-3 py-2 shadow-2xl animate-in fade-in slide-in-from-right-4 duration-700 delay-700 flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center text-white text-xs shrink-0">♥</div>
+              <div>
+                <p className="text-[10px] font-semibold text-foreground">1,204 إعجاب</p>
+                <p className="text-[9px] text-muted-foreground">على منشورك</p>
+              </div>
             </div>
 
-            {/* Active users badge */}
-            <div className="absolute -top-2 -right-2 z-40 bg-card/90 backdrop-blur border border-border/50 rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-700 delay-700">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs font-medium text-foreground">
-                {language.code === 'ar' ? 'مستخدمون نشطون' : 'Active now'}
+            {/* Floating badge — active users */}
+            <div className="absolute top-14 -right-2 z-30 bg-card/90 backdrop-blur-md border border-cyan-500/30 rounded-full px-2.5 py-1.5 shadow-xl animate-in fade-in slide-in-from-top-2 duration-700 delay-600 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-[9px] font-medium text-foreground">
+                {language.code === 'ar' ? '12K نشط الآن' : '12K online'}
+              </span>
+            </div>
+
+            {/* Floating badge — posts */}
+            <div className="absolute bottom-6 left-0 z-30 bg-card/90 backdrop-blur-md border border-border/50 rounded-full px-2.5 py-1.5 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-700 delay-800 flex items-center gap-1.5">
+              <span className="text-[9px]">📸</span>
+              <span className="text-[9px] font-medium text-foreground">
+                {language.code === 'ar' ? '+50K منشور يومياً' : '50K+ daily posts'}
               </span>
             </div>
           </div>
