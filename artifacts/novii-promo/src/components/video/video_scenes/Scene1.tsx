@@ -38,9 +38,9 @@ export function Scene1() {
             style={{ background: 'radial-gradient(circle, #7c3aed, #ec4899)' }}
           />
           <img
-            src={`${import.meta.env.BASE_URL}novii_logo.png`}
+            src={`${import.meta.env.BASE_URL}novii_logo_new.png`}
             alt="Novii"
-            className="relative w-full h-full rounded-3xl object-cover shadow-2xl"
+            className="relative w-full h-full object-contain drop-shadow-2xl"
           />
         </motion.div>
 

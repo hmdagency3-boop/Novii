@@ -62,9 +62,9 @@ export function Scene3() {
               style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
             >
               <img
-                src={`${import.meta.env.BASE_URL}novii_logo.png`}
+                src={`${import.meta.env.BASE_URL}novii_logo_new.png`}
                 alt="Novii"
-                style={{ width: '1.8vw', height: '1.8vw', borderRadius: '0.4vw', objectFit: 'cover' }}
+                style={{ width: '1.8vw', height: '1.8vw', objectFit: 'contain' }}
               />
               <div className="flex gap-1">
                 {['#7c3aed', '#ec4899'].map((c, i) => (

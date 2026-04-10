@@ -53,9 +53,9 @@ export function Scene5() {
             style={{ background: 'linear-gradient(135deg, #7c3aed88, #ec489988)' }}
           />
           <img
-            src={`${import.meta.env.BASE_URL}novii_logo.png`}
+            src={`${import.meta.env.BASE_URL}novii_logo_new.png`}
             alt="Novii"
-            className="relative w-full h-full rounded-2xl object-cover shadow-2xl"
+            className="relative w-full h-full object-contain drop-shadow-2xl"
           />
         </motion.div>
 
