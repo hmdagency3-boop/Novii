@@ -103,14 +103,14 @@ function ConnectedDevicesSection({ direction, user }: { direction: string; user?
                     <Smartphone className="w-6 h-6 text-primary" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-lg mb-1">{device.deviceName}</h3>
+                    <h3 className="font-bold text-lg mb-1">{device.device_name}</h3>
                     <div className="space-y-1 text-sm text-muted-foreground">
-                      <p>🌐 {device.browser} {device.browserVersion}</p>
-                      <p>💻 {device.osName} {device.osVersion}</p>
+                      <p>🌐 {device.browser} {device.browser_version}</p>
+                      <p>💻 {device.os_name} {device.os_version}</p>
                       <p>📍 {device.city}, {device.country}</p>
-                      <p>🔗 {device.ipAddress}</p>
+                      <p>🔗 {device.ip_address}</p>
                       <p className="text-xs mt-2">
-                        {direction === 'rtl' ? 'آخر نشاط:' : 'Last active:'} {new Date(device.lastActiveAt).toLocaleDateString()}
+                        {direction === 'rtl' ? 'آخر نشاط:' : 'Last active:'} {new Date(device.last_active_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>

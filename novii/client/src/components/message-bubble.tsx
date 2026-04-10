@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -107,7 +108,7 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
     queryKey: ['story', message.story_id],
     queryFn: async () => {
       if (!message.story_id) return null;
-      const { data, error } = await api.supabase
+      const { data, error } = await supabase
         .from('stories')
         .select(`*, profile:profiles!stories_user_id_fkey(*)`)
         .eq('id', message.story_id)
@@ -292,7 +293,7 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
             className="relative rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow cursor-pointer group/image bg-transparent border-none p-0"
           >
             <img 
-              src={message.image_url} 
+              src={message.image_url ?? undefined} 
               alt="Story reply" 
               className="w-32 h-48 object-cover hover:opacity-80 transition-opacity"
             />
@@ -395,7 +396,7 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
         <Dialog open={showImageModal} onOpenChange={setShowImageModal}>
           <DialogContent className="max-w-2xl max-h-[80vh] p-0 border-0">
             <img 
-              src={message.image_url} 
+              src={message.image_url ?? undefined} 
               alt="Story" 
               className="w-full h-full object-contain"
             />

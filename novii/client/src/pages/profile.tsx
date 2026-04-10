@@ -590,7 +590,7 @@ export default function Profile() {
         reel={selectedReel}
         open={reelModalOpen}
         onOpenChange={setReelModalOpen}
-        allReels={userReels}
+        allReels={userReels as any}
         onNavigate={setSelectedReel}
       />
 

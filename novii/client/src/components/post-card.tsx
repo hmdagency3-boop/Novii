@@ -405,7 +405,7 @@ export default function PostCard({ post }: PostCardProps) {
         post={post}
         open={showPostModal}
         onOpenChange={setShowPostModal}
-        isRTL={true}
+        isRTL={direction === 'rtl'}
       />
 
       {/* Delete Confirmation Dialog */}

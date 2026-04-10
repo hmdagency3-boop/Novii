@@ -138,7 +138,7 @@ export async function compressImage(
 
         canvas.toBlob(
           (blob) => {
-            if (!blob) reject(new Error('Failed to compress image'));
+            if (!blob) { reject(new Error('Failed to compress image')); return; }
             resolve(blob);
           },
           'image/jpeg',

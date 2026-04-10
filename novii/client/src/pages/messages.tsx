@@ -257,7 +257,7 @@ export default function Messages() {
         (payload) => {
           console.log("🔄 Community member change detected:", payload);
           // Update mute status for current user if it's about them
-          if (currentUser && payload.new && (payload.new.user_id === currentUser.id || payload.old?.user_id === currentUser.id)) {
+          if (currentUser && payload.new && ((payload.new as any).user_id === currentUser.id || (payload.old as any)?.user_id === currentUser.id)) {
             updateMuteStatusFromMembers([payload.new]);
           }
           refetchMembers();

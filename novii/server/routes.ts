@@ -312,10 +312,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { deviceId } = req.params;
       
-      // Delete from database using Drizzle
-      await db.delete(userDevices).where(
-        sql`id = ${deviceId}::uuid`
-      );
+      // Delete from database using Supabase
+      await db.from('user_devices').delete().eq('id', deviceId);
       
       res.json({ success: true });
     } catch (error) {

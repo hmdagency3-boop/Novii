@@ -1,7 +1,7 @@
 import Layout from "@/components/layout";
 import { useState, useRef, useEffect } from "react";
 import { useLanguage } from "@/lib/language-context";
-import { useReels, useToggleReelLike } from "@/hooks/use-data";
+import { useReels, useToggleReelLike, useToggleFollow } from "@/hooks/use-data";
 import { Spinner } from "@/components/ui/spinner";
 import { Heart, MessageCircle, Share2, MoreVertical } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -15,6 +15,8 @@ export default function Reels() {
   const { data: reels, isLoading } = useReels(20);
   const { data: currentUser } = useCurrentUser();
   const toggleReelLike = useToggleReelLike();
+  const toggleFollow = useToggleFollow();
+  const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set());
   const [floatingHearts, setFloatingHearts] = useState<Array<{ id: string; left: number; top: number }>>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement }>({});
@@ -204,9 +206,31 @@ export default function Reels() {
                   <p className="font-bold text-white text-sm">{reel.profile?.username}</p>
                   <p className="text-xs text-white/60">{new Date(reel.created_at).toLocaleDateString()}</p>
                 </div>
-                <button className="px-3 py-1 rounded-full border border-white/40 text-xs font-semibold text-white backdrop-blur-sm hover:bg-white/10 transition-colors">
-                  {isRTL ? "متابعة" : "Follow"}
-                </button>
+                {reel.profile && currentUser?.id !== reel.profile.id && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!currentUser) { toast.error(isRTL ? "يجب تسجيل الدخول أولاً" : "Please login first"); return; }
+                      const userId = reel.profile!.id;
+                      toggleFollow.mutate(userId);
+                      setFollowedUsers(prev => {
+                        const next = new Set(prev);
+                        next.has(userId) ? next.delete(userId) : next.add(userId);
+                        return next;
+                      });
+                    }}
+                    className={cn(
+                      "px-3 py-1 rounded-full border text-xs font-semibold backdrop-blur-sm transition-colors",
+                      followedUsers.has(reel.profile.id)
+                        ? "border-purple-500 bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
+                        : "border-white/40 text-white hover:bg-white/10"
+                    )}
+                  >
+                    {followedUsers.has(reel.profile.id)
+                      ? (isRTL ? "متابَق" : "Following")
+                      : (isRTL ? "متابعة" : "Follow")}
+                  </button>
+                )}
               </div>
 
               {reel.caption && (

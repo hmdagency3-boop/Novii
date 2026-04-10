@@ -22,20 +22,20 @@ import {
 export interface Profile {
   id: string;
   username: string;
-  full_name: string | null;
-  bio: string | null;
-  avatar_url: string | null;
-  cover_url: string | null;
-  website: string | null;
-  location: string | null;
+  full_name?: string | null;
+  bio?: string | null;
+  avatar_url?: string | null;
+  cover_url?: string | null;
+  website?: string | null;
+  location?: string | null;
   is_verified: boolean;
-  verified_at: string | null;
+  verified_at?: string | null;
   is_official: boolean;
-  is_private: boolean;
-  is_creator: boolean;
-  is_premium: boolean;
-  is_popular: boolean;
-  is_active: boolean;
+  is_private?: boolean;
+  is_creator?: boolean;
+  is_premium?: boolean;
+  is_popular?: boolean;
+  is_active?: boolean;
   is_gold_early_member?: boolean;
   gold_early_member_at?: string | null;
   is_silver_early_member?: boolean;
@@ -45,14 +45,14 @@ export interface Profile {
   is_beta_tester?: boolean;
   beta_tester_at?: string | null;
   followers_count: number;
-  following_count: number;
-  posts_count: number;
-  is_online: boolean;
-  last_seen: string;
-  created_at: string;
-  updated_at: string;
-  is_following?: boolean; // Optional: indicates if current user follows this profile
-  is_followed_by?: boolean; // Optional: indicates if this profile follows current user
+  following_count?: number;
+  posts_count?: number;
+  is_online?: boolean;
+  last_seen?: string;
+  created_at?: string;
+  updated_at?: string;
+  is_following?: boolean;
+  is_followed_by?: boolean;
 }
 
 export interface Post {
@@ -82,7 +82,7 @@ export interface Comment {
   content: string;
   likes_count: number;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   profile?: Profile;
   is_liked?: boolean;
   parent_comment_id?: string | null;
@@ -509,10 +509,10 @@ export const api = {
         ...post,
         is_liked: likedIds.has(post.id),
         is_saved: savedIds.has(post.id)
-      }));
+      })) as unknown as Post[];
     }
 
-    return posts;
+    return posts as unknown as Post[];
   },
 
   async getExplorePosts(limit = 30): Promise<Post[]> {
@@ -543,10 +543,10 @@ export const api = {
         ...post,
         is_liked: likedIds.has(post.id),
         is_saved: savedIds.has(post.id)
-      }));
+      })) as unknown as Post[];
     }
 
-    return posts;
+    return posts as unknown as Post[];
   },
 
   async getUserPosts(userId: string): Promise<Post[]> {
@@ -611,10 +611,10 @@ export const api = {
       return reels.map(reel => ({
         ...reel,
         is_liked: likedIds.has(reel.id)
-      }));
+      })) as unknown as Reel[];
     }
 
-    return reels;
+    return reels as unknown as Reel[];
   },
 
   async getPost(postId: string): Promise<Post | null> {
@@ -646,14 +646,14 @@ export const api = {
         ...data,
         is_liked: !!likeData.data,
         is_saved: !!saveData.data
-      };
+      } as unknown as Post;
     }
 
     return {
       ...data,
       is_liked: false,
       is_saved: false
-    };
+    } as unknown as Post;
   },
 
   async uploadPostImage(file: File, onProgress?: (progress: number) => void): Promise<string> {
@@ -714,7 +714,7 @@ export const api = {
 
     await supabase.rpc('increment_posts_count', { profile_id: user.id });
 
-    return data;
+    return data as unknown as Post;
   },
 
   async deletePost(postId: string): Promise<void> {
@@ -860,13 +860,14 @@ export const api = {
   // Comments APIs
   async getComments(postId: string): Promise<Comment[]> {
     // Optimized: use specific columns
-    const { data: allComments, error } = await supabase
+    const { data: allCommentsRaw, error } = await supabase
       .from('comments')
       .select(COMMENT_WITH_PROFILE)
       .eq('post_id', postId)
       .order('created_at', { ascending: true });
 
     if (error) throw error;
+    const allComments = (allCommentsRaw || []) as unknown as Comment[];
 
     // Build nested structure
     const commentMap = new Map<string, Comment>();
@@ -982,7 +983,7 @@ export const api = {
       }
     }
 
-    return data;
+    return data as unknown as Comment;
   },
 
   async toggleCommentLike(commentId: string): Promise<boolean> {
@@ -1016,7 +1017,7 @@ export const api = {
 
     if (error) throw error;
     console.log(`🔍 Search results for "${query}":`, data?.length || 0, 'users');
-    return data || [];
+    return (data || []) as unknown as Profile[];
   },
 
   async deleteComment(commentId: string): Promise<void> {
@@ -1095,7 +1096,7 @@ export const api = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as Story[];
   },
 
   async getUserStories(userId: string): Promise<Story[]> {
@@ -1108,7 +1109,7 @@ export const api = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as Story[];
   },
 
   async createStory(mediaUrl: string, mediaType: 'image' | 'video' = 'image'): Promise<Story> {
@@ -1127,7 +1128,7 @@ export const api = {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as unknown as Story;
   },
 
   async deleteStory(storyId: string): Promise<void> {

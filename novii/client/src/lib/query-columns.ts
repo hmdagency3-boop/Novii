@@ -14,11 +14,15 @@ export const PROFILE_COLUMNS = `
   website,
   location,
   is_verified,
+  verified_at,
   is_official,
   is_creator,
   is_premium,
   is_private,
   is_active,
+  is_popular,
+  is_online,
+  last_seen,
   followers_count,
   following_count,
   posts_count,
@@ -26,7 +30,8 @@ export const PROFILE_COLUMNS = `
   is_silver_early_member,
   is_bronze_early_member,
   is_beta_tester,
-  created_at
+  created_at,
+  updated_at
 `;
 
 // Minimal profile for lists

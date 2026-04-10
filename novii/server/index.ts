@@ -12,12 +12,12 @@ declare module 'http' {
 }
 
 // ✅ Enable gzip compression for all responses
-app.use(compression({
+app.use((compression as any)({
   filter: (req: any, res: any) => {
     // Don't compress if client says no-compression
     if (req.headers['x-no-compression']) return false;
     // Use compression filter to decide
-    return compression.filter(req, res);
+    return (compression as any).filter(req, res);
   },
   level: 6, // Compression level 1-9 (6 is good balance)
   threshold: 1024 // Only compress if > 1KB
