@@ -18,7 +18,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 async function callBackendAuth(endpoint: string, body: object): Promise<any> {
-  const res = await fetch(`/api/auth/${endpoint}`, {
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const res = await fetch(`${baseUrl}/api/auth/${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
