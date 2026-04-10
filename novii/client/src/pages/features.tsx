@@ -1,8 +1,71 @@
+import { useEffect } from "react";
 import { Link } from "wouter";
 
 const logo = "/assets/novii_logo_new.png";
 
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "ما هو Novii؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Novii هو تطبيق تواصل اجتماعي عربي حديث يتيح لك مشاركة الصور والفيديوهات والقصص اليومية والريلز مع أصدقائك، مع دعم كامل للغة العربية والإنجليزية."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "هل Novii مجاني؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "نعم، Novii مجاني تماماً. يمكنك إنشاء حساب والاستمتاع بجميع المميزات بدون أي رسوم أو اشتراكات."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "ما هي مميزات Novii؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "يوفر Novii: مشاركة الصور والفيديوهات، القصص اليومية (Stories)، الريلز القصيرة (Reels)، الرسائل المباشرة، اكتشاف المحتوى، ودعم كامل للغة العربية مع واجهة RTL."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "هل يدعم Novii اللغة العربية؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "نعم، Novii مصمم أصلاً للمستخدم العربي مع دعم كامل لاتجاه الكتابة من اليمين لليسار (RTL) ويمكن التبديل بين العربية والإنجليزية في أي وقت."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "كيف أنضم إلى Novii؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "يمكنك إنشاء حساب مجاني على Novii بزيارة novii.netlify.app والضغط على 'إنشاء حساب'، ثم إدخال بريدك الإلكتروني وكلمة المرور."
+      }
+    }
+  ]
+};
+
 export default function FeaturesPage() {
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.text = JSON.stringify(faqSchema);
+    script.id = "faq-schema";
+    if (!document.getElementById("faq-schema")) {
+      document.head.appendChild(script);
+    }
+    document.title = "مميزات Novii — منصة التواصل الاجتماعي العربية";
+    return () => {
+      const el = document.getElementById("faq-schema");
+      if (el) el.remove();
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-950 text-white" dir="rtl" lang="ar">
       {/* Header */}

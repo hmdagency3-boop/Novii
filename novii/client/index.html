@@ -78,7 +78,50 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Static content for search engine crawlers (React replaces this on load) -->
+      <main style="font-family:sans-serif;max-width:900px;margin:0 auto;padding:2rem;direction:rtl;display:none" aria-hidden="true">
+        <header>
+          <h1>Novii — منصة التواصل الاجتماعي العربية</h1>
+          <p>شارك لحظاتك مع أصدقائك على Novii، منصة التواصل الاجتماعي العربية الحديثة للصور والقصص والريلز.</p>
+        </header>
+        <section>
+          <h2>ما هو Novii؟</h2>
+          <p>
+            Novii هو تطبيق تواصل اجتماعي يتيح لك مشاركة الصور والفيديوهات واللحظات اليومية
+            مع أصدقائك، مع تجربة استخدام سريعة وتصميم عصري يدعم اللغة العربية والإنجليزية بالكامل.
+          </p>
+        </section>
+        <section>
+          <h2>مميزات Novii</h2>
+          <ul>
+            <li>مشاركة الصور والفيديوهات بجودة عالية</li>
+            <li>القصص اليومية — Stories تختفي بعد 24 ساعة</li>
+            <li>الريلز القصيرة — Reels لمشاركة مقاطع مسلية</li>
+            <li>الرسائل المباشرة والدردشة مع الأصدقاء</li>
+            <li>اكتشاف محتوى جديد عبر خوارزمية ذكية</li>
+            <li>دعم كامل للغة العربية مع واجهة RTL</li>
+          </ul>
+        </section>
+        <section>
+          <h2>لماذا Novii؟</h2>
+          <p>
+            صُمِّم Novii ليكون المنصة الاجتماعية المثالية للمجتمع العربي، حيث يمكنك التعبير عن نفسك،
+            مشاركة إبداعك، والتواصل مع من تحب بحرية تامة وبتصميم عصري يدعم اللغة العربية بشكل كامل.
+          </p>
+          <p>Novii is a modern Arabic social media platform supporting photos, stories, reels, and direct messaging with full RTL Arabic language support.</p>
+        </section>
+        <nav>
+          <a href="/features">اكتشف جميع المميزات</a> |
+          <a href="/auth">إنشاء حساب مجاني</a>
+        </nav>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Show static content only if JS fails to load (for crawlers that don't run JS)
+      document.querySelector('main[aria-hidden]') && 
+        document.querySelector('main[aria-hidden]').removeAttribute('style');
+    </script>
   </body>
 </html>
