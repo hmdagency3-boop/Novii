@@ -1,27 +1,26 @@
 @import "tailwindcss";
 
-/* REPLACE THESE -- define your own palette and fonts for each video */
 :root {
-  --color-primary: #000000;
-  --color-secondary: #6B7280;
-  --color-accent: #3B82F6;
+  --color-primary: #7c3aed;
+  --color-secondary: #ec4899;
+  --color-accent: #06b6d4;
 
-  --color-bg-light: #FFFFFF;
-  --color-bg-dark: #0F172A;
-  --color-bg-muted: #F8FAFC;
+  --color-bg-light: #0d0d14;
+  --color-bg-dark: #0d0d14;
+  --color-bg-muted: #13131f;
 
-  --color-text-primary: #111827;
-  --color-text-secondary: #6B7280;
-  --color-text-muted: #9CA3AF;
-  --color-text-inverse: #FFFFFF;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a78bfa;
+  --color-text-muted: #6b7280;
+  --color-text-inverse: #0d0d14;
 
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-error: #EF4444;
 
-  --font-display: 'Space Grotesk', sans-serif;
+  --font-display: 'Cairo', sans-serif;
   --font-body: 'DM Sans', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-mono: 'Cairo', sans-serif;
 }
 
 @theme inline {
@@ -43,8 +42,12 @@
   --font-mono: var(--font-mono);
 }
 
+* { box-sizing: border-box; }
+
 body {
   font-family: var(--font-body);
+  background: var(--color-bg-dark);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
 }
