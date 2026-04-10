@@ -118,10 +118,5 @@
       </main>
     </div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // Show static content only if JS fails to load (for crawlers that don't run JS)
-      document.querySelector('main[aria-hidden]') && 
-        document.querySelector('main[aria-hidden]').removeAttribute('style');
-    </script>
   </body>
 </html>
