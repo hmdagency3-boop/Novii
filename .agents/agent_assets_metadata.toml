@@ -18,3 +18,21 @@ id = "I0tztjSeo3B80WtA05muq"
 uri = "file://novii/client/public/assets/auth-laptop-3.png"
 type = "image"
 title = "generated_image"
+
+[[generated]]
+id = "t8WFRwuOv4SOr4GxeGt0P"
+uri = "file://novii/client/public/assets/screen-laptop-main.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "7FnydK8ThVgRSF1PHtmfI"
+uri = "file://novii/client/public/assets/screen-person-2.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "j6jo3rtC8tieaBJeVP6jb"
+uri = "file://novii/client/public/assets/screen-person-3.png"
+type = "image"
+title = "generated_image"

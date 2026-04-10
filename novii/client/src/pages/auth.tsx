@@ -323,8 +323,8 @@ export default function AuthPage() {
             {/* Main large image — center */}
             <div className="absolute inset-4 rounded-2xl overflow-hidden shadow-2xl border border-primary/20 z-20">
               <img
-                src="/assets/auth-laptop-main.png"
-                alt="Person using Novii on laptop"
+                src="/assets/screen-laptop-main.png"
+                alt="Novii app on laptop"
                 className="w-full h-full object-cover"
               />
               {/* Overlay with Novii branding */}
@@ -340,7 +340,7 @@ export default function AuthPage() {
             {/* Top-left small image */}
             <div className="absolute -top-3 -left-3 w-28 h-28 rounded-xl overflow-hidden shadow-xl border border-cyan-500/30 z-30 animate-in fade-in slide-in-from-left-4 duration-700 delay-500">
               <img
-                src="/assets/auth-laptop-2.png"
+                src="/assets/screen-person-2.png"
                 alt="User on Novii"
                 className="w-full h-full object-cover"
               />
@@ -350,7 +350,7 @@ export default function AuthPage() {
             {/* Bottom-right small image */}
             <div className="absolute -bottom-3 -right-3 w-28 h-28 rounded-xl overflow-hidden shadow-xl border border-pink-500/30 z-30 animate-in fade-in slide-in-from-right-4 duration-700 delay-700">
               <img
-                src="/assets/auth-laptop-3.png"
+                src="/assets/screen-person-3.png"
                 alt="Team using Novii"
                 className="w-full h-full object-cover"
               />
