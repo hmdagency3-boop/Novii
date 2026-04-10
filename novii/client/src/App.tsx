@@ -63,7 +63,7 @@ function SplashOverlay() {
     >
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <img
-          src="/assets/novii_app_logo.png"
+          src="/assets/novii_logo_new.png"
           alt="Novii"
           style={{ width: 96, height: 96, objectFit: "contain" }}
         />
