@@ -409,7 +409,7 @@ export default function Profile() {
         <div className="flex-1 border-t border-border overflow-hidden">
             <Tabs defaultValue="posts" className="w-full h-full flex flex-col">
                 <div className="border-b border-border">
-                    <TabsList className="h-12 bg-transparent gap-0.5 md:gap-8 w-full justify-center md:justify-start">
+                    <TabsList className="h-12 bg-transparent gap-0.5 md:gap-8 w-full justify-center">
                         <TabsTrigger value="posts" className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground text-muted-foreground px-2.5 md:px-4 gap-2 uppercase text-xs tracking-widest font-bold bg-transparent shadow-none whitespace-nowrap flex-1 md:flex-none">
                             <Grid3X3 className="w-4 h-4" /> POSTS
                         </TabsTrigger>
