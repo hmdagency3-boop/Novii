@@ -1,0 +1,110 @@
+[
+  {
+    "name": "security_definer_view",
+    "title": "Security Definer View",
+    "level": "ERROR",
+    "facing": "EXTERNAL",
+    "categories": [
+      "SECURITY"
+    ],
+    "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
+    "detail": "View \\`public.users_with_silver_badges\\` is defined with the SECURITY DEFINER property",
+    "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
+    "metadata": {
+      "name": "users_with_silver_badges",
+      "type": "view",
+      "schema": "public"
+    },
+    "cache_key": "security_definer_view_public_users_with_silver_badges"
+  },
+  {
+    "name": "security_definer_view",
+    "title": "Security Definer View",
+    "level": "ERROR",
+    "facing": "EXTERNAL",
+    "categories": [
+      "SECURITY"
+    ],
+    "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
+    "detail": "View \\`public.users_with_beta_tester_badges\\` is defined with the SECURITY DEFINER property",
+    "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
+    "metadata": {
+      "name": "users_with_beta_tester_badges",
+      "type": "view",
+      "schema": "public"
+    },
+    "cache_key": "security_definer_view_public_users_with_beta_tester_badges"
+  },
+  {
+    "name": "security_definer_view",
+    "title": "Security Definer View",
+    "level": "ERROR",
+    "facing": "EXTERNAL",
+    "categories": [
+      "SECURITY"
+    ],
+    "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
+    "detail": "View \\`public.users_with_gold_badges\\` is defined with the SECURITY DEFINER property",
+    "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
+    "metadata": {
+      "name": "users_with_gold_badges",
+      "type": "view",
+      "schema": "public"
+    },
+    "cache_key": "security_definer_view_public_users_with_gold_badges"
+  },
+  {
+    "name": "security_definer_view",
+    "title": "Security Definer View",
+    "level": "ERROR",
+    "facing": "EXTERNAL",
+    "categories": [
+      "SECURITY"
+    ],
+    "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
+    "detail": "View \\`public.users_with_bronze_badges\\` is defined with the SECURITY DEFINER property",
+    "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
+    "metadata": {
+      "name": "users_with_bronze_badges",
+      "type": "view",
+      "schema": "public"
+    },
+    "cache_key": "security_definer_view_public_users_with_bronze_badges"
+  },
+  {
+    "name": "rls_disabled_in_public",
+    "title": "RLS Disabled in Public",
+    "level": "ERROR",
+    "facing": "EXTERNAL",
+    "categories": [
+      "SECURITY"
+    ],
+    "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+    "detail": "Table \\`public.followers\\` is public, but RLS has not been enabled.",
+    "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+    "metadata": {
+      "name": "followers",
+      "type": "table",
+      "schema": "public"
+    },
+    "cache_key": "rls_disabled_in_public_public_followers"
+  },
+  {
+    "name": "rls_disabled_in_public",
+    "title": "RLS Disabled in Public",
+    "level": "ERROR",
+    "facing": "EXTERNAL",
+    "categories": [
+      "SECURITY"
+    ],
+    "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+    "detail": "Table \\`public.activity_logs\\` is public, but RLS has not been enabled.",
+    "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+    "metadata": {
+      "name": "activity_logs",
+      "type": "table",
+      "schema": "public"
+    },
+    "cache_key": "rls_disabled_in_public_public_activity_logs"
+  }
+]

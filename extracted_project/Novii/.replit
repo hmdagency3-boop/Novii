@@ -1,12 +1,9 @@
-modules = ["nodejs-24"]
+modules = ["nodejs-20", "web", "postgresql-16"]
+[agent]
+expertMode = true
 
-[deployment]
-router = "application"
-deploymentTarget = "autoscale"
-
-[deployment.postBuild]
-args = ["pnpm", "store", "prune"]
-env = { "CI" = "true" }
+[nix]
+channel = "stable-25_05"
 
 [workflows]
 runButton = "Project"
@@ -24,39 +21,35 @@ args = "Novii Platform"
 name = "Novii Platform"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd extracted_project/Novii && npm run dev"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
 
-[agent]
-stack = "PNPM_WORKSPACE"
-expertMode = true
-
-[postMerge]
-path = "scripts/post-merge.sh"
-timeoutMs = 20000
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
 
 [[ports]]
 localPort = 5000
-externalPort = 5000
-
-[[ports]]
-localPort = 8080
-externalPort = 8080
-
-[[ports]]
-localPort = 8081
 externalPort = 80
 
-[nix]
-channel = "stable-25_05"
+[[ports]]
+localPort = 44273
+externalPort = 3000
+
+[[ports]]
+localPort = 45853
+externalPort = 3001
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["npm", "start"]
+build = ["npm", "run", "build"]
 
 [userenv]
 
 [userenv.shared]
 SUPABASE_URL = "https://anyxcvhpgvqdjrsuthch.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFueXhjdmhwZ3ZxZGpyc3V0aGNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2MTc4NzgsImV4cCI6MjA3OTE5Mzg3OH0.BWLD5Ely45GTItNx5MZSEGH7yLIEr_As_XmJXeyczxs"
+
+[userenv.development]

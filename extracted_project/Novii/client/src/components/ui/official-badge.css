@@ -1,0 +1,171 @@
+/* Premium Glass-Morphism Official Badge */
+
+@keyframes floatSmooth {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(236, 72, 153, 0.2));
+  }
+  50% {
+    filter: drop-shadow(0 0 4px rgba(236, 72, 153, 0.3));
+  }
+}
+
+/* Main Badge Container */
+.official-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  animation: floatSmooth 3s ease-in-out infinite;
+  transition: all 0.25s cubic-bezier(0.23, 1, 0.320, 1);
+}
+
+.official-badge:hover {
+  animation: floatSmooth 2s ease-in-out infinite;
+}
+
+/* Badge Image Container */
+.official-badge-image {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-size: cover;
+  background-position: center;
+  border-radius: 50%;
+  animation: glowPulse 2.5s ease-in-out infinite;
+  transition: all 0.25s cubic-bezier(0.23, 1, 0.320, 1);
+  
+  /* Glass effect overlay */
+  box-shadow: 
+    0 8px 32px rgba(236, 72, 153, 0.12),
+    0 0 1px rgba(255, 255, 255, 0.1) inset,
+    0 4px 16px rgba(168, 85, 247, 0.08);
+}
+
+.official-badge:hover .official-badge-image {
+  box-shadow: 
+    0 12px 48px rgba(236, 72, 153, 0.2),
+    0 0 1px rgba(255, 255, 255, 0.15) inset,
+    0 8px 24px rgba(168, 85, 247, 0.15);
+  transform: scale(1.08);
+}
+
+/* Ultra Premium Text */
+.official-badge-text {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  font-weight: 700;
+  font-size: inherit;
+  letter-spacing: 1.2px;
+  background: linear-gradient(
+    135deg,
+    #ec4899 0%,
+    #a855f7 35%,
+    #06b6d4 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 2px 8px rgba(236, 72, 153, 0.1);
+  transition: all 0.25s cubic-bezier(0.23, 1, 0.320, 1);
+}
+
+.official-badge:hover .official-badge-text {
+  letter-spacing: 1.4px;
+}
+
+/* Premium Indicator Dot */
+.official-badge-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ec4899 0%, #06b6d4 100%);
+  box-shadow: 
+    0 0 12px rgba(236, 72, 153, 0.5),
+    0 0 24px rgba(6, 182, 212, 0.3),
+    0 0 1px rgba(255, 255, 255, 0.4) inset;
+  animation: indicatorPulse 2s ease-in-out infinite;
+}
+
+@keyframes indicatorPulse {
+  0%, 100% {
+    opacity: 0.7;
+    box-shadow: 
+      0 0 12px rgba(236, 72, 153, 0.5),
+      0 0 24px rgba(6, 182, 212, 0.3),
+      0 0 1px rgba(255, 255, 255, 0.4) inset;
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 
+      0 0 16px rgba(236, 72, 153, 0.7),
+      0 0 32px rgba(6, 182, 212, 0.4),
+      0 0 2px rgba(255, 255, 255, 0.6) inset;
+  }
+}
+
+/* Modern Tooltip */
+.official-badge-tooltip {
+  background: linear-gradient(
+    135deg,
+    rgba(5, 5, 15, 0.92) 0%,
+    rgba(15, 15, 35, 0.92) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(236, 72, 153, 0.15);
+  border-radius: 12px;
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.35),
+    0 0 1px rgba(255, 255, 255, 0.08) inset;
+  animation: tooltipSlideUp 0.2s cubic-bezier(0.23, 1, 0.320, 1);
+  padding: 2px;
+}
+
+@keyframes tooltipSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.official-badge-tooltip span {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .official-badge {
+    animation: floatSmooth 2.5s ease-in-out infinite;
+  }
+  
+  .official-badge-image {
+    animation: glowPulse 2s ease-in-out infinite;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .official-badge,
+  .official-badge-image,
+  .official-badge-indicator {
+    animation: none;
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "name": "Novii - Creative Platform",
+  "short_name": "Novii",
+  "description": "Share special moments with your closest friends - Creative Platform",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#000000",
+  "theme_color": "#a855f7",
+  "icons": [
+    {
+      "src": "/assets/novii_app_logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/novii_app_logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/novii_app_logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/assets/novii_logo_new.png",
+      "sizes": "540x720",
+      "type": "image/png"
+    }
+  ]
+}

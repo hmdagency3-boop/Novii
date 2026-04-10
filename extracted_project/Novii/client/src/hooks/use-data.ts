@@ -1,0 +1,795 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import type { Profile, Post, Story, Message, Notification, Comment, Reel, UserDevice } from '@/lib/api';
+import { useToast } from './use-toast';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+
+// Profile hooks
+export function useCurrentProfile() {
+  return useQuery({
+    queryKey: ['profile', 'current'],
+    queryFn: () => api.getCurrentProfile(),
+    refetchInterval: false, // تحديث فوري عند الحاجة فقط
+  });
+}
+
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: ['profile', 'current'],
+    queryFn: () => api.getCurrentProfile(),
+    refetchInterval: false, // تحديث فوري عند الحاجة فقط
+  });
+}
+
+export function useProfile(username: string) {
+  return useQuery({
+    queryKey: ['profile', username],
+    queryFn: () => api.getProfile(username),
+    enabled: !!username,
+    refetchInterval: false, // تحديث فوري عند الحاجة فقط
+  });
+}
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (updates: Partial<Profile>) => api.updateProfile(updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast({
+        title: 'تم التحديث',
+        description: 'تم تحديث الملف الشخصي بنجاح',
+      });
+    },
+    onError: () => {
+      toast({
+        variant: 'destructive',
+        title: 'خطأ',
+        description: 'فشل تحديث الملف الشخصي',
+      });
+    },
+  });
+}
+
+// Feed hooks
+export function useFeed(limit = 20, offset = 0) {
+  return useQuery({
+    queryKey: ['feed', limit, offset],
+    queryFn: () => api.getFeed(limit, offset),
+  });
+}
+
+export function useExplorePosts(limit = 30) {
+  return useQuery({
+    queryKey: ['explore', limit],
+    queryFn: () => api.getExplorePosts(limit),
+  });
+}
+
+export function useUserPosts(userId: string) {
+  return useQuery({
+    queryKey: ['posts', 'user', userId],
+    queryFn: () => api.getUserPosts(userId),
+    enabled: !!userId,
+  });
+}
+
+export function useUserStatistics() {
+  return useQuery({
+    queryKey: ['statistics', 'user'],
+    queryFn: () => api.getUserStatistics(),
+  });
+}
+
+export function usePost(postId: string) {
+  return useQuery({
+    queryKey: ['post', postId],
+    queryFn: () => api.getPost(postId),
+    enabled: !!postId,
+  });
+}
+
+export function useCreatePost() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ caption, imageUrl, location }: { caption: string; imageUrl: string; location?: string }) =>
+      api.createPost(caption, imageUrl, location),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast({
+        title: 'تم النشر',
+        description: 'تم نشر المنشور بنجاح',
+      });
+    },
+    onError: () => {
+      toast({
+        variant: 'destructive',
+        title: 'خطأ',
+        description: 'فشل نشر المنشور',
+      });
+    },
+  });
+}
+
+export function useDeletePost() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (postId: string) => api.deletePost(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast({
+        title: 'تم الحذف',
+        description: 'تم حذف المنشور بنجاح',
+      });
+    },
+    onError: () => {
+      toast({
+        variant: 'destructive',
+        title: 'خطأ',
+        description: 'فشل حذف المنشور',
+      });
+    },
+  });
+}
+
+// Like hooks
+export function useToggleLike() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (postId: string) => api.toggleLike(postId),
+    onMutate: async (postId) => {
+      // Update UI immediately with optimistic like state toggle
+      const updatePost = (post: Post) => ({
+        ...post,
+        is_liked: !post.is_liked,
+        // Don't change likes_count - let database trigger handle it
+      });
+
+      // Update feed queries
+      queryClient.setQueriesData({ queryKey: ['feed'] }, (old: any) => {
+        if (!old) return old;
+        return Array.isArray(old) 
+          ? old.map((post: Post) => post.id === postId ? updatePost(post) : post)
+          : old;
+      });
+
+      // Update individual post
+      queryClient.setQueriesData({ queryKey: ['post'] }, (old: any) => {
+        if (!old) return old;
+        if (old.id === postId) {
+          return updatePost(old);
+        }
+        return old;
+      });
+
+      // Update explore queries
+      queryClient.setQueriesData({ queryKey: ['explore'] }, (old: any) => {
+        if (!old) return old;
+        return Array.isArray(old)
+          ? old.map((post: Post) => post.id === postId ? updatePost(post) : post)
+          : old;
+      });
+    },
+    onSuccess: (_, postId) => {
+      // After success, refetch only the specific post to get fresh likes_count from database
+      queryClient.refetchQueries({ queryKey: ['post', postId] });
+    },
+    onError: (error: any) => {
+      console.error('Like toggle error:', error);
+      // Rollback optimistic update by invalidating (will refetch fresh data)
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['post'] });
+      queryClient.invalidateQueries({ queryKey: ['explore'] });
+    },
+  });
+}
+
+export function useToggleReelLike() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (reelId: string) => api.toggleReelLike(reelId),
+    onMutate: async (reelId) => {
+      // Update UI immediately with optimistic like state toggle
+      const updateReel = (reel: any) => ({
+        ...reel,
+        is_liked: !reel.is_liked,
+        likes_count: reel.is_liked ? Math.max(0, reel.likes_count - 1) : reel.likes_count + 1,
+      });
+
+      // Update all userReels queries
+      queryClient.setQueriesData({ queryKey: ['userReels'] }, (old: any) => {
+        if (!old) return old;
+        return Array.isArray(old)
+          ? old.map((reel: any) => reel.id === reelId ? updateReel(reel) : reel)
+          : old;
+      });
+
+      // Update reel queries (fallback)
+      queryClient.setQueriesData({ queryKey: ['reel', reelId] }, (old: any) => {
+        return old ? updateReel(old) : old;
+      });
+    },
+    onSuccess: (_, reelId) => {
+      // After success, invalidate all userReels to get fresh data from database
+      queryClient.invalidateQueries({ queryKey: ['userReels'] });
+    },
+    onError: (error: any) => {
+      console.error('Reel like toggle error:', error);
+      // Rollback optimistic update
+      queryClient.invalidateQueries({ queryKey: ['userReels'] });
+      queryClient.invalidateQueries({ queryKey: ['reel'] });
+    },
+  });
+}
+
+// Comment hooks
+export function useComments(postId: string) {
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ['comments', postId],
+    queryFn: () => api.getComments(postId),
+    enabled: !!postId,
+  });
+
+  // Set up real-time subscription for comments
+  useEffect(() => {
+    if (!postId) return;
+
+    console.log('🔴 Setting up real-time subscription for comments on post:', postId);
+
+    // Subscribe to INSERT events
+    const insertSubscription = supabase
+      .channel(`comments:${postId}:insert`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'comments',
+        filter: `post_id=eq.${postId}`,
+      }, (payload: any) => {
+        console.log('✅ New comment received:', payload.new);
+        // Refetch comments when a new one is added
+        queryClient.refetchQueries({ queryKey: ['comments', postId] });
+      })
+      .subscribe();
+
+    // Subscribe to UPDATE events
+    const updateSubscription = supabase
+      .channel(`comments:${postId}:update`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'comments',
+        filter: `post_id=eq.${postId}`,
+      }, (payload: any) => {
+        console.log('✏️ Comment updated:', payload.new);
+        queryClient.refetchQueries({ queryKey: ['comments', postId] });
+      })
+      .subscribe();
+
+    // Subscribe to DELETE events
+    const deleteSubscription = supabase
+      .channel(`comments:${postId}:delete`)
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'comments',
+        filter: `post_id=eq.${postId}`,
+      }, (payload: any) => {
+        console.log('🗑️ Comment deleted:', payload.old);
+        queryClient.refetchQueries({ queryKey: ['comments', postId] });
+      })
+      .subscribe();
+
+    // Cleanup subscriptions
+    return () => {
+      console.log('🔌 Cleaning up comment subscriptions for post:', postId);
+      insertSubscription.unsubscribe();
+      updateSubscription.unsubscribe();
+      deleteSubscription.unsubscribe();
+    };
+  }, [postId, queryClient]);
+
+  return query;
+}
+
+// Typing indicator hook
+export function useTypingIndicator(postId: string, userId: string) {
+  const [typingUsers, setTypingUsers] = useState<Record<string, { username: string; avatar_url?: string; timestamp: number }>>({});
+
+  useEffect(() => {
+    if (!postId || !userId) return;
+
+    console.log('🎹 Setting up typing indicator subscription for post:', postId);
+
+    const channel = supabase.channel(`typing:${postId}`);
+
+    // Subscribe to typing events
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState() as Record<string, Array<any>>;
+      const typing: Record<string, { username: string; avatar_url?: string; timestamp: number }> = {};
+      
+      Object.entries(state).forEach(([key, users]) => {
+        users.forEach((user: any) => {
+          if (user.typing && user.user_id !== userId) {
+            typing[user.user_id] = {
+              username: user.username,
+              avatar_url: user.avatar_url,
+              timestamp: Date.now()
+            };
+          }
+        });
+      });
+
+      setTypingUsers(typing);
+    }).subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Typing indicator subscribed');
+      }
+    });
+
+    return () => {
+      console.log('🔌 Cleaning up typing indicator for post:', postId);
+      channel.unsubscribe();
+    };
+  }, [postId, userId]);
+
+  const startTyping = async () => {
+    const { data: currentProfile } = await supabase
+      .from('profiles')
+      .select('username, avatar_url')
+      .eq('id', userId)
+      .single();
+
+    supabase.channel(`typing:${postId}`).track({
+      user_id: userId,
+      username: currentProfile?.username || 'User',
+      avatar_url: currentProfile?.avatar_url,
+      typing: true,
+      timestamp: Date.now()
+    });
+  };
+
+  const stopTyping = () => {
+    supabase.channel(`typing:${postId}`).track({
+      user_id: userId,
+      typing: false,
+      timestamp: Date.now()
+    });
+  };
+
+  return { typingUsers, startTyping, stopTyping };
+}
+
+export function useCreateComment() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ postId, content, parentCommentId, gifUrl }: { postId: string; content: string; parentCommentId?: string; gifUrl?: string }) =>
+      api.createComment(postId, content, parentCommentId, gifUrl),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['comments', variables.postId] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.refetchQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    onError: (error: any) => {
+      console.error('Comment creation error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'خطأ',
+        description: error?.message || 'فشل إضافة التعليق',
+      });
+    },
+  });
+}
+
+export function useToggleCommentLike() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (commentId: string) => api.toggleCommentLike(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments'] });
+    },
+  });
+}
+
+export function useDeleteComment() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (commentId: string) => api.deleteComment(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments'] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      toast({
+        title: 'تم',
+        description: 'تم حذف التعليق بنجاح',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'خطأ',
+        description: error.message || 'فشل حذف التعليق',
+      });
+    },
+  });
+}
+
+// Stories hooks
+export function useStories() {
+  return useQuery({
+    queryKey: ['stories'],
+    queryFn: () => api.getStories(),
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+  });
+}
+
+export function useUserStories(userId: string) {
+  return useQuery({
+    queryKey: ['userStories', userId],
+    queryFn: () => api.getUserStories(userId),
+    enabled: !!userId,
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+  });
+}
+
+export function useCreateStory() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: currentProfile } = useCurrentProfile();
+
+  return useMutation({
+    mutationFn: ({ mediaUrl, mediaType }: { mediaUrl: string; mediaType: 'image' | 'video' }) =>
+      api.createStory(mediaUrl, mediaType),
+    onSuccess: () => {
+      // Immediately refetch stories for real-time updates
+      queryClient.refetchQueries({ queryKey: ['stories'], type: 'active' });
+      
+      // Refetch user's own stories
+      if (currentProfile?.id) {
+        queryClient.refetchQueries({ queryKey: ['userStories', currentProfile.id], type: 'active' });
+      }
+      
+      toast({
+        title: 'تم النشر',
+        description: 'تم نشر القصة بنجاح',
+      });
+    },
+    onError: () => {
+      toast({
+        variant: 'destructive',
+        title: 'خطأ',
+        description: 'فشل نشر القصة',
+      });
+    },
+  });
+}
+
+// Follow hooks
+export function useToggleFollow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (targetUserId: string) => api.toggleFollow(targetUserId),
+    onMutate: async (targetUserId) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['profile'] });
+      await queryClient.cancelQueries({ queryKey: ['isFollowing'] });
+
+      // Get current data
+      const currentProfile = queryClient.getQueryData(['profile', 'current']) as any;
+      const targetProfile = queryClient.getQueryData(['profile', targetUserId]) as any;
+      const isFollowing = queryClient.getQueryData(['isFollowing', targetUserId]) as boolean;
+
+      // Optimistically update current profile
+      if (currentProfile) {
+        const newFollowingCount = isFollowing 
+          ? currentProfile.following_count - 1 
+          : currentProfile.following_count + 1;
+        
+        queryClient.setQueryData(['profile', 'current'], {
+          ...currentProfile,
+          following_count: newFollowingCount,
+        });
+      }
+
+      // Optimistically update target profile
+      if (targetProfile) {
+        const newFollowersCount = isFollowing 
+          ? targetProfile.followers_count - 1 
+          : targetProfile.followers_count + 1;
+        
+        queryClient.setQueryData(['profile', targetUserId], {
+          ...targetProfile,
+          followers_count: newFollowersCount,
+        });
+      }
+
+      // Update is_following status
+      queryClient.setQueryData(['isFollowing', targetUserId], !isFollowing);
+
+      return { currentProfile, targetProfile, isFollowing };
+    },
+    onError: (err, targetUserId, context) => {
+      // Rollback on error
+      if (context) {
+        queryClient.setQueryData(['profile', 'current'], context.currentProfile);
+        queryClient.setQueryData(['profile', targetUserId], context.targetProfile);
+        queryClient.setQueryData(['isFollowing', targetUserId], context.isFollowing);
+      }
+    },
+    onSuccess: (result, targetUserId) => {
+      // Refetch in background to ensure data consistency (non-blocking)
+      queryClient.refetchQueries({ queryKey: ['profile', 'current'] });
+      queryClient.refetchQueries({ queryKey: ['profile', targetUserId] });
+      queryClient.invalidateQueries({ queryKey: ['followers'] });
+      queryClient.invalidateQueries({ queryKey: ['following'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+export function useIsFollowing(targetUserId: string) {
+  return useQuery({
+    queryKey: ['following', targetUserId],
+    queryFn: () => api.isFollowing(targetUserId),
+    enabled: !!targetUserId,
+  });
+}
+
+// Messages hooks
+export function useConversations() {
+  return useQuery({
+    queryKey: ['conversations'],
+    queryFn: () => api.getConversations(),
+  });
+}
+
+export function useMessages(userId: string) {
+  return useQuery({
+    queryKey: ['messages', userId],
+    queryFn: () => api.getMessages(userId),
+    enabled: !!userId,
+  });
+}
+
+export function useSendMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ receiverId, content }: { receiverId: string; content: string }) =>
+      api.sendMessage(receiverId, content),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['messages', variables.receiverId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+}
+
+// Notifications hooks
+export function useNotifications() {
+  return useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => api.getNotifications(),
+  });
+}
+
+export function useMarkNotificationAsRead() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (notificationId: string) => api.markNotificationAsRead(notificationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+export function useMarkAllNotificationsAsRead() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => api.markAllMessageNotificationsAsRead(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+// Followers and Following hooks
+export function useFollowers(userId: string) {
+  return useQuery({
+    queryKey: ['followers', userId],
+    queryFn: () => api.getFollowers(userId),
+    enabled: !!userId,
+  });
+}
+
+export function useFollowing(userId: string) {
+  return useQuery({
+    queryKey: ['following', userId],
+    queryFn: () => api.getFollowing(userId),
+    enabled: !!userId,
+  });
+}
+
+// Saved Posts hooks
+export function useToggleSave() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (postId: string) => api.toggleSave(postId),
+    onMutate: async (postId) => {
+      await queryClient.cancelQueries({ queryKey: ['feed'] });
+      
+      const previousData = queryClient.getQueryData(['feed']);
+      
+      queryClient.setQueryData(['feed'], (old: any) => {
+        if (!old) return old;
+        return old.map((post: Post) => {
+          if (post.id === postId) {
+            return {
+              ...post,
+              is_saved: !post.is_saved,
+            };
+          }
+          return post;
+        });
+      });
+
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      queryClient.setQueryData(['feed'], context?.previousData);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['saved'] });
+    },
+  });
+}
+
+export function useSavedPosts() {
+  return useQuery({
+    queryKey: ['saved'],
+    queryFn: () => api.getSavedPosts(),
+  });
+}
+
+// Post Settings hooks
+export function useTogglePinPost() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (postId: string) => api.togglePinPost(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+    },
+    onError: (error: any) => {
+      console.error('Pin toggle error:', error);
+    },
+  });
+}
+
+export function useToggleHideLikes() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (postId: string) => api.toggleHideLikes(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+    },
+    onError: (error: any) => {
+      console.error('Hide likes toggle error:', error);
+    },
+  });
+}
+
+export function useToggleRepliesDisabled() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (postId: string) => api.toggleRepliesDisabled(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+    },
+    onError: (error: any) => {
+      console.error('Replies disabled toggle error:', error);
+    },
+  });
+}
+
+export function useRecordPostView() {
+  return useMutation({
+    mutationFn: (postId: string) => api.recordPostView(postId),
+    onError: (error: any) => {
+      console.log('View recording skipped:', error);
+    },
+  });
+}
+
+export function usePostInsights(postId: string) {
+  return useQuery({
+    queryKey: ['insights', postId],
+    queryFn: () => api.getPostInsights(postId),
+    enabled: !!postId,
+  });
+}
+
+// Reels hooks
+export function useReels(limit = 20, offset = 0) {
+  return useQuery({
+    queryKey: ['reels', limit, offset],
+    queryFn: () => api.getReels(limit, offset),
+  });
+}
+
+// Suggestions
+export function useSuggestedUsers(limit = 5) {
+  return useQuery({
+    queryKey: ['suggestions', limit],
+    queryFn: () => api.getSuggestedUsers(limit),
+  });
+}
+
+// Device Tracking hooks
+export function useTrackDevice() {
+  return useMutation({
+    mutationFn: (userId: string) => api.trackDevice(userId),
+    onError: (error: any) => {
+      console.error('Device tracking error:', error);
+    },
+  });
+}
+
+export function useUserDevices(userId: string) {
+  return useQuery({
+    queryKey: ['devices', userId],
+    queryFn: () => api.getUserDevices(userId),
+    enabled: !!userId,
+  });
+}
+
+export function useRemoveDevice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (deviceId: string) => api.removeDevice(deviceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+    },
+    onError: (error: any) => {
+      console.error('Remove device error:', error);
+    },
+  });
+}
+
+export function useCurrentDeviceInfo() {
+  return useQuery({
+    queryKey: ['device', 'current'],
+    queryFn: () => api.getCurrentDeviceInfo(),
+  });
+}
