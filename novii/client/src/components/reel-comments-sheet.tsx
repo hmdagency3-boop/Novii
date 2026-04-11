@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useToggleCommentLike, useCreateComment, useDeleteComment, useCurrentUser } from "@/hooks/use-data";
 import { useLanguage } from "@/lib/language-context";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -39,7 +40,8 @@ interface ReelCommentsSheetProps {
 
 export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetProps) {
   const { direction } = useLanguage();
-  const isRTL = direction === "rtl";
+  const isRTL  = direction === "rtl";
+  const isMobile = useIsMobile();
   const { data: currentUser } = useCurrentUser();
   const [commentText, setCommentText]     = useState("");
   const [replyingTo, setReplyingTo]       = useState<string | null>(null);
@@ -221,8 +223,12 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <SheetContent
-        side="bottom"
-        className={cn("h-[85vh] bg-black/95 border-neutral-800 flex flex-col p-0 lg:ms-20", isRTL && "dir-rtl")}
+        side={isMobile ? "bottom" : (isRTL ? "left" : "right")}
+        className={cn(
+          "bg-black/95 border-neutral-800 flex flex-col p-0",
+          isMobile ? "h-[85vh]" : "w-[380px] h-full top-0",
+          isRTL && "dir-rtl"
+        )}
       >
         <SheetHeader className="border-b border-neutral-800 p-4 pb-3">
           <SheetTitle className="text-white text-center text-lg">
