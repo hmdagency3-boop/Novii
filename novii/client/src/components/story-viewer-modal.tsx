@@ -112,13 +112,18 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
     }
 
     const musicUrl = (currentStory as any).music_url;
+    const musicStartTime = (currentStory as any).music_start_time ?? 0;
     if (musicUrl) {
       if (!musicRef.current) musicRef.current = new Audio();
       if (musicRef.current.src !== musicUrl) {
         musicRef.current.src = musicUrl;
         musicRef.current.loop = true;
+        musicRef.current.currentTime = musicStartTime;
       }
       if (!isPaused) {
+        if (musicRef.current.paused) {
+          musicRef.current.currentTime = musicStartTime;
+        }
         musicRef.current.play().catch(() => {});
       } else {
         musicRef.current.pause();
