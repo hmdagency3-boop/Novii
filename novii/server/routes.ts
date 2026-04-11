@@ -6,6 +6,7 @@ import { userDevices, profiles } from "../shared/schema";
 import { sql, eq } from "drizzle-orm";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import { upload, handleUpload } from "./cloudinary";
 
 // Helper to convert Uint8Array/array/string to UUID string
 function arrayToUUID(arr: any): string {
@@ -45,6 +46,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     'https://ldgbbbxqfwgufhvnvojy.supabase.co',
     'sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX'
   );
+
+  // ===== Cloudinary Upload Route =====
+  app.post("/api/upload", upload.single("file"), handleUpload);
 
   // ===== Server-side Auth Routes (browser calls backend → backend calls Supabase) =====
 

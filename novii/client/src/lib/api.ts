@@ -222,152 +222,45 @@ export const api = {
     return result;
   },
 
-  async uploadAvatar(file: File, onProgress?: (progress: number) => void): Promise<string> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+  // ── Shared Cloudinary upload helper ──────────────────────────────────────────
+  async _uploadToCloudinary(
+    file: File,
+    folder: string,
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", folder);
 
-    // Get current profile to save old avatar URL
-    const currentProfile = await this.getCurrentProfile();
-    const oldAvatarUrl = currentProfile?.avatar_url;
-
-    // Create unique filename with proper folder structure
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `${user.id}/${fileName}`;
-
-    // Report initial progress
     if (onProgress) onProgress(10);
 
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
 
-    if (uploadError) throw uploadError;
-
-    // Report upload complete
-    if (onProgress) onProgress(80);
-
-    // Get public URL
-    const { data } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath);
-
-    const newAvatarUrl = data.publicUrl;
-
-    // Only delete old avatar after successful upload
-    if (oldAvatarUrl && oldAvatarUrl !== newAvatarUrl) {
-      try {
-        await this.deleteAvatar(oldAvatarUrl);
-      } catch (error) {
-        console.warn('Failed to delete old avatar:', error);
-        // Don't fail the upload if deletion fails
-      }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Upload failed");
     }
 
+    if (onProgress) onProgress(90);
+    const { url } = await res.json();
     if (onProgress) onProgress(100);
-
-    return newAvatarUrl;
+    return url;
   },
 
-  async deleteAvatar(avatarUrl: string): Promise<void> {
-    if (!avatarUrl || !avatarUrl.includes('/storage/v1/object/public/avatars/')) return;
+  async uploadAvatar(file: File, onProgress?: (progress: number) => void): Promise<string> {
+    return this._uploadToCloudinary(file, "avatars", onProgress);
+  },
 
-    try {
-      // Extract file path from URL
-      // URL format: https://.../storage/v1/object/public/avatars/user-id/filename.ext
-      const urlParts = avatarUrl.split('/storage/v1/object/public/avatars/');
-      if (urlParts.length < 2) return;
-      
-      const filePath = urlParts[1];
-
-      const { error } = await supabase.storage
-        .from('avatars')
-        .remove([filePath]);
-
-      if (error) {
-        console.warn('Failed to delete avatar from storage:', error);
-      }
-    } catch (error) {
-      console.warn('Error deleting avatar:', error);
-    }
+  async deleteAvatar(_avatarUrl: string): Promise<void> {
+    // Cloudinary handles storage — deletion optional via Cloudinary dashboard
   },
 
   async uploadCover(file: File, onProgress?: (progress: number) => void): Promise<string> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    // Get current profile to save old cover URL
-    const currentProfile = await this.getCurrentProfile();
-    const oldCoverUrl = currentProfile?.cover_url;
-
-    // Create unique filename with proper folder structure
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `${user.id}/${fileName}`;
-
-    // Report initial progress
-    if (onProgress) onProgress(10);
-
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage
-      .from('covers')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) throw uploadError;
-
-    // Report upload complete
-    if (onProgress) onProgress(80);
-
-    // Get public URL
-    const { data } = supabase.storage
-      .from('covers')
-      .getPublicUrl(filePath);
-
-    const newCoverUrl = data.publicUrl;
-
-    // Only delete old cover after successful upload
-    if (oldCoverUrl && oldCoverUrl !== newCoverUrl) {
-      try {
-        await this.deleteCover(oldCoverUrl);
-      } catch (error) {
-        console.warn('Failed to delete old cover:', error);
-        // Don't fail the upload if deletion fails
-      }
-    }
-
-    if (onProgress) onProgress(100);
-
-    return newCoverUrl;
+    return this._uploadToCloudinary(file, "covers", onProgress);
   },
 
-  async deleteCover(coverUrl: string): Promise<void> {
-    if (!coverUrl || !coverUrl.includes('/storage/v1/object/public/covers/')) return;
-
-    try {
-      // Extract file path from URL
-      // URL format: https://.../storage/v1/object/public/covers/user-id/filename.ext
-      const urlParts = coverUrl.split('/storage/v1/object/public/covers/');
-      if (urlParts.length < 2) return;
-      
-      const filePath = urlParts[1];
-
-      const { error } = await supabase.storage
-        .from('covers')
-        .remove([filePath]);
-
-      if (error) {
-        console.warn('Failed to delete cover from storage:', error);
-      }
-    } catch (error) {
-      console.warn('Error deleting cover:', error);
-    }
+  async deleteCover(_coverUrl: string): Promise<void> {
+    // Cloudinary handles storage — deletion optional via Cloudinary dashboard
   },
 
   async getProfile(username: string): Promise<Profile | null> {
@@ -661,38 +554,7 @@ export const api = {
   },
 
   async uploadPostImage(file: File, onProgress?: (progress: number) => void): Promise<string> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    // Create unique filename with proper folder structure
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-    const filePath = `${user.id}/${fileName}`;
-
-    // Report initial progress
-    if (onProgress) onProgress(10);
-
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage
-      .from('posts')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) throw uploadError;
-
-    // Report upload complete
-    if (onProgress) onProgress(80);
-
-    // Get public URL
-    const { data } = supabase.storage
-      .from('posts')
-      .getPublicUrl(filePath);
-
-    if (onProgress) onProgress(100);
-
-    return data.publicUrl;
+    return this._uploadToCloudinary(file, "posts", onProgress);
   },
 
   async createPost(caption: string, imageUrl: string, location?: string): Promise<Post> {
@@ -1614,19 +1476,7 @@ export const api = {
   },
 
   async uploadMessageImage(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result as string;
-        console.log(`✅ Image converted to base64`);
-        resolve(base64);
-      };
-      reader.onerror = () => {
-        console.error('❌ Error reading file:', reader.error);
-        reject(reader.error);
-      };
-      reader.readAsDataURL(file);
-    });
+    return this._uploadToCloudinary(file, "messages");
   },
 
   async sendMessage(receiverId: string, content: string, imageUrl?: string): Promise<Message> {
@@ -2670,33 +2520,7 @@ export const api = {
   },
 
   async uploadCommunityAvatar(file: File, onProgress?: (progress: number) => void): Promise<string> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `community/${user.id}/${fileName}`;
-
-    if (onProgress) onProgress(10);
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) throw uploadError;
-
-    if (onProgress) onProgress(80);
-
-    const { data } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath);
-
-    if (onProgress) onProgress(100);
-
-    return data.publicUrl;
+    return this._uploadToCloudinary(file, "community-avatars", onProgress);
   },
 
   async updateCommunity(communityId: string, updates: { name?: string; description?: string; avatarUrl?: string }): Promise<any> {
