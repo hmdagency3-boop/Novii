@@ -242,7 +242,7 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
         )}
         <div className={cn(
           "max-w-[70%] rounded-2xl px-4 py-2 text-xs italic shadow-sm",
-          "bg-gray-700 text-gray-300"
+          "bg-muted text-muted-foreground"
         )}>
           {isRTL ? "تم حذف هذه الرسالة" : "This message was deleted"}
         </div>
@@ -318,7 +318,7 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
             "rounded-2xl px-4 py-2 text-sm shadow-sm max-w-xs",
             isMe 
               ? "bg-blue-500 text-white" 
-              : "bg-gray-700 text-white"
+              : "bg-muted text-foreground"
           )}>
             <p className={cn("leading-relaxed break-words", isRTL && "text-right")}>
               {message.content}
@@ -476,8 +476,8 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
               {message.content && (
                 <div>
                   <div className={cn(
-                    "rounded-2xl px-4 py-2.5 text-sm relative max-w-sm bg-gray-900",
-                    "text-white"
+                    "rounded-2xl px-4 py-2.5 text-sm relative max-w-sm",
+                    isMe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
                   )}>
                     <p className={cn("leading-relaxed break-words text-sm font-light", isRTL && "text-right")}>{message.content}</p>
                     
@@ -528,7 +528,7 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
                             "px-2 py-0.5 rounded-full text-xs transition-all",
                             userReaction === reaction
                               ? "bg-blue-500/30 border border-blue-500/50"
-                              : "bg-gray-700/50 border border-gray-600/50 hover:bg-gray-600/50"
+                              : "bg-muted/50 border border-border hover:bg-muted"
                           )}
                         >
                           {reaction} {count > 1 ? count : ''}
@@ -539,7 +539,7 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
 
                   {/* Reaction Picker Popover - Under Message */}
                   {showReactionPicker && (
-                    <div className={cn("flex gap-1 mt-2 p-2 bg-gray-800 rounded-lg border border-gray-700", isMe && "justify-end")}>
+                    <div className={cn("flex gap-1 mt-2 p-2 bg-muted rounded-lg border border-border", isMe && "justify-end")}>
                       {reactions_list.map((reaction) => (
                         <button
                           key={reaction}

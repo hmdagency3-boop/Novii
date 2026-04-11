@@ -1796,7 +1796,7 @@ export default function Messages() {
                             ? "bg-gradient-to-b from-purple-950/40 via-black to-purple-950/20"
                             : currentCommunity?.name === "Bug Hunter"
                             ? "bg-transparent"
-                            : "bg-black"
+                            : "bg-background"
                       )}>
                         {userKickedStatus?.isKicked ? (
                           <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
@@ -1874,7 +1874,7 @@ export default function Messages() {
                                         <>
                                           <div className={cn(
                                             "rounded-xl px-4 py-2 transition-all duration-300",
-                                            isMe ? "bg-primary text-primary-foreground" : "bg-gray-800 text-foreground",
+                                            isMe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
                                             msg.is_official && !isMe && "bg-gradient-to-br from-purple-600/40 via-pink-600/30 to-purple-600/40 shadow-lg shadow-purple-500/40 ring-1.5 ring-purple-400/50 hover:shadow-xl hover:shadow-purple-500/50 hover:ring-purple-400/70",
                                             currentCommunity?.creator_is_official && !isMe && !msg.is_official && "shadow-lg shadow-purple-500/30 ring-1 ring-purple-500/20 hover:shadow-xl hover:shadow-purple-500/40"
                                           )}>
@@ -1913,7 +1913,7 @@ export default function Messages() {
                                       <p className="text-xs text-primary font-semibold">
                                         {typingUser.username}
                                       </p>
-                                      <div className="bg-gray-700/50 rounded-xl px-3 py-2 flex items-center gap-1">
+                                      <div className="bg-muted/70 rounded-xl px-3 py-2 flex items-center gap-1">
                                         <span className="text-xs text-muted-foreground">
                                           {isRTL ? "جاري الكتابة" : "typing"}
                                         </span>
@@ -1994,7 +1994,7 @@ export default function Messages() {
                     </div>
 
                     {/* Messages Area */}
-                    <ScrollArea className="flex-1 p-2 sm:p-5 bg-black overflow-y-auto w-full pt-16 md:pt-0">
+                    <ScrollArea className="flex-1 p-2 sm:p-5 bg-background overflow-y-auto w-full pt-16 md:pt-0">
                         {messagesLoading ? (
                           <div className="flex items-center justify-center py-10">
                             <Spinner className="w-6 h-6" />
@@ -2077,11 +2077,11 @@ export default function Messages() {
                                   <AvatarImage src={selectedConversation.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedConversation.user?.username}`} />
                                   <AvatarFallback>{selectedConversation.user?.username?.[0]?.toUpperCase()}</AvatarFallback>
                                 </Avatar>
-                                <div className="max-w-[70%] rounded-xl px-4 py-2 bg-gray-800 text-foreground">
+                                <div className="max-w-[70%] rounded-xl px-4 py-2 bg-muted text-foreground">
                                   <div className="flex items-center gap-1">
-                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                    <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                    <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                    <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                                   </div>
                                 </div>
                               </div>
@@ -2093,7 +2093,7 @@ export default function Messages() {
                     </ScrollArea>
 
                     {/* Desktop Input Box */}
-                    <div className="hidden md:flex px-4 py-3 border-0 bg-black shrink-0 m-0 gap-0">
+                    <div className="hidden md:flex px-4 py-3 border-0 bg-background border-t border-border shrink-0 m-0 gap-0">
                       {/* Community Input */}
                       {selectedCommunityId && (
                         <div className="flex items-end gap-1 w-full leading-none pb-1 m-0">
