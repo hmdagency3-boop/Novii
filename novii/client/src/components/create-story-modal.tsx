@@ -1,9 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, Image as ImageIcon, Video, X, AlertCircle, CheckCircle2, Clock, Play, Pause } from "lucide-react";
+import { Upload, Image as ImageIcon, Video, X, AlertCircle, CheckCircle2, Clock, Play, Pause, Music2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useCreateStory } from "@/hooks/use-data";
 import { cn } from "@/lib/utils";
+import { MusicPicker, type MusicTrack } from "@/components/music-picker";
 
 interface CreateStoryModalProps {
   open: boolean;
@@ -26,6 +27,8 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
   const [trimEnd, setTrimEnd] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [selectedMusic, setSelectedMusic] = useState<MusicTrack | null>(null);
+  const [musicPickerOpen, setMusicPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const createStory = useCreateStory();
@@ -123,10 +126,20 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
         payload.trimEnd = Math.floor(trimEnd);
       }
 
+      if (selectedMusic) {
+        payload.music = {
+          url: selectedMusic.preview_url,
+          title: selectedMusic.title,
+          artist: selectedMusic.artist,
+          artwork_url: selectedMusic.artwork_url,
+        };
+      }
+
       await createStory.mutateAsync(payload);
       
       setSelectedFile(null);
       setPreview(null);
+      setSelectedMusic(null);
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to create story:', error);
@@ -145,6 +158,7 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
     setTrimEnd(0);
     setIsPlaying(false);
     setCurrentTime(0);
+    setSelectedMusic(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -165,6 +179,7 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-full sm:max-w-2xl w-screen sm:w-full max-h-[90vh] overflow-y-auto rounded-none sm:rounded-lg" dir={isRTL ? "rtl" : "ltr"}>
         <DialogHeader>
@@ -270,6 +285,28 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
                 >
                   <X className="w-5 h-5" />
                 </button>
+
+                {/* Music button overlay */}
+                <button
+                  onClick={() => setMusicPickerOpen(true)}
+                  className={cn(
+                    "absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-sm transition-all text-sm font-medium",
+                    selectedMusic
+                      ? "bg-primary text-white"
+                      : "bg-black/60 text-white hover:bg-black/80"
+                  )}
+                >
+                  <Music2 className="w-4 h-4" />
+                  {selectedMusic ? selectedMusic.title : (isRTL ? 'إضافة موسيقى' : 'Add Music')}
+                </button>
+
+                {/* Music artwork overlay on preview */}
+                {selectedMusic && (
+                  <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5 max-w-[160px]">
+                    <img src={selectedMusic.artwork_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                    <span className="text-white text-xs truncate">{selectedMusic.artist}</span>
+                  </div>
+                )}
               </div>
 
               {/* File Info */}
@@ -465,5 +502,14 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
         </div>
       </DialogContent>
     </Dialog>
+
+    <MusicPicker
+      open={musicPickerOpen}
+      onOpenChange={setMusicPickerOpen}
+      onSelect={setSelectedMusic}
+      selectedTrack={selectedMusic}
+      isRTL={isRTL}
+    />
+    </>
   );
 }

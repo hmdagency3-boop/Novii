@@ -100,6 +100,10 @@ export interface Story {
   views_count: number;
   expires_at: string;
   created_at: string;
+  music_url?: string | null;
+  music_title?: string | null;
+  music_artist?: string | null;
+  music_artwork_url?: string | null;
   profile?: Profile;
   is_viewed?: boolean;
 }
@@ -1112,18 +1116,26 @@ export const api = {
     return (data || []) as unknown as Story[];
   },
 
-  async createStory(mediaUrl: string, mediaType: 'image' | 'video' = 'image'): Promise<Story> {
+  async createStory(mediaUrl: string, mediaType: 'image' | 'video' = 'image', music?: { url: string; title: string; artist: string; artwork_url: string } | null): Promise<Story> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    // Use optimized columns to reduce egress (70% savings!)
+    const insertData: any = {
+      user_id: user.id,
+      media_url: mediaUrl,
+      media_type: mediaType,
+    };
+
+    if (music) {
+      insertData.music_url = music.url;
+      insertData.music_title = music.title;
+      insertData.music_artist = music.artist;
+      insertData.music_artwork_url = music.artwork_url;
+    }
+
     const { data, error } = await supabase
       .from('stories')
-      .insert({
-        user_id: user.id,
-        media_url: mediaUrl,
-        media_type: mediaType
-      })
+      .insert(insertData)
       .select(STORY_WITH_PROFILE)
       .single();
 

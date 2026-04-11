@@ -1,6 +1,6 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { X, Heart, Send, MoreVertical, ChevronLeft, ChevronRight, Pause, Play, Eye, Trash2 } from "lucide-react";
+import { X, Heart, Send, MoreVertical, ChevronLeft, ChevronRight, Pause, Play, Eye, Trash2, Music2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
@@ -34,6 +34,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   const { language } = useLanguage();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
 
   const currentStory = stories[currentIndex];
 
@@ -70,6 +71,38 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
       setIsPaused(pausedBeforeMenu);
     }
   }, [showViews]);
+
+  // Music playback
+  useEffect(() => {
+    if (!open || !currentStory) {
+      musicRef.current?.pause();
+      return;
+    }
+
+    const musicUrl = (currentStory as any).music_url;
+    if (musicUrl) {
+      if (!musicRef.current) musicRef.current = new Audio();
+      if (musicRef.current.src !== musicUrl) {
+        musicRef.current.src = musicUrl;
+        musicRef.current.loop = true;
+      }
+      if (!isPaused) {
+        musicRef.current.play().catch(() => {});
+      } else {
+        musicRef.current.pause();
+      }
+    } else {
+      musicRef.current?.pause();
+    }
+  }, [open, currentStory?.id, isPaused]);
+
+  useEffect(() => {
+    return () => { musicRef.current?.pause(); };
+  }, []);
+
+  useEffect(() => {
+    if (!open) musicRef.current?.pause();
+  }, [open]);
 
   useEffect(() => {
     if (!open || !currentStory) return;
@@ -306,6 +339,28 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
               alt="Story"
               className="max-h-full max-w-full object-contain"
             />
+          )}
+
+          {/* Music Info Overlay */}
+          {(currentStory as any).music_url && (
+            <div className="absolute bottom-24 left-0 right-0 flex justify-center z-20 pointer-events-none">
+              <div className="flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 max-w-[80%]">
+                {(currentStory as any).music_artwork_url && (
+                  <img
+                    src={(currentStory as any).music_artwork_url}
+                    alt=""
+                    className="w-6 h-6 rounded-full object-cover flex-shrink-0 animate-spin"
+                    style={{ animationDuration: '4s' }}
+                  />
+                )}
+                <Music2 className="w-4 h-4 text-white flex-shrink-0" />
+                <div className="overflow-hidden">
+                  <p className="text-white text-xs font-semibold truncate whitespace-nowrap">
+                    {(currentStory as any).music_title || ''} — {(currentStory as any).music_artist || ''}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Navigation Areas */}

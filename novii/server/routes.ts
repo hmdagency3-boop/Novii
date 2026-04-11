@@ -529,6 +529,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Deezer music search proxy (avoid CORS issues)
+  app.get("/api/music/search", async (req: Request, res: Response) => {
+    try {
+      const { q } = req.query;
+      if (!q || !(q as string).trim()) return res.json([]);
+
+      const response = await fetch(
+        `https://api.deezer.com/search?q=${encodeURIComponent((q as string).trim())}&limit=20&output=json`
+      );
+      if (!response.ok) return res.json([]);
+      const data = await response.json() as any;
+      const tracks = (data.data || []).map((track: any) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist?.name || '',
+        preview_url: track.preview,
+        artwork_url: track.album?.cover_medium || track.album?.cover || '',
+        album: track.album?.title || '',
+        duration: track.duration,
+      }));
+      res.json(tracks);
+    } catch (error) {
+      console.error("Music search error:", error);
+      res.json([]);
+    }
+  });
+
   // Advanced recommendation algorithm for suggesting users (Instagram-like)
   app.get("/api/suggestions/recommended", async (req: Request, res: Response) => {
     try {

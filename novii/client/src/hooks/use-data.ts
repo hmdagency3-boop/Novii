@@ -459,8 +459,14 @@ export function useCreateStory() {
   const { data: currentProfile } = useCurrentProfile();
 
   return useMutation({
-    mutationFn: ({ mediaUrl, mediaType }: { mediaUrl: string; mediaType: 'image' | 'video' }) =>
-      api.createStory(mediaUrl, mediaType),
+    mutationFn: ({ mediaUrl, mediaType, music }: {
+      mediaUrl: string;
+      mediaType: 'image' | 'video';
+      trimStart?: number;
+      trimEnd?: number;
+      music?: { url: string; title: string; artist: string; artwork_url: string };
+    }) =>
+      api.createStory(mediaUrl, mediaType, music),
     onSuccess: () => {
       // Immediately refetch stories for real-time updates
       queryClient.refetchQueries({ queryKey: ['stories'], type: 'active' });

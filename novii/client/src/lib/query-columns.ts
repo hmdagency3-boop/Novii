@@ -138,7 +138,11 @@ export const STORY_COLUMNS = `
   media_type,
   views_count,
   expires_at,
-  created_at
+  created_at,
+  music_url,
+  music_title,
+  music_artist,
+  music_artwork_url
 `;
 
 // Story with profile
@@ -150,6 +154,10 @@ export const STORY_WITH_PROFILE = `
   views_count,
   expires_at,
   created_at,
+  music_url,
+  music_title,
+  music_artist,
+  music_artwork_url,
   profile:profiles!stories_user_id_fkey(${PROFILE_MINIMAL})
 `;
 
