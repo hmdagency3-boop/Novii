@@ -172,8 +172,8 @@ export function ProfileShareModal({
   /* ── Desktop: centered dialog ── */
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl" style={{ direction: "ltr" }}>
-        <DialogTitle className="text-center text-base font-bold px-5 pt-5 pb-0" style={{ direction: direction }}>
+      <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl">
+        <DialogTitle className="text-center text-base font-bold px-5 pt-5 pb-0">
           {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
         </DialogTitle>
         <ModalBody qrSize={200} />
