@@ -4,16 +4,15 @@ import QRCodeStyling from "qr-code-styling";
 interface NoviiQRCodeProps {
   value: string;
   size?: number;
-  avatarUrl?: string;
 }
 
-function buildQR(value: string, size: number, avatarUrl?: string) {
+function buildQR(value: string, size: number) {
   return new QRCodeStyling({
     width: size,
     height: size,
     type: "svg",
     data: value,
-    image: avatarUrl || "/assets/novii_logo_new.png",
+    image: "/assets/novii_logo_new.png",
     dotsOptions: {
       type: "extra-rounded",
       gradient: {
@@ -46,7 +45,7 @@ function buildQR(value: string, size: number, avatarUrl?: string) {
     imageOptions: {
       crossOrigin: "anonymous",
       margin: 4,
-      imageSize: avatarUrl ? 0.28 : 0.22,
+      imageSize: 0.22,
     },
     qrOptions: {
       errorCorrectionLevel: "H",
@@ -54,17 +53,17 @@ function buildQR(value: string, size: number, avatarUrl?: string) {
   });
 }
 
-export function NoviiQRCode({ value, size = 200, avatarUrl }: NoviiQRCodeProps) {
+export function NoviiQRCode({ value, size = 200 }: NoviiQRCodeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const qrRef = useRef<QRCodeStyling | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
     containerRef.current.innerHTML = "";
-    const qr = buildQR(value, size, avatarUrl);
+    const qr = buildQR(value, size);
     qrRef.current = qr;
     qr.append(containerRef.current);
-  }, [value, size, avatarUrl]);
+  }, [value, size]);
 
   return (
     <div
@@ -75,11 +74,7 @@ export function NoviiQRCode({ value, size = 200, avatarUrl }: NoviiQRCodeProps) 
   );
 }
 
-export async function downloadNoviiQR(
-  value: string,
-  username: string,
-  avatarUrl?: string
-) {
-  const qr = buildQR(value, 300, avatarUrl);
+export async function downloadNoviiQR(value: string, username: string) {
+  const qr = buildQR(value, 300);
   await qr.download({ name: `novii-${username}-qr`, extension: "png" });
 }

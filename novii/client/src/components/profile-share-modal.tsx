@@ -65,7 +65,7 @@ export function ProfileShareModal({
 
   const handleDownloadQR = async () => {
     try {
-      await downloadNoviiQR(profileUrl, username, avatarUrl);
+      await downloadNoviiQR(profileUrl, username);
     } catch {
       toast.error(isRTL ? "فشل التحميل" : "Download failed");
     }
@@ -75,7 +75,7 @@ export function ProfileShareModal({
     <div className="flex flex-col items-center gap-4 px-5 pb-5 pt-1">
       {/* Branded QR Code */}
       <div className="bg-white p-3 rounded-2xl shadow-md">
-        <NoviiQRCode value={profileUrl} size={200} avatarUrl={avatarUrl} />
+        <NoviiQRCode value={profileUrl} size={200} />
       </div>
 
       {/* Username */}
