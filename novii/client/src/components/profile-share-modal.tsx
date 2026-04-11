@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Share2, Download } from "lucide-react";
 import { toast } from "sonner";
@@ -80,84 +80,74 @@ export function ProfileShareModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm rounded-2xl p-0 overflow-hidden">
-        <DialogHeader className="px-6 pt-6 pb-2">
-          <DialogTitle className="text-center text-lg font-bold">
-            {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-w-xs sm:max-w-sm p-6">
+        {/* Title */}
+        <DialogTitle className="text-center text-base font-bold mb-2">
+          {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
+        </DialogTitle>
 
-        <div className="flex flex-col items-center gap-4 px-6 pb-6">
-          {/* QR Code */}
-          <div className="bg-white p-4 rounded-2xl shadow-sm">
+        {/* QR Code */}
+        <div className="flex justify-center">
+          <div className="bg-white p-3 rounded-2xl shadow-sm inline-block">
             <QRCodeSVG
               id="profile-qr-code"
               value={profileUrl}
-              size={180}
+              size={164}
               level="H"
               includeMargin={false}
               imageSettings={
                 avatarUrl
-                  ? {
-                      src: avatarUrl,
-                      x: undefined,
-                      y: undefined,
-                      height: 40,
-                      width: 40,
-                      excavate: true,
-                    }
+                  ? { src: avatarUrl, height: 36, width: 36, excavate: true }
                   : undefined
               }
             />
           </div>
+        </div>
 
-          {/* Username — always LTR so @ appears correctly */}
-          <div className="text-center" dir="ltr">
-            <p className="font-bold text-base">@{username}</p>
-            {displayName && (
-              <p className="text-sm text-muted-foreground">{displayName}</p>
-            )}
-          </div>
+        {/* Username — LTR so @ always appears before username */}
+        <div className="text-center" dir="ltr">
+          <p className="font-bold text-sm">@{username}</p>
+          {displayName && (
+            <p className="text-xs text-muted-foreground mt-0.5">{displayName}</p>
+          )}
+        </div>
 
-          {/* Profile URL box — always LTR */}
-          <div className="w-full bg-muted rounded-xl px-4 py-2.5" dir="ltr">
-            <span className="text-xs text-muted-foreground truncate block font-mono">
-              {profileUrl}
-            </span>
-          </div>
+        {/* Profile URL — LTR */}
+        <div className="bg-muted rounded-lg px-3 py-2" dir="ltr">
+          <p className="text-xs text-muted-foreground font-mono truncate">{profileUrl}</p>
+        </div>
 
-          {/* Action buttons */}
-          <div className="flex w-full gap-2" dir={direction}>
-            <Button
-              variant="outline"
-              className="flex-1 gap-2 rounded-xl"
-              onClick={handleCopy}
-            >
-              {copied ? (
-                <Check className="w-4 h-4 text-green-500 shrink-0" />
-              ) : (
-                <Copy className="w-4 h-4 shrink-0" />
-              )}
-              <span>{isRTL ? (copied ? "تم النسخ" : "نسخ") : (copied ? "Copied!" : "Copy")}</span>
-            </Button>
+        {/* Buttons */}
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant="outline"
+            className="rounded-xl gap-1.5 text-sm"
+            onClick={handleCopy}
+          >
+            {copied
+              ? <Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
+              : <Copy className="w-3.5 h-3.5 shrink-0" />}
+            {isRTL ? (copied ? "تم" : "نسخ") : (copied ? "Copied" : "Copy")}
+          </Button>
 
-            <Button
-              className="flex-1 gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white border-0"
-              onClick={handleShare}
-            >
-              <Share2 className="w-4 h-4 shrink-0" />
-              <span>{isRTL ? "مشاركة" : "Share"}</span>
-            </Button>
-          </div>
+          <Button
+            className="rounded-xl gap-1.5 text-sm bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white border-0"
+            onClick={handleShare}
+          >
+            <Share2 className="w-3.5 h-3.5 shrink-0" />
+            {isRTL ? "مشاركة" : "Share"}
+          </Button>
+        </div>
 
-          {/* Download button */}
+        {/* Download QR */}
+        <div className="flex justify-center">
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground gap-2 text-xs"
+            className="text-muted-foreground gap-1.5 text-xs h-7"
             onClick={handleDownloadQR}
           >
-            <Download className="w-3.5 h-3.5 shrink-0" />
+            <Download className="w-3 h-3 shrink-0" />
             {isRTL ? "تحميل QR Code" : "Download QR Code"}
           </Button>
         </div>
