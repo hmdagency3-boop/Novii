@@ -43,7 +43,7 @@ export function ProfileShareModal({
     if (!open) setActiveTab("share");
   }, [open]);
 
-  const profileUrl = `https://novii.netlify.app/user?id=${userId}`;
+  const profileUrl = `${window.location.origin}/user?id=${userId}`;
   const displayName = fullName && fullName !== username ? fullName : null;
 
   const handleCopy = async () => {
@@ -85,18 +85,15 @@ export function ProfileShareModal({
     // Extract user id from Novii profile URLs
     try {
       const parsed = new URL(url);
-      if (
-        parsed.hostname === "novii.netlify.app" &&
-        parsed.pathname === "/user"
-      ) {
+      if (parsed.pathname === "/user") {
         const id = parsed.searchParams.get("id");
         if (id) {
           navigate(`/user?id=${id}`);
           return;
         }
       }
-      // Try direct navigation if it looks like a Novii URL
-      if (url.includes("novii.netlify.app")) {
+      // If same origin, do client-side navigation
+      if (parsed.origin === window.location.origin) {
         window.location.href = url;
         return;
       }
