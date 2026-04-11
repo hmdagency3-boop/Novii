@@ -107,23 +107,14 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   useEffect(() => {
     if (!open || !currentStory) return;
 
-    // للفيديو: ننتظر حدث "ended" من الفيديو نفسه
     if (currentStory.media_type === 'video' && videoRef.current) {
       const video = videoRef.current;
 
-      // تشغيل الفيديو تلقائياً
-      video.play().catch(() => {
-        // إذا لم يتم التشغيل تلقائياً، لا توجد مشكلة - المستخدم يمكنه التشغيل يدويّاً
-      });
+      video.play().catch(() => {});
 
-      const handleVideoEnded = () => {
-        // عندما ينتهي الفيديو، انتقل للاستوري التالي
-        handleNext();
-      };
-
+      const handleVideoEnded = () => handleNext();
       video.addEventListener('ended', handleVideoEnded);
 
-      // تحديث شريط progress بناءً على موضع الفيديو
       const updateProgressInterval = setInterval(() => {
         if (!isPaused && video.duration) {
           const progress = (video.currentTime / video.duration) * 100;
@@ -136,12 +127,28 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
         clearInterval(updateProgressInterval);
       };
     } else if (currentStory.media_type === 'image') {
-      // للصور: 5 ثوان
-      const imageTimeout = setTimeout(() => {
-        handleNext();
-      }, 5000);
+      // إذا فيه موسيقى → 30 ثانية، وإلا → 10 ثواني
+      const hasMusic = !!(currentStory as any).music_url;
+      const DURATION = hasMusic ? 30000 : 10000;
+      const INTERVAL = 100;
 
-      return () => clearTimeout(imageTimeout);
+      if (isPaused) return;
+
+      const startTime = Date.now();
+      const startProgress = progress;
+
+      const progressInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const elapsedProgress = (elapsed / DURATION) * 100;
+        const newProgress = Math.min(startProgress + elapsedProgress, 100);
+        setProgress(newProgress);
+        if (newProgress >= 100) {
+          clearInterval(progressInterval);
+          handleNext();
+        }
+      }, INTERVAL);
+
+      return () => clearInterval(progressInterval);
     }
   }, [currentIndex, open, currentStory?.id, currentStory?.media_type, isPaused]);
 
