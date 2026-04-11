@@ -395,138 +395,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Search GIFs - using mock data with real Tenor GIF URLs
+  // Search GIFs via Tenor API
   app.get("/api/gifs/search", async (req: Request, res: Response) => {
     try {
       const { q } = req.query;
-      const query = (q as string || '').toLowerCase().trim();
+      const query = (q as string || '').trim();
+      const TENOR_KEY = "LIVDSRZULELA"; // Tenor demo key
+      const limit = 24;
 
-      // Real Giphy GIFs database using direct URLs (no API key needed)
-      const gifDatabase = {
-        happy: {
-          title: "Happy",
-          url: "https://i.giphy.com/media/14kdiJUblbWBXy/giphy.gif"
-        },
-        celebrate: {
-          title: "Celebrate",
-          url: "https://i.giphy.com/media/l0HlFZgKMohkANjR6/giphy.gif"
-        },
-        party: {
-          title: "Party",
-          url: "https://i.giphy.com/media/l0Iy1YAJ0roLeKfQc/giphy.gif"
-        },
-        dance: {
-          title: "Dance",
-          url: "https://i.giphy.com/media/l3q2K5jinAlChoCLS/giphy.gif"
-        },
-        funny: {
-          title: "Funny",
-          url: "https://i.giphy.com/media/LCdPNT81vlv3Y/giphy.gif"
-        },
-        laugh: {
-          title: "Laugh",
-          url: "https://i.giphy.com/media/G4ZNYMQVMH6NU/giphy.gif"
-        },
-        love: {
-          title: "Love",
-          url: "https://i.giphy.com/media/l0HlQaQ7mwAiEXXQA/giphy.gif"
-        },
-        awesome: {
-          title: "Awesome",
-          url: "https://i.giphy.com/media/l0HlV5Q7TYXo5XO1i/giphy.gif"
-        },
-        cool: {
-          title: "Cool",
-          url: "https://i.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif"
-        },
-        wow: {
-          title: "Wow",
-          url: "https://i.giphy.com/media/3o85xIO33l7RlmLqqI/giphy.gif"
-        },
-        shocked: {
-          title: "Shocked",
-          url: "https://i.giphy.com/media/l3q2K5jinAlChoCLS/giphy.gif"
-        },
-        thinking: {
-          title: "Thinking",
-          url: "https://i.giphy.com/media/3ohzdKZ7W6h9wGiGS4/giphy.gif"
-        },
-        confused: {
-          title: "Confused",
-          url: "https://i.giphy.com/media/dQvEwJ6wQeR9Zs0B0d/giphy.gif"
-        },
-        sad: {
-          title: "Sad",
-          url: "https://i.giphy.com/media/jx8bDxr5AhZLMCcn8h/giphy.gif"
-        },
-        angry: {
-          title: "Angry",
-          url: "https://i.giphy.com/media/l0HlW1VHUVsPewdOA/giphy.gif"
-        },
-        yes: {
-          title: "Yes",
-          url: "https://i.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif"
-        },
-        no: {
-          title: "No",
-          url: "https://i.giphy.com/media/3o6Zt6KHxJTbXCnSvu/giphy.gif"
-        },
-        victory: {
-          title: "Victory",
-          url: "https://i.giphy.com/media/l0HlGY9x8FZo0XO1i/giphy.gif"
-        },
-        clap: {
-          title: "Clap",
-          url: "https://i.giphy.com/media/l0HlSY9x8FZo0XO1i/giphy.gif"
-        },
-        perfect: {
-          title: "Perfect",
-          url: "https://i.giphy.com/media/l0HlQaQ7mwAiEXXQA/giphy.gif"
-        }
-      };
+      const endpoint = query
+        ? `https://api.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=${limit}&media_filter=minimal&contentfilter=medium`
+        : `https://api.tenor.com/v1/trending?key=${TENOR_KEY}&limit=${limit}&media_filter=minimal&contentfilter=medium`;
 
-      // If no query, return trending
-      if (!query) {
-        const trendingGifs = Object.entries(gifDatabase).slice(0, 10).map(([key, data], index) => ({
-          id: key,
-          title: data.title,
-          images: {
-            preview_gif: { url: data.url },
-            original: { url: data.url }
-          }
-        }));
-        return res.json({ data: trendingGifs });
-      }
+      const response = await fetch(endpoint);
+      const json = await response.json() as any;
 
-      // Search by keywords
-      const results = Object.entries(gifDatabase)
-        .filter(([key, data]) => 
-          key.includes(query) || 
-          data.title.toLowerCase().includes(query)
-        )
-        .map(([key, data]) => ({
-          id: key,
-          title: data.title,
-          images: {
-            preview_gif: { url: data.url },
-            original: { url: data.url }
-          }
-        }));
+      const data = (json.results || []).map((item: any) => ({
+        id: item.id,
+        title: item.title || "",
+        images: {
+          original: { url: item.media?.[0]?.gif?.url || item.media?.[0]?.tinygif?.url || "" },
+          preview:  { url: item.media?.[0]?.tinygif?.url || item.media?.[0]?.nanogif?.url || "" },
+        },
+      })).filter((g: any) => g.images.original.url);
 
-      // If exact match not found, return related or top items
-      if (results.length === 0) {
-        const topGifs = Object.entries(gifDatabase).slice(0, 8).map(([key, data]) => ({
-          id: key,
-          title: data.title,
-          images: {
-            preview_gif: { url: data.url },
-            original: { url: data.url }
-          }
-        }));
-        return res.json({ data: topGifs });
-      }
-
-      res.json({ data: results });
+      res.json({ data });
     } catch (error) {
       console.error("GIF search error:", error);
       res.json({ data: [] });

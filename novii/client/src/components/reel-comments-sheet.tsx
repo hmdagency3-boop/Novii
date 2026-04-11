@@ -67,7 +67,11 @@ function GifPicker({ onSelect, isRTL }: { onSelect: (url: string) => void; isRTL
     queryFn: async () => {
       const res = await fetch(`/api/gifs/search?q=${encodeURIComponent(debouncedQ)}`);
       const json = await res.json();
-      return json.data as Array<{ id: string; title: string; images: { original: { url: string } } }>;
+      return json.data as Array<{
+        id: string;
+        title: string;
+        images: { original: { url: string }; preview?: { url: string } };
+      }>;
     },
   });
 
@@ -106,7 +110,7 @@ function GifPicker({ onSelect, isRTL }: { onSelect: (url: string) => void; isRTL
                 className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-pink-500 transition-all"
               >
                 <img
-                  src={gif.images.original.url}
+                  src={gif.images.preview?.url || gif.images.original.url}
                   alt={gif.title}
                   className="w-full h-full object-cover"
                   loading="lazy"
