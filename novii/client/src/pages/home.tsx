@@ -1,7 +1,6 @@
 import Layout from "@/components/layout";
 import StoryBar from "@/components/story-bar";
 import PostCard from "@/components/post-card";
-import { CreatePostModal } from "@/components/create-post-modal";
 import { CreateStoryModal } from "@/components/create-story-modal";
 import { StoryViewerModal } from "@/components/story-viewer-modal";
 import { useFeed, useStories, useCurrentProfile, useFollowing } from "@/hooks/use-data";
@@ -18,9 +17,7 @@ export default function Home() {
   const { data: stories, isLoading: storiesLoading } = useStories();
   const { data: currentUser } = useCurrentProfile();
   const { data: followingUsers = [] } = useFollowing(currentUser?.id || '');
-  const [location, navigate] = useLocation();
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [createModalInitialType, setCreateModalInitialType] = useState<'post' | 'reel'>('post');
+  const [location] = useLocation();
   const [isCreateStoryModalOpen, setIsCreateStoryModalOpen] = useState(false);
   const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -38,29 +35,7 @@ export default function Home() {
     return filtered;
   }, [selectedUserId, stories]);
 
-  // Open modal when navigating to /create
-  useEffect(() => {
-    if (location === "/create") {
-      setIsCreateModalOpen(true);
-    }
-  }, [location]);
 
-  // Listen for create menu events from layout
-  useEffect(() => {
-    const handleOpenStory = () => setIsCreateStoryModalOpen(true);
-    const handleOpenPost = () => { setCreateModalInitialType('post'); setIsCreateModalOpen(true); };
-    const handleOpenReel = () => { setCreateModalInitialType('reel'); setIsCreateModalOpen(true); };
-
-    window.addEventListener('openStoryModal', handleOpenStory);
-    window.addEventListener('openPostModal', handleOpenPost);
-    window.addEventListener('openReelModal', handleOpenReel);
-
-    return () => {
-      window.removeEventListener('openStoryModal', handleOpenStory);
-      window.removeEventListener('openPostModal', handleOpenPost);
-      window.removeEventListener('openReelModal', handleOpenReel);
-    };
-  }, []);
 
   // Listen for double-click on Home icon to refresh feed
   useEffect(() => {
@@ -81,14 +56,6 @@ export default function Home() {
     window.addEventListener('doubleClickHome', handleDoubleClickHome);
     return () => window.removeEventListener('doubleClickHome', handleDoubleClickHome);
   }, [refetchFeed, isRTL]);
-
-  // Close modal and navigate back to home
-  const handleCloseModal = (open: boolean) => {
-    setIsCreateModalOpen(open);
-    if (!open && location === "/create") {
-      navigate("/");
-    }
-  };
 
   // Empty Feed State Component
   const EmptyFeedState = () => (
@@ -187,13 +154,6 @@ export default function Home() {
           )}
         </div>
       </div>
-
-      {/* Create Post Modal */}
-      <CreatePostModal 
-        open={isCreateModalOpen} 
-        onOpenChange={handleCloseModal}
-        initialMediaType={createModalInitialType}
-      />
 
       {/* Create Story Modal */}
       <CreateStoryModal

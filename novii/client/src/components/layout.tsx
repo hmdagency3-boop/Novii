@@ -1,6 +1,8 @@
 import { Link, useLocation } from "wouter";
 import { Home, Search, PlusSquare, Heart, User, LogOut, Menu, Sun, Moon, Clapperboard, MessageCircle, Compass, Settings, AtSign, FileText, Video, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CreatePostModal } from "@/components/create-post-modal";
+import { CreateStoryModal } from "@/components/create-story-modal";
 
 const logo = "/assets/novii_app_logo.png";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createType, setCreateType] = useState<'story' | 'post' | 'reel' | null>(null);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
+  const [createModalInitialType, setCreateModalInitialType] = useState<'post' | 'reel'>('post');
+  const [isCreateStoryModalOpen, setIsCreateStoryModalOpen] = useState(false);
   const [chatActive, setChatActive] = useState(false);
   const createButtonRef = useRef<HTMLButtonElement>(null);
   
@@ -75,6 +80,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
+    };
+  }, []);
+
+  // Listen for global create modal events (works from any page)
+  useEffect(() => {
+    const handleOpenPost = () => { setCreateModalInitialType('post'); setIsCreatePostModalOpen(true); };
+    const handleOpenReel = () => { setCreateModalInitialType('reel'); setIsCreatePostModalOpen(true); };
+    const handleOpenStory = () => setIsCreateStoryModalOpen(true);
+    window.addEventListener('openPostModal', handleOpenPost);
+    window.addEventListener('openReelModal', handleOpenReel);
+    window.addEventListener('openStoryModal', handleOpenStory);
+    return () => {
+      window.removeEventListener('openPostModal', handleOpenPost);
+      window.removeEventListener('openReelModal', handleOpenReel);
+      window.removeEventListener('openStoryModal', handleOpenStory);
     };
   }, []);
 
@@ -436,6 +456,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </button>
         </Link>
       </nav>
+
+      {/* Global Create Modals — available from any page */}
+      <CreatePostModal
+        open={isCreatePostModalOpen}
+        onOpenChange={setIsCreatePostModalOpen}
+        initialMediaType={createModalInitialType}
+      />
+      <CreateStoryModal
+        open={isCreateStoryModalOpen}
+        onOpenChange={setIsCreateStoryModalOpen}
+      />
     </div>
   );
 }
