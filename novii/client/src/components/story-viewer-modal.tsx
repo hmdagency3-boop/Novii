@@ -412,7 +412,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
               {musicBlocked && (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleUnblockMusic(); }}
-                  className="flex items-center gap-2 bg-white/20 backdrop-blur-sm border border-white/40 rounded-full px-4 py-2 animate-pulse"
+                  className="flex items-center gap-2 bg-white/20 backdrop-blur-sm border border-white/40 rounded-full px-4 py-2 animate-pulse pointer-events-auto relative z-40"
                 >
                   <VolumeX className="w-4 h-4 text-white" />
                   <span className="text-white text-xs font-semibold">
@@ -441,20 +441,18 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
             </div>
           )}
 
-          {/* Navigation Areas */}
-          <div className="absolute inset-0 flex">
+          {/* Navigation Areas — pointer-events-none on wrapper so overlays (music button etc.) can receive clicks */}
+          <div className="absolute inset-0 flex pointer-events-none">
             <div 
-              className="w-1/3 h-full cursor-pointer"
+              className="w-1/3 h-full cursor-pointer pointer-events-auto"
               onClick={(e) => {
                 e.stopPropagation();
                 handlePrevious();
               }}
             />
+            <div className="w-1/3 h-full" />
             <div 
-              className="w-1/3 h-full"
-            />
-            <div 
-              className="w-1/3 h-full cursor-pointer"
+              className="w-1/3 h-full cursor-pointer pointer-events-auto"
               onClick={(e) => {
                 e.stopPropagation();
                 handleNext();
