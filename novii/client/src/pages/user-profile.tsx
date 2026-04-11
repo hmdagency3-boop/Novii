@@ -45,7 +45,12 @@ export default function UserProfile() {
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  
+  const [slideIn, setSlideIn] = useState(() => {
+    const flag = sessionStorage.getItem("novii-qr-nav");
+    if (flag) { sessionStorage.removeItem("novii-qr-nav"); return true; }
+    return false;
+  });
+
   const isRTL = direction === "rtl";
 
   // Track mobile size
@@ -202,9 +207,21 @@ export default function UserProfile() {
 
   return (
     <Layout>
+      {slideIn && (
+        <style>{`
+          @keyframes noviiSlideIn {
+            from { transform: translateX(100%); opacity: 0.6; }
+            to   { transform: translateX(0);    opacity: 1;   }
+          }
+          .novii-slide-in {
+            animation: noviiSlideIn 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+          }
+        `}</style>
+      )}
       <div className={cn(
         "flex flex-col w-full min-h-screen bg-background relative",
-        isOfficialProfile && "before:absolute before:top-0 before:left-0 before:right-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-purple-500 before:to-transparent before:opacity-60"
+        isOfficialProfile && "before:absolute before:top-0 before:left-0 before:right-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-purple-500 before:to-transparent before:opacity-60",
+        slideIn && "novii-slide-in"
       )}>
         
         {/* Profile Header - Responsive Unified Layout */}

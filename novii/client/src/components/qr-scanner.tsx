@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { useLanguage } from "@/lib/language-context";
-import { QRSuccessAnimation } from "@/components/qr-success-animation";
 import { Camera, X } from "lucide-react";
 
 interface QRScannerProps {
@@ -19,7 +18,6 @@ export function QRScanner({ onResult, onClose }: QRScannerProps) {
   const doneRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [scannedUrl, setScannedUrl] = useState<string | null>(null);
 
   useEffect(() => {
     doneRef.current = false;
@@ -71,7 +69,9 @@ export function QRScanner({ onResult, onClose }: QRScannerProps) {
         if (code) {
           doneRef.current = true;
           streamRef.current?.getTracks().forEach((t) => t.stop());
-          setScannedUrl(code.data);
+          // Flag for slide-in page transition
+          sessionStorage.setItem("novii-qr-nav", "1");
+          onResult(code.data);
           return;
         }
       }
@@ -84,13 +84,6 @@ export function QRScanner({ onResult, onClose }: QRScannerProps) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [ready, onResult]);
-
-  // Show success animation when QR is detected
-  if (scannedUrl) {
-    return (
-      <QRSuccessAnimation onDone={() => onResult(scannedUrl)} />
-    );
-  }
 
   return (
     <div className="flex flex-col items-center gap-4 px-4 pb-6">
