@@ -1,6 +1,7 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Heart, MessageCircle, Share2, ChevronLeft, ChevronRight, X, Send, Trash2, Play, Pause, Volume2, VolumeX, Reply, MoreVertical } from "lucide-react";
+import { Heart, MessageCircle, Share2, ChevronLeft, ChevronRight, X, Send, Trash2, Play, Pause, Volume2, VolumeX, Reply, MoreVertical, ImageIcon } from "lucide-react";
+import { GifPicker, GIF_PREFIX } from "@/components/gif-picker";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,6 @@ import { useToggleReelLike, useCreateComment, useToggleCommentLike, useDeleteCom
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
-const GIF_PREFIX = "__GIF__:";
 
 function renderCommentContent(content: string, isOfficial?: boolean) {
   if (content.startsWith(GIF_PREFIX)) {
@@ -106,6 +106,8 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
   const [showCenterButton, setShowCenterButton] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [showMobileComments, setShowMobileComments] = useState(false);
+  const [showDesktopGifPicker, setShowDesktopGifPicker] = useState(false);
+  const [showMobileGifPicker, setShowMobileGifPicker] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const centerButtonTimeoutRef = useRef<NodeJS.Timeout>(null);
@@ -328,12 +330,33 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
       
       setCommentText("");
       setReplyingTo(null);
+      setShowDesktopGifPicker(false);
+      setShowMobileGifPicker(false);
       // Refetch comments
       if (refetchComments) {
         refetchComments();
       }
     } catch (error) {
       console.error('Error:', error);
+    }
+  };
+
+  const handleGifSelect = async (url: string, forMobile: boolean) => {
+    if (!currentUser?.id || !reel?.id) return;
+    try {
+      await supabase.from("comments").insert({
+        reel_id: reel.id,
+        user_id: currentUser.id,
+        content: GIF_PREFIX + url,
+        post_id: null,
+        parent_comment_id: replyingTo || null,
+      });
+      setReplyingTo(null);
+      if (forMobile) setShowMobileGifPicker(false);
+      else setShowDesktopGifPicker(false);
+      if (refetchComments) refetchComments();
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -950,6 +973,13 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                 </div>
               )}
 
+              {/* GIF Picker — desktop */}
+              {showDesktopGifPicker && (
+                <div className="mb-2">
+                  <GifPicker isRTL={isRTL} height={240} onSelect={(url) => handleGifSelect(url, false)} />
+                </div>
+              )}
+
               {/* Comment Input */}
               <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
                 <Avatar className="w-8 h-8 flex-shrink-0">
@@ -964,6 +994,15 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                     onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
                     className="bg-neutral-800/50 border-neutral-700 text-white placeholder:text-muted-foreground focus:border-pink-500 h-10 text-sm"
                   />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowDesktopGifPicker(p => !p)}
+                    className={cn("h-10 w-10 flex-shrink-0", showDesktopGifPicker && "text-pink-400")}
+                    title="GIF"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                  </Button>
                   <Button
                     onClick={handleAddComment}
                     disabled={!commentText.trim() || createComment.isPending}
@@ -1154,6 +1193,13 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
               </div>
             )}
 
+            {/* GIF Picker — mobile */}
+            {showMobileGifPicker && (
+              <div className="mb-2">
+                <GifPicker isRTL={isRTL} height={220} onSelect={(url) => handleGifSelect(url, true)} />
+              </div>
+            )}
+
             {/* Comment Input */}
             <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
               <Avatar className="w-7 h-7 flex-shrink-0">
@@ -1168,6 +1214,15 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                   onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
                   className="bg-neutral-800/50 border-neutral-700 text-white placeholder:text-muted-foreground focus:border-pink-500 h-9 text-xs"
                 />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowMobileGifPicker(p => !p)}
+                  className={cn("h-9 w-9 flex-shrink-0", showMobileGifPicker && "text-pink-400")}
+                  title="GIF"
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                </Button>
                 <Button
                   onClick={handleAddComment}
                   disabled={!commentText.trim() || createComment.isPending}

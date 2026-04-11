@@ -1,153 +1,93 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Image as ImageIcon, Search, Loader } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
 
-interface GifPickerProps {
-  onGifSelect: (gifUrl: string) => void;
-  disabled?: boolean;
+export const GIF_PREFIX = "__GIF__:";
+
+interface GifItem {
+  id: string;
+  title: string;
+  images: {
+    original: { url: string };
+    preview?: { url: string };
+  };
 }
 
-export function GifPicker({ onGifSelect, disabled }: GifPickerProps) {
-  const [open, setOpen] = useState(false);
-  const [gifs, setGifs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [imageErrors, setImageErrors] = useState<string[]>([]);
+interface GifPickerProps {
+  onSelect: (url: string) => void;
+  isRTL: boolean;
+  height?: number;
+}
 
-  const searchGifs = async (query: string) => {
-    setLoading(true);
-    setImageErrors([]);
-    try {
-      // Use backend API to search GIFs from Tenor
-      const response = await fetch(`/api/gifs/search?q=${encodeURIComponent(query)}`);
-      const data = await response.json();
-      setGifs(data.data || []);
-    } catch (error) {
-      console.error("Error searching GIFs:", error);
-      setGifs([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+export function GifPicker({ onSelect, isRTL, height = 260 }: GifPickerProps) {
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageError = (gifId: string) => {
-    setImageErrors(prev => [...prev, gifId]);
-  };
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 400);
+    return () => clearTimeout(t);
+  }, [q]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      searchGifs(searchQuery);
-    } else {
-      // If empty, load trending
-      searchGifs('trending');
-    }
-  };
+  useEffect(() => { inputRef.current?.focus(); }, []);
 
-  // Load trending GIFs when dialog opens
-  const handleDialogOpen = (isOpen: boolean) => {
-    setOpen(isOpen);
-    if (isOpen && gifs.length === 0) {
-      searchGifs('trending');
-    }
-  };
-
-  const handleGifClick = (gifUrl: string) => {
-    onGifSelect(gifUrl);
-    setOpen(false);
-    setSearchQuery("");
-    setGifs([]);
-  };
+  const { data, isLoading } = useQuery({
+    queryKey: ["gifs", debouncedQ],
+    queryFn: async () => {
+      const res = await fetch(`/api/gifs/search?q=${encodeURIComponent(debouncedQ)}`);
+      const json = await res.json();
+      return json.data as GifItem[];
+    },
+  });
 
   return (
-    <>
-      <Button
-        variant="ghost"
-        size="icon"
-        disabled={disabled}
-        onClick={() => handleDialogOpen(true)}
-        title="Add GIF"
-        className="hover:bg-secondary"
-      >
-        <ImageIcon className="w-4 h-4" />
-      </Button>
+    <div
+      className="bg-neutral-900 border border-neutral-700 rounded-xl overflow-hidden shadow-2xl"
+      style={{ height }}
+    >
+      {/* Search */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-neutral-700">
+        <Search className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+        <input
+          ref={inputRef}
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder={isRTL ? "ابحث عن GIF..." : "Search GIFs..."}
+          className="flex-1 bg-transparent text-xs text-white outline-none placeholder:text-muted-foreground"
+          dir={isRTL ? "rtl" : "ltr"}
+        />
+      </div>
 
-      <Dialog open={open} onOpenChange={handleDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Select a GIF</DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSearch} className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Search GIFs..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1"
-              />
-              <Button type="submit" disabled={loading}>
-                {loading ? <Loader className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              </Button>
-            </div>
-          </form>
-
-          {loading && <div className="text-center py-8 flex flex-col items-center gap-2">
-            <Loader className="w-5 h-5 animate-spin" />
-            <span className="text-sm text-muted-foreground">Loading GIFs...</span>
-          </div>}
-
-          {gifs.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-              {gifs.map((gif) => {
-                const hasError = imageErrors.includes(gif.id);
-                const imageUrl = gif.images?.preview_gif?.url || gif.images?.original?.url;
-                
-                return (
-                  <button
-                    key={gif.id}
-                    onClick={() => handleGifClick(gif.images.original.url)}
-                    className="relative group cursor-pointer overflow-hidden rounded-lg h-32 bg-muted flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
-                  >
-                    {imageUrl && !hasError ? (
-                      <>
-                        <img
-                          src={imageUrl}
-                          alt={gif.title || "GIF"}
-                          className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
-                          onError={() => handleImageError(gif.id)}
-                        />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                          <span className="text-white text-xs font-bold bg-black/70 px-3 py-1 rounded">Select</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-center px-2">
-                        <div className="text-2xl">🎬</div>
-                        <span className="text-xs font-semibold line-clamp-2">{gif.title || 'GIF'}</span>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {!loading && gifs.length === 0 && searchQuery && (
-            <div className="text-center py-8 text-muted-foreground">
-              No GIFs found for "{searchQuery}"
-            </div>
-          )}
-
-          {!loading && gifs.length === 0 && !searchQuery && (
-            <div className="text-center py-8 text-muted-foreground">
-              Search for GIFs to get started
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+      {/* Grid */}
+      <div className="overflow-y-auto" style={{ height: height - 45, scrollbarWidth: "none" }}>
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-xs gap-2">
+            <span className="animate-spin inline-block">⌛</span>
+            {isRTL ? "جاري التحميل..." : "Loading..."}
+          </div>
+        ) : !data?.length ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+            {isRTL ? "لا توجد نتائج" : "No results"}
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-1 p-2">
+            {data.map(gif => (
+              <button
+                key={gif.id}
+                onClick={() => onSelect(gif.images.original.url)}
+                className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-pink-500 transition-all"
+              >
+                <img
+                  src={gif.images.preview?.url || gif.images.original.url}
+                  alt={gif.title}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

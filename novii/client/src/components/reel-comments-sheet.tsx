@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Heart, Send, Trash2, Reply, X, ImageIcon, Search } from "lucide-react";
+import { Heart, Send, Trash2, Reply, X, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
@@ -18,8 +18,7 @@ import { CreatorBadge } from "@/components/ui/creator-badge";
 import { PremiumBadge } from "@/components/ui/premium-badge";
 import { PopularBadge } from "@/components/ui/popular-badge";
 import { ActiveBadge } from "@/components/ui/active-badge";
-
-const GIF_PREFIX = "__GIF__:";
+import { GifPicker, GIF_PREFIX } from "@/components/gif-picker";
 
 const formatTime = (timestamp: string | Date) => {
   const date = new Date(timestamp);
@@ -47,81 +46,6 @@ function renderContent(content: string) {
     );
   }
   return <p className="text-sm mt-1.5 break-words text-white/85">{content}</p>;
-}
-
-/* ── GIF Picker ──────────────────────────────────── */
-function GifPicker({ onSelect, isRTL }: { onSelect: (url: string) => void; isRTL: boolean }) {
-  const [q, setQ] = useState("");
-  const [debouncedQ, setDebouncedQ] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q), 400);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  useEffect(() => { inputRef.current?.focus(); }, []);
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["gifs", debouncedQ],
-    queryFn: async () => {
-      const res = await fetch(`/api/gifs/search?q=${encodeURIComponent(debouncedQ)}`);
-      const json = await res.json();
-      return json.data as Array<{
-        id: string;
-        title: string;
-        images: { original: { url: string }; preview?: { url: string } };
-      }>;
-    },
-  });
-
-  return (
-    <div className="bg-neutral-900 border border-neutral-700 rounded-xl overflow-hidden shadow-2xl"
-      style={{ height: 260 }}>
-      {/* Search */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-neutral-700">
-        <Search className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-        <input
-          ref={inputRef}
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          placeholder={isRTL ? "ابحث عن GIF..." : "Search GIFs..."}
-          className="flex-1 bg-transparent text-xs text-white outline-none placeholder:text-muted-foreground"
-          dir={isRTL ? "rtl" : "ltr"}
-        />
-      </div>
-      {/* Grid */}
-      <div className="overflow-y-auto" style={{ height: 215, scrollbarWidth: "none" }}>
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-            <div className="animate-spin mr-2">⌛</div>
-            {isRTL ? "جاري التحميل..." : "Loading..."}
-          </div>
-        ) : !data?.length ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-            {isRTL ? "لا توجد نتائج" : "No results"}
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-1 p-2">
-            {data.map(gif => (
-              <button
-                key={gif.id}
-                onClick={() => onSelect(gif.images.original.url)}
-                className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-pink-500 transition-all"
-              >
-                <img
-                  src={gif.images.preview?.url || gif.images.original.url}
-                  alt={gif.title}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
 /* ── Main Component ──────────────────────────────── */
