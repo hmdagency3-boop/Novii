@@ -86,14 +86,15 @@ export function ProfileShareModal({
     img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
   };
 
-  const Content = () => (
-    <div className="flex flex-col items-center gap-4 px-6 pb-6 pt-2">
+  const ModalBody = ({ qrSize }: { qrSize: number }) => (
+    <div className="flex flex-col items-center gap-4 px-5 pb-5 pt-1">
+
       {/* QR Code */}
       <div className="bg-white p-4 rounded-2xl shadow-sm">
         <QRCodeSVG
           id="profile-qr-code"
           value={profileUrl}
-          size={isMobile ? 180 : 200}
+          size={qrSize}
           level="H"
           includeMargin={false}
           imageSettings={
@@ -113,36 +114,36 @@ export function ProfileShareModal({
       </div>
 
       {/* Profile URL */}
-      <div className="w-full bg-muted rounded-xl px-4 py-3" dir="ltr">
+      <div className="w-full bg-muted rounded-xl px-4 py-2.5" dir="ltr">
         <p className="text-xs text-muted-foreground font-mono truncate">{profileUrl}</p>
       </div>
 
-      {/* Action Buttons */}
-      <div className="grid grid-cols-2 gap-3 w-full">
-        <Button
-          variant="outline"
-          className="rounded-xl gap-2 h-11"
-          onClick={handleCopy}
-        >
-          {copied
-            ? <Check className="w-4 h-4 text-green-500 shrink-0" />
-            : <Copy className="w-4 h-4 shrink-0" />}
-          <span>{isRTL ? (copied ? "تم النسخ" : "نسخ") : (copied ? "Copied!" : "Copy Link")}</span>
-        </Button>
-        <Button
-          className="rounded-xl gap-2 h-11 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white border-0"
-          onClick={handleShare}
-        >
-          <Share2 className="w-4 h-4 shrink-0" />
-          <span>{isRTL ? "مشاركة" : "Share"}</span>
-        </Button>
-      </div>
+      {/* Copy Button - full width */}
+      <Button
+        variant="outline"
+        className="w-full rounded-xl h-11 gap-2 text-sm font-medium"
+        onClick={handleCopy}
+      >
+        {copied
+          ? <Check className="w-4 h-4 text-green-500 shrink-0" />
+          : <Copy className="w-4 h-4 shrink-0" />}
+        {isRTL ? (copied ? "تم نسخ الرابط" : "نسخ الرابط") : (copied ? "Link Copied!" : "Copy Link")}
+      </Button>
+
+      {/* Share Button - full width */}
+      <Button
+        className="w-full rounded-xl h-11 gap-2 text-sm font-medium bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white border-0"
+        onClick={handleShare}
+      >
+        <Share2 className="w-4 h-4 shrink-0" />
+        {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
+      </Button>
 
       {/* Download QR */}
       <Button
         variant="ghost"
         size="sm"
-        className="text-muted-foreground gap-2 text-xs"
+        className="text-muted-foreground gap-2 text-xs h-7"
         onClick={handleDownloadQR}
       >
         <Download className="w-3.5 h-3.5 shrink-0" />
@@ -151,30 +152,31 @@ export function ProfileShareModal({
     </div>
   );
 
+  /* ── Mobile: bottom sheet ── */
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={onClose}>
         <SheetContent side="bottom" className="rounded-t-3xl pb-8 px-0 pt-0">
-          {/* Handle bar */}
           <div className="flex justify-center pt-3 pb-1">
             <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
           </div>
           <SheetTitle className="text-center text-base font-bold py-3">
             {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
           </SheetTitle>
-          <Content />
+          <ModalBody qrSize={190} />
         </SheetContent>
       </Sheet>
     );
   }
 
+  /* ── Desktop: centered dialog ── */
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl">
-        <DialogTitle className="text-center text-base font-bold px-6 pt-6 pb-0">
+      <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl" style={{ direction: "ltr" }}>
+        <DialogTitle className="text-center text-base font-bold px-5 pt-5 pb-0" style={{ direction: direction }}>
           {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
         </DialogTitle>
-        <Content />
+        <ModalBody qrSize={200} />
       </DialogContent>
     </Dialog>
   );
