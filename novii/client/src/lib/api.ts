@@ -193,7 +193,6 @@ export const api = {
     const cacheKey = `profile_current_${user.id}`;
     const cached = getFromCache<Profile>(cacheKey);
     if (cached) {
-      console.log('✅ Current profile from cache');
       return cached;
     }
 
@@ -269,7 +268,6 @@ export const api = {
     // Try cache first
     const cached = getFromCache<Profile>(cacheKey);
     if (cached) {
-      console.log(`✅ Profile ${username} from cache`);
       return cached;
     }
 
@@ -621,7 +619,6 @@ export const api = {
       
       if (deleteError) throw deleteError;
       
-      console.log('❤️ Like removed');
       return false;
     } else {
       // Like: insert the like (count increment handled by trigger)
@@ -631,7 +628,6 @@ export const api = {
       
       if (insertError) throw insertError;
       
-      console.log('❤️ Like added');
       
       // Get post owner to create notification
       const { data: post, error: postError } = await supabase
@@ -651,7 +647,6 @@ export const api = {
             type: 'like',
             postId: postId,
           });
-          console.log('✅ Like notification created');
         } catch (notifError) {
           console.error('⚠️ Failed to create like notification:', notifError);
         }
@@ -684,7 +679,6 @@ export const api = {
       
       if (deleteError) throw deleteError;
       
-      console.log('❤️ Reel like removed');
       return false;
     } else {
       // Like: insert the like
@@ -694,7 +688,6 @@ export const api = {
       
       if (insertError) throw insertError;
       
-      console.log('❤️ Reel like added');
       
       // Get reel owner to create notification
       const { data: reel, error: reelError } = await supabase
@@ -713,7 +706,6 @@ export const api = {
             actorId: user.id,
             type: 'like',
           });
-          console.log('✅ Reel like notification created');
         } catch (notifError) {
           console.error('⚠️ Failed to create reel like notification:', notifError);
         }
@@ -815,7 +807,6 @@ export const api = {
           commentId: data.id,
           content: content.substring(0, 100),
         });
-        console.log('✅ Comment notification created');
       } catch (notifError) {
         console.error('⚠️ Failed to create comment notification:', notifError);
       }
@@ -882,7 +873,6 @@ export const api = {
       .limit(10);
 
     if (error) throw error;
-    console.log(`🔍 Search results for "${query}":`, data?.length || 0, 'users');
     return (data || []) as unknown as Profile[];
   },
 
@@ -1033,7 +1023,6 @@ export const api = {
 
       if (deleteError) throw deleteError;
       
-      console.log('✅ Story deleted successfully');
     } catch (error) {
       console.error('❌ Error deleting story:', error);
       throw error;
@@ -1042,7 +1031,6 @@ export const api = {
 
   // Follow APIs
   async toggleFollow(targetUserId: string): Promise<{isFollowing: boolean; actorProfile: Profile | null; isPending?: boolean}> {
-    console.log('🔄 toggleFollow called for user:', targetUserId);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
@@ -1069,21 +1057,18 @@ export const api = {
 
     if (existingFollow) {
       // Delete follow
-      console.log('❌ Unfollowing user:', targetUserId);
       await supabase.from('follows').delete().eq('id', existingFollow.id);
       return { isFollowing: false, actorProfile: currentProfile };
     } else {
       // Check if target user has private account
       if (targetProfile?.is_private) {
         // Send follow request instead
-        console.log('📨 Sending follow request to private account:', targetUserId);
         try {
           await this.createNotification({
             userId: targetUserId,
             actorId: user.id,
             type: 'follow_request',
           });
-          console.log('✅ Follow request sent');
           return { isFollowing: false, actorProfile: currentProfile, isPending: true };
         } catch (error) {
           console.error('❌ Failed to send follow request:', error);
@@ -1091,7 +1076,6 @@ export const api = {
         }
       } else {
         // Public account - follow directly
-        console.log('✅ Following user:', targetUserId);
         const { error } = await supabase.from('follows').insert({
           follower_id: user.id,
           following_id: targetUserId
@@ -1100,7 +1084,6 @@ export const api = {
           console.error('❌ Follow insert error:', error);
           throw error;
         }
-        console.log('✅ Follow inserted successfully');
         
         // Create notification for the followed user
         try {
@@ -1109,7 +1092,6 @@ export const api = {
             actorId: user.id,
             type: 'follow',
           });
-          console.log('✅ Follow notification created');
         } catch (notifError) {
           console.error('⚠️ Failed to create follow notification:', notifError);
         }
@@ -1148,7 +1130,6 @@ export const api = {
     if (!user) throw new Error('Not authenticated');
 
     try {
-      console.log('✅ Approving follow request from:', actorId);
 
       // Create follow
       const { error: followError } = await supabase.from('follows').insert({
@@ -1161,7 +1142,6 @@ export const api = {
         throw followError;
       }
 
-      console.log('✅ Follow created successfully');
 
       // Delete follow request notification
       const { error: deleteError } = await supabase
@@ -1174,7 +1154,6 @@ export const api = {
       if (deleteError) {
         console.error('❌ Error deleting follow request notification:', deleteError);
       } else {
-        console.log('✅ Follow request notification deleted');
       }
     } catch (error) {
       console.error('❌ Error in approveFollowRequest:', error);
@@ -1216,7 +1195,6 @@ export const api = {
 
       if (messageError) throw messageError;
       
-      console.log('✅ Story reply sent:', message);
       return message;
     } catch (error) {
       console.error('❌ Error sending story reply:', error);
@@ -1250,7 +1228,6 @@ export const api = {
 
         if (insertError) throw insertError;
         
-        console.log('✅ Story view recorded');
       }
 
       // Get current views count
@@ -1282,7 +1259,6 @@ export const api = {
 
   async getStoryViews(storyId: string): Promise<any[]> {
     try {
-      console.log('📊 Fetching story views for story:', storyId);
       
       const { data, error } = await supabase
         .from('story_views')
@@ -1298,7 +1274,6 @@ export const api = {
         throw error;
       }
 
-      console.log('📊 Fetched story views:', data?.length || 0);
 
       // Map the data to include profile info with viewedAt
       const views = data?.map((view: any) => ({
@@ -1306,7 +1281,6 @@ export const api = {
         viewedAt: view.viewed_at
       })) || [];
 
-      console.log('📊 Mapped views:', views);
       return views;
     } catch (error) {
       console.error('❌ Error getting story views:', error);
@@ -1319,7 +1293,6 @@ export const api = {
     if (!user) throw new Error('Not authenticated');
 
     try {
-      console.log('❌ Rejecting follow request from:', actorId);
 
       // Delete follow request notification
       const { error } = await supabase
@@ -1334,7 +1307,6 @@ export const api = {
         throw error;
       }
 
-      console.log('✅ Follow request rejected');
     } catch (error) {
       console.error('❌ Error in rejectFollowRequest:', error);
       throw error;
@@ -1444,7 +1416,6 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    console.log(`📨 getMessages called - Current User: ${user.id}, Target User: ${userId}`);
     
     // Prevent fetching messages to self
     if (user.id === userId) {
@@ -1471,7 +1442,6 @@ export const api = {
       throw error;
     }
     
-    console.log(`✅ Fetched ${data?.length || 0} messages between Current User (${user.id}) and Target User (${userId})`);
     return data || [];
   },
 
@@ -1489,7 +1459,6 @@ export const api = {
       throw new Error('Cannot send messages to yourself');
     }
 
-    console.log(`📤 Sending message from ${user.id} to ${receiverId}`);
 
     const { data, error } = await supabase
       .from('messages')
@@ -1511,7 +1480,6 @@ export const api = {
       throw error;
     }
     
-    console.log(`✅ Message sent successfully`);
     return data;
   },
 
@@ -1519,7 +1487,6 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    console.log(`📖 Marking messages as read from ${senderId} to ${user.id}`);
 
     const { error } = await supabase
       .from('messages')
@@ -1533,60 +1500,55 @@ export const api = {
       throw error;
     }
     
-    console.log(`✅ Messages marked as read successfully`);
   },
 
   async updateMessage(messageId: string, newContent: string): Promise<Message> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    console.log(`✏️ Updating message ${messageId}`);
-
-    const { data, error } = await supabase.rpc('update_message', {
-      message_id: messageId,
-      new_content: newContent
-    });
+    const { data, error } = await supabase
+      .from('messages')
+      .update({
+        content: newContent,
+        is_edited: true,
+        edited_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', messageId)
+      .eq('sender_id', user.id)
+      .select()
+      .single();
 
     if (error) {
-      console.error('❌ Error updating message:', error);
+      console.error('Error updating message:', error);
       throw error;
     }
-    
-    // RPC returns array, get first item
-    const updatedMessage = Array.isArray(data) ? data[0] : data;
-    
-    if (!updatedMessage) {
-      throw new Error('Failed to update message');
-    }
-    
-    console.log(`✅ Message updated successfully`);
-    return updatedMessage;
+    if (!data) throw new Error('Failed to update message');
+    return data;
   },
 
   async deleteMessage(messageId: string): Promise<Message> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    console.log(`🗑️ Deleting message ${messageId}`);
-
-    const { data, error } = await supabase.rpc('delete_message', {
-      message_id: messageId
-    });
+    const { data, error } = await supabase
+      .from('messages')
+      .update({
+        is_deleted: true,
+        content: '[deleted]',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', messageId)
+      .eq('sender_id', user.id)
+      .select()
+      .single();
 
     if (error) {
-      console.error('❌ Error deleting message:', error);
+      console.error('Error deleting message:', error);
       throw error;
     }
-    
-    // RPC returns array, get first item
-    const deletedMessage = Array.isArray(data) ? data[0] : data;
-    
-    if (!deletedMessage) {
-      throw new Error('Failed to delete message');
-    }
-    
-    console.log(`✅ Message deleted successfully`);
-    return deletedMessage;
+    if (!data) throw new Error('Failed to delete message');
+    return data;
   },
 
   // Notifications APIs
@@ -1651,7 +1613,6 @@ export const api = {
       throw error;
     }
     
-    console.log(`✅ Notification created: ${params.type}`);
     return {
       id: data.id,
       actor: actor || { id: params.actorId, is_official: false, is_verified: false } as Profile
@@ -1734,7 +1695,6 @@ export const api = {
       throw error;
     }
     
-    console.log('✅ All unread notifications marked as read');
   },
 
   // Saved Posts APIs
@@ -2055,7 +2015,6 @@ export const api = {
       .eq('user_id', user.id);
 
     if (updateError) throw updateError;
-    console.log(`📌 Post ${newPinnedStatus ? 'pinned' : 'unpinned'}`);
     return newPinnedStatus;
   },
 
@@ -2083,7 +2042,6 @@ export const api = {
       .eq('user_id', user.id);
 
     if (updateError) throw updateError;
-    console.log(`👁️ Post likes ${newHideLikesStatus ? 'hidden' : 'visible'}`);
     return newHideLikesStatus;
   },
 
@@ -2111,7 +2069,6 @@ export const api = {
       .eq('user_id', user.id);
 
     if (updateError) throw updateError;
-    console.log(`💬 Post replies ${newRepliesDisabledStatus ? 'disabled' : 'enabled'}`);
     return newRepliesDisabledStatus;
   },
 
@@ -2129,10 +2086,8 @@ export const api = {
         })
         .maybeSingle();
       
-      console.log('👀 Post view recorded');
     } catch (error) {
       // Ignore duplicate view errors - it's handled by the unique constraint
-      console.log('View already recorded or error:', error);
     }
   },
 
@@ -2215,7 +2170,6 @@ export const api = {
         return [];
       }
 
-      console.log("🔄 getCommunities: Fetching with user ID:", user.id);
       const response = await fetch('/api/communities', {
         headers: { 'x-user-id': user.id },
       });
@@ -2227,7 +2181,6 @@ export const api = {
       
       const result = await response.json();
       const communities = result.data || [];
-      console.log("✅ getCommunities: Fetched", communities.length, "communities:", communities);
       return communities;
     } catch (error) {
       console.error("❌ getCommunities: Error:", error);

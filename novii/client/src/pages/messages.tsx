@@ -133,10 +133,8 @@ export default function Messages() {
   const { data: communities = [], isLoading: communitiesLoading, refetch: refetchCommunities } = useQuery({
     queryKey: ['communities', currentUser?.id],
     queryFn: async () => {
-      console.log("🔄 [QUERY] Fetching communities, currentUser:", currentUser?.id);
       try {
         const result = await api.getCommunities();
-        console.log("✅ [QUERY] Communities result:", result);
         return result || [];
       } catch (error) {
         console.error("❌ [QUERY] Error:", error);
@@ -156,7 +154,6 @@ export default function Messages() {
   useEffect(() => {
     if (!currentUser) return;
 
-    console.log("🔴 Setting up real-time subscription for communities");
 
     // Subscribe to community_members changes to detect when user is removed from a community
     communitiesSubscriptionRef.current = supabase
@@ -170,7 +167,6 @@ export default function Messages() {
           filter: `user_id=eq.${currentUser.id}`
         },
         (payload) => {
-          console.log("🔄 Community member change detected:", payload);
           refetchCommunities();
         }
       )
@@ -182,18 +178,15 @@ export default function Messages() {
           table: 'communities'
         },
         (payload) => {
-          console.log("🔄 Community change detected:", payload);
           // Refetch communities to reflect any changes/deletions
           refetchCommunities();
         }
       )
       .subscribe((status) => {
-        console.log("📡 Communities real-time subscription status:", status);
       });
 
     return () => {
       if (communitiesSubscriptionRef.current) {
-        console.log("🔌 Cleaning up communities real-time subscription");
         supabase.removeChannel(communitiesSubscriptionRef.current);
       }
     };
@@ -231,10 +224,8 @@ export default function Messages() {
         isMuted: true,
         mutedUntil: currentUserMember.muted_until
       });
-      console.log("🔴 User is muted:", currentUserMember);
     } else {
       setUserMuteStatus({ isMuted: false });
-      console.log("✅ User mute status cleared - unmuted!");
     }
   };
 
@@ -242,7 +233,6 @@ export default function Messages() {
   useEffect(() => {
     if (!selectedCommunityId) return;
 
-    console.log("🔴 Setting up real-time subscription for community members:", selectedCommunityId);
 
     membersSubscriptionRef.current = supabase
       .channel(`community-members-${selectedCommunityId}`)
@@ -255,7 +245,6 @@ export default function Messages() {
           filter: `community_id=eq.${selectedCommunityId}`
         },
         (payload) => {
-          console.log("🔄 Community member change detected:", payload);
           // Update mute status for current user if it's about them
           if (currentUser && payload.new && ((payload.new as any).user_id === currentUser.id || (payload.old as any)?.user_id === currentUser.id)) {
             updateMuteStatusFromMembers([payload.new]);
@@ -264,12 +253,10 @@ export default function Messages() {
         }
       )
       .subscribe((status) => {
-        console.log("📡 Community members real-time subscription status:", status);
       });
 
     return () => {
       if (membersSubscriptionRef.current) {
-        console.log("🔌 Cleaning up community members real-time subscription");
         supabase.removeChannel(membersSubscriptionRef.current);
       }
     };
@@ -471,7 +458,6 @@ export default function Messages() {
       // Upload image if a new file is selected
       if (editCommunityImageFile) {
         avatarUrl = await api.uploadCommunityAvatar(editCommunityImageFile, (progress) => {
-          console.log(`📸 Upload progress: ${progress}%`);
         });
       }
 
@@ -606,7 +592,6 @@ export default function Messages() {
       queryClient.invalidateQueries({ queryKey: ['communities', currentUser?.id] });
       queryClient.refetchQueries({ queryKey: ['communities', currentUser?.id] });
       // Show success message
-      console.log("✅ Joined community:", data.communityName);
       toast.success(isRTL ? `تم الانضمام إلى "${data.communityName}"` : `Joined "${data.communityName}"`);
     },
     onError: (error: any) => {
@@ -714,7 +699,6 @@ export default function Messages() {
   useEffect(() => {
     if (!selectedCommunityId) return;
 
-    console.log("🔴 Setting up real-time subscription for community messages:", selectedCommunityId);
 
     const subscription = supabase
       .channel(`community_messages:${selectedCommunityId}`)
@@ -727,7 +711,6 @@ export default function Messages() {
           filter: `community_id=eq.${selectedCommunityId}`,
         },
         (payload) => {
-          console.log("💬 New community message received instantly:", payload);
           // Refetch community messages to get the new message
           queryClient.invalidateQueries({
             queryKey: ['communityMessages', selectedCommunityId, currentUser?.id]
@@ -737,7 +720,6 @@ export default function Messages() {
       .subscribe();
 
     return () => {
-      console.log("🔌 Cleaning up community message real-time subscription");
       subscription.unsubscribe();
     };
   }, [selectedCommunityId, queryClient, currentUser?.id]);
@@ -746,7 +728,6 @@ export default function Messages() {
   useEffect(() => {
     if (!selectedCommunityId) return;
 
-    console.log("🎹 Setting up typing indicator subscription for community:", selectedCommunityId);
 
     const subscription = supabase
       .channel(`community_typing:${selectedCommunityId}`)
@@ -759,7 +740,6 @@ export default function Messages() {
           filter: `community_id=eq.${selectedCommunityId}`,
         },
         (payload) => {
-          console.log("⌨️ Typing indicator update:", payload);
           
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             // User is typing - add to list
@@ -780,7 +760,6 @@ export default function Messages() {
       .subscribe();
 
     return () => {
-      console.log("🔌 Cleaning up typing indicator subscription");
       subscription.unsubscribe();
     };
   }, [selectedCommunityId, currentUser?.id]);
@@ -795,26 +774,6 @@ export default function Messages() {
     }
   }, [location]);
 
-  // When a new conversation is selected, mark messages as read immediately
-  useEffect(() => {
-    if (!selectedUserId || !currentUser) return;
-
-    // Mark messages as read
-    api.markMessagesAsRead(selectedUserId)
-      .then(() => {
-        // Immediately update conversations query to reflect 0 unread count
-        queryClient.setQueryData(['conversations'], (oldData: any) => {
-          if (!oldData) return oldData;
-          return oldData.map((conv: any) => 
-            conv.user?.id === selectedUserId 
-              ? { ...conv, unreadCount: 0 }
-              : conv
-          );
-        });
-      })
-      .catch(err => console.error('Failed to mark messages as read:', err));
-  }, [selectedUserId, currentUser, queryClient]);
-
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -823,7 +782,6 @@ export default function Messages() {
   useEffect(() => {
     if (!currentUser) return;
     
-    console.log('🔔 Setting up global real-time subscription for all messages');
 
     const channel = supabase
       .channel(`user-messages-${currentUser.id}`)
@@ -837,10 +795,8 @@ export default function Messages() {
         },
         (payload: any) => {
           const newMessage = payload.new;
-          console.log('📨 New message received globally:', newMessage);
           
           // Message is already filtered to current user as receiver
-          console.log('✅ Incoming message, updating conversations list');
           
           // Check if message is for currently open chat
           const isActiveChat = selectedUserId === newMessage.sender_id;
@@ -850,7 +806,7 @@ export default function Messages() {
             api.markMessagesAsRead(newMessage.sender_id)
               .then(() => {
                 // Update messages only, keep unread count at 0
-                queryClient.setQueryData(['conversations'], (oldData: any) => {
+                queryClient.setQueryData(['conversations', currentUser.id], (oldData: any) => {
                   if (!oldData) return oldData;
                   return oldData.map((conv: any) => 
                     conv.user?.id === newMessage.sender_id 
@@ -863,7 +819,7 @@ export default function Messages() {
               .catch(err => console.error('Failed to mark messages as read:', err));
           } else {
             // Increment unread count by 1 for this conversation (don't refetch all data)
-            queryClient.setQueryData(['conversations'], (oldData: any) => {
+            queryClient.setQueryData(['conversations', currentUser.id], (oldData: any) => {
               if (!oldData) return oldData;
               return oldData.map((conv: any) => 
                 conv.user?.id === newMessage.sender_id 
@@ -874,7 +830,7 @@ export default function Messages() {
             
             // Play notification sound
             if (notificationSoundRef.current) {
-              notificationSoundRef.current.play().catch(err => console.log('Could not play sound:', err));
+              notificationSoundRef.current.play();
             }
             
             // Show browser notification
@@ -908,11 +864,9 @@ export default function Messages() {
         }
       )
       .subscribe((status: any) => {
-        console.log('📡 Global realtime subscription status:', status);
       });
 
     return () => {
-      console.log('🔕 Cleaning up global real-time subscription');
       supabase.removeChannel(channel);
     };
   }, [currentUser, queryClient]);
@@ -921,7 +875,6 @@ export default function Messages() {
   useEffect(() => {
     if (!currentUser || !selectedUserId) return;
     
-    console.log('🔔 Setting up real-time subscription for messages with user:', selectedUserId);
 
     // Create unique channel name for this conversation
     const userIds = [currentUser.id, selectedUserId].sort();
@@ -939,7 +892,6 @@ export default function Messages() {
         },
         (payload: any) => {
           const newMessage = payload.new;
-          console.log('📨 New message received via real-time:', newMessage);
           
           // Check if this message is relevant to current conversation
           const isRelevant = 
@@ -947,10 +899,9 @@ export default function Messages() {
             (newMessage.sender_id === selectedUserId && newMessage.receiver_id === currentUser.id);
           
           if (isRelevant) {
-            console.log('✅ Message is relevant, updating UI');
             // Update messages query only, keep unread count at 0 for active chat
             queryClient.invalidateQueries({ queryKey: ['messages', selectedUserId] });
-            queryClient.setQueryData(['conversations'], (oldData: any) => {
+            queryClient.setQueryData(['conversations', currentUser?.id], (oldData: any) => {
               if (!oldData) return oldData;
               return oldData.map((conv: any) => 
                 conv.user?.id === selectedUserId 
@@ -971,7 +922,6 @@ export default function Messages() {
         },
         (payload: any) => {
           const updatedMessage = payload.new;
-          console.log('✏️ Message updated via real-time:', updatedMessage);
           
           // Check if this message is relevant to current conversation
           const isRelevant = 
@@ -979,10 +929,9 @@ export default function Messages() {
             (updatedMessage.sender_id === selectedUserId && updatedMessage.receiver_id === currentUser.id);
           
           if (isRelevant) {
-            console.log('✅ Message update is relevant, refreshing UI');
             // Update messages query only, keep unread count at 0 for active chat
             queryClient.invalidateQueries({ queryKey: ['messages', selectedUserId] });
-            queryClient.setQueryData(['conversations'], (oldData: any) => {
+            queryClient.setQueryData(['conversations', currentUser?.id], (oldData: any) => {
               if (!oldData) return oldData;
               return oldData.map((conv: any) => 
                 conv.user?.id === selectedUserId 
@@ -995,7 +944,6 @@ export default function Messages() {
       )
       // Listen for typing events
       .on('broadcast', { event: 'typing' }, (payload: any) => {
-        console.log('⌨️ Typing event received:', payload);
         const { userId, isTyping: typing } = payload.payload;
         
         // Only show typing if it's from the other person
@@ -1014,12 +962,10 @@ export default function Messages() {
         }
       })
       .subscribe((status: any) => {
-        console.log('📡 Realtime subscription status:', status);
       });
 
     // Cleanup subscription on unmount
     return () => {
-      console.log('🔕 Cleaning up real-time subscription');
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
