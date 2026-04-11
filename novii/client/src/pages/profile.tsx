@@ -1,6 +1,6 @@
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Settings, Grid3X3, Bookmark, UserSquare2, Heart, MessageCircle, Lock, Shield } from "lucide-react";
+import { Settings, Grid3X3, Bookmark, UserSquare2, Heart, MessageCircle, Lock, Shield, QrCode } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
@@ -31,6 +31,7 @@ import { useUserStories } from "@/hooks/use-data";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { REEL_COLUMNS, PROFILE_CARD } from "@/lib/query-columns";
+import { ProfileShareModal } from "@/components/profile-share-modal";
 
 export default function Profile() {
   const { user } = useAuth();
@@ -45,6 +46,7 @@ export default function Profile() {
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const isRTL = direction === "rtl";
   const queryClient = useQueryClient();
   
@@ -349,6 +351,15 @@ export default function Profile() {
                       {isRTL ? (isMobile ? "تعديل" : "تعديل الملف") : (isMobile ? "Edit" : "Edit Profile")}
                     </Button>
                   </EditProfileDialog>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={isMobile ? "h-8 w-8" : "h-9 w-9"}
+                    onClick={() => setShareModalOpen(true)}
+                    title={isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
+                  >
+                    <QrCode className={isMobile ? "w-4 h-4" : "w-5 h-5"} />
+                  </Button>
                   <Link href="/settings">
                     <Button variant="ghost" size="icon" className={isMobile ? "h-8 w-8" : "h-9 w-9"}>
                       <Settings className={isMobile ? "w-4 h-4" : "w-5 h-5"} />
@@ -602,6 +613,18 @@ export default function Profile() {
           open={storyViewerOpen}
           onOpenChange={setStoryViewerOpen}
           isRTL={isRTL}
+        />
+      )}
+
+      {/* Profile Share Modal */}
+      {profile && user && (
+        <ProfileShareModal
+          open={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          username={profile.username}
+          userId={user.id}
+          avatarUrl={profile.avatar_url ?? undefined}
+          fullName={profile.full_name ?? undefined}
         />
       )}
     </Layout>

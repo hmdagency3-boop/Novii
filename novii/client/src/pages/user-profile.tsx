@@ -1,6 +1,6 @@
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Grid3X3, Bookmark, UserSquare2, Heart, MessageCircle, ArrowLeft, Lock } from "lucide-react";
+import { Grid3X3, Bookmark, UserSquare2, Heart, MessageCircle, ArrowLeft, Lock, QrCode } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
@@ -29,6 +29,7 @@ import { StoryViewerModal } from "@/components/story-viewer-modal";
 import { useToggleFollow, useUserStories } from "@/hooks/use-data";
 import { OnlineIndicator } from "@/components/online-indicator";
 import { supabase } from "@/lib/supabase";
+import { ProfileShareModal } from "@/components/profile-share-modal";
 
 export default function UserProfile() {
   const { user: currentUser } = useAuth();
@@ -43,6 +44,7 @@ export default function UserProfile() {
   const [reelModalOpen, setReelModalOpen] = useState(false);
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   
   const isRTL = direction === "rtl";
 
@@ -406,8 +408,9 @@ export default function UserProfile() {
                 )}
 
                 {/* Buttons - Below Stats */}
-                {!isOwnProfile && (
-                  <div className="flex gap-1 md:gap-2 pt-3 md:pt-4">
+                <div className="flex gap-1 md:gap-2 pt-3 md:pt-4">
+                  {!isOwnProfile && (
+                    <>
                       <Button 
                         variant={isFollowing ? "secondary" : (profile?.is_private && !hasRequest) ? "default" : hasRequest ? "outline" : "default"} 
                         className={cn(
@@ -439,8 +442,18 @@ export default function UserProfile() {
                           {isRTL ? "رسالة" : "Message"}
                         </Button>
                       </Link>
-                  </div>
-                )}
+                    </>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 md:h-8 md:w-8"
+                    onClick={() => setShareModalOpen(true)}
+                    title={isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
+                  >
+                    <QrCode className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
 
               {/* Bio Section - Desktop Only */}
@@ -639,6 +652,18 @@ export default function UserProfile() {
           open={storyViewerOpen}
           onOpenChange={setStoryViewerOpen}
           isRTL={isRTL}
+        />
+      )}
+
+      {/* Profile Share Modal */}
+      {profile && (
+        <ProfileShareModal
+          open={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          username={profile.username}
+          userId={userId}
+          avatarUrl={profile.avatar_url ?? undefined}
+          fullName={profile.full_name ?? undefined}
         />
       )}
     </Layout>
