@@ -357,14 +357,14 @@ function MobileReelCard({
       </button>
 
       {/* Action buttons */}
-      <div className={cn("absolute bottom-16 z-30", isRTL ? "left-3" : "right-3")}>
+      <div className={cn("absolute bottom-24 z-30", isRTL ? "left-3" : "right-3")}>
         <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
           currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
           onSave={onSave} onShare={onShare} size="sm" />
       </div>
 
       {/* Bottom info */}
-      <div className={cn("absolute bottom-0 z-20 pb-6 px-4 w-full",
+      <div className={cn("absolute bottom-0 z-20 pb-20 px-4 w-full",
         isRTL ? "text-right pr-4 pl-16" : "pl-4 pr-16")}>
         <Link href={`/user?id=${reel.profile?.id}`}>
           <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity drop-shadow">
