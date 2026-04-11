@@ -5,7 +5,7 @@ import { useReels, useToggleReelLike, useToggleFollow } from "@/hooks/use-data";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Heart, MessageCircle, Share2, Bookmark,
-  Volume2, VolumeX, Play, Plus, Music2,
+  Volume2, VolumeX, Play, Pause, Plus, Music2,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -308,10 +308,68 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
    MOBILE CARD
 ════════════════════════════════════════════════════ */
 function MobileReelCard({
-  reel, idx, isRTL, muted, setMuted, paused, followed, saved,
-  floatingHearts, currentUserId, videoRefs,
-  onTap, onDoubleTap, onLike, onFollow, onSave, onShare,
+  reel, idx, isRTL, muted, setMuted, followed, saved,
+  currentUserId, videoRefs,
+  onLike, onFollow, onSave, onShare,
 }: CardProps) {
+  const longPressTimer  = useRef<ReturnType<typeof setTimeout>>();
+  const isLongPress     = useRef(false);
+  const lastTapTime     = useRef(0);
+  const singleTapTimer  = useRef<ReturnType<typeof setTimeout>>();
+  const [holdActive, setHoldActive] = useState(false);
+  const [localFloatingHearts, setLocalFloatingHearts] = useState<FloatingHeart[]>([]);
+
+  const spawnHeart = (e: React.PointerEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const id   = Math.random().toString(36).slice(2);
+    setLocalFloatingHearts(p => [...p, { id, x: e.clientX - rect.left, y: e.clientY - rect.top }]);
+    setTimeout(() => setLocalFloatingHearts(p => p.filter(h => h.id !== id)), 900);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    isLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      setHoldActive(true);
+      const vid = videoRefs.current[reel.id];
+      if (vid) vid.pause();
+    }, 300);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    clearTimeout(longPressTimer.current);
+    if (isLongPress.current) {
+      isLongPress.current = false;
+      setHoldActive(false);
+      const vid = videoRefs.current[reel.id];
+      if (vid) vid.play().catch(() => {});
+      return;
+    }
+    const now = Date.now();
+    if (now - lastTapTime.current < 350) {
+      clearTimeout(singleTapTimer.current);
+      lastTapTime.current = 0;
+      onLike(reel, e as any);
+      spawnHeart(e);
+    } else {
+      lastTapTime.current = now;
+      singleTapTimer.current = setTimeout(() => {
+        setMuted(m => !m);
+      }, 350);
+    }
+  };
+
+  const handlePointerLeave = () => {
+    clearTimeout(longPressTimer.current);
+    if (isLongPress.current) {
+      isLongPress.current = false;
+      setHoldActive(false);
+      const vid = videoRefs.current[reel.id];
+      if (vid) vid.play().catch(() => {});
+    }
+  };
+
   return (
     <div
       data-id={reel.id} data-index={idx}
@@ -324,37 +382,38 @@ function MobileReelCard({
         src={reel.video_url}
         className="absolute inset-0 w-full h-full object-cover"
         loop playsInline muted={muted}
-        onClick={() => onTap(reel.id)}
-        onDoubleClick={e => onDoubleTap(reel, e)}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
+        onPointerCancel={handlePointerLeave}
+        onContextMenu={e => e.preventDefault()}
+        style={{ userSelect: "none", WebkitUserSelect: "none" } as React.CSSProperties}
       />
 
       {/* Gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/80 pointer-events-none" />
 
       {/* Floating hearts */}
-      {floatingHearts.map(h => (
+      {localFloatingHearts.map(h => (
         <div key={h.id} className="absolute pointer-events-none z-50"
           style={{ left: h.x - 32, top: h.y - 32, animation: "floatHeart .9s ease-out forwards" }}>
           <Heart className="w-16 h-16 fill-red-500 text-red-500 drop-shadow-[0_0_12px_rgba(239,68,68,.8)]" />
         </div>
       ))}
 
-      {/* Paused overlay */}
-      {paused && (
+      {/* Hold overlay */}
+      {holdActive && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <div className="bg-black/40 rounded-full p-5 backdrop-blur-sm">
-            <Play className="w-12 h-12 text-white fill-white" />
+          <div className="bg-black/50 rounded-full p-5 backdrop-blur-sm">
+            <Pause className="w-12 h-12 text-white fill-white" />
           </div>
         </div>
       )}
 
-      {/* Mute */}
-      <button
-        onClick={() => setMuted(m => !m)}
-        className="absolute top-4 right-4 z-30 bg-black/40 backdrop-blur-sm rounded-full p-2 border border-white/20"
-      >
+      {/* Mute indicator — top right */}
+      <div className="absolute top-4 right-4 z-30 bg-black/40 backdrop-blur-sm rounded-full p-2 border border-white/20 pointer-events-none">
         {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
-      </button>
+      </div>
 
       {/* Action buttons */}
       <div className={cn("absolute bottom-24 z-30", isRTL ? "left-3" : "right-3")}>
