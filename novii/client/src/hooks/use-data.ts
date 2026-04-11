@@ -245,62 +245,23 @@ export function useComments(postId: string) {
     enabled: !!postId,
   });
 
-  // Set up real-time subscription for comments
+  // Single realtime channel for all comment changes
   useEffect(() => {
     if (!postId) return;
 
-    console.log('🔴 Setting up real-time subscription for comments on post:', postId);
-
-    // Subscribe to INSERT events
-    const insertSubscription = supabase
-      .channel(`comments:${postId}:insert`)
+    const subscription = supabase
+      .channel(`comments:${postId}`)
       .on('postgres_changes', {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'comments',
         filter: `post_id=eq.${postId}`,
-      }, (payload: any) => {
-        console.log('✅ New comment received:', payload.new);
-        // Refetch comments when a new one is added
-        queryClient.refetchQueries({ queryKey: ['comments', postId] });
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['comments', postId] });
       })
       .subscribe();
 
-    // Subscribe to UPDATE events
-    const updateSubscription = supabase
-      .channel(`comments:${postId}:update`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'comments',
-        filter: `post_id=eq.${postId}`,
-      }, (payload: any) => {
-        console.log('✏️ Comment updated:', payload.new);
-        queryClient.refetchQueries({ queryKey: ['comments', postId] });
-      })
-      .subscribe();
-
-    // Subscribe to DELETE events
-    const deleteSubscription = supabase
-      .channel(`comments:${postId}:delete`)
-      .on('postgres_changes', {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'comments',
-        filter: `post_id=eq.${postId}`,
-      }, (payload: any) => {
-        console.log('🗑️ Comment deleted:', payload.old);
-        queryClient.refetchQueries({ queryKey: ['comments', postId] });
-      })
-      .subscribe();
-
-    // Cleanup subscriptions
-    return () => {
-      console.log('🔌 Cleaning up comment subscriptions for post:', postId);
-      insertSubscription.unsubscribe();
-      updateSubscription.unsubscribe();
-      deleteSubscription.unsubscribe();
-    };
+    return () => { subscription.unsubscribe(); };
   }, [postId, queryClient]);
 
   return query;
@@ -440,7 +401,9 @@ export function useStories() {
   return useQuery({
     queryKey: ['stories'],
     queryFn: () => api.getStories(),
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    staleTime: 3 * 60 * 1000,      // treat as fresh for 3 minutes
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
   });
 }
 
@@ -449,7 +412,9 @@ export function useUserStories(userId: string) {
     queryKey: ['userStories', userId],
     queryFn: () => api.getUserStories(userId),
     enabled: !!userId,
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    staleTime: 3 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
   });
 }
 
