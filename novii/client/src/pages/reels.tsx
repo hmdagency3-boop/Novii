@@ -459,7 +459,7 @@ function DesktopReelCard({
       </div>
 
       {/* Card + actions */}
-      <div className="relative z-10 flex items-center gap-6">
+      <div className="relative z-10 flex items-end gap-6">
 
         {/* 9:16 video card */}
         <div
@@ -527,7 +527,7 @@ function DesktopReelCard({
         </div>
 
         {/* Action column */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 pb-5">
           <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
             currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
             onSave={onSave} onShare={onShare} size="md" />
