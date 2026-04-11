@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ar } from "date-fns/locale";
 import { api, type Story, type Profile } from "@/lib/api";
+import { getFilterById } from "@/lib/story-filters";
 import { useLanguage } from "@/lib/language-context";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@supabase/supabase-js";
@@ -369,6 +370,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
               ref={videoRef}
               src={currentStory.media_url}
               className="max-h-full max-w-full object-contain"
+              style={{ filter: getFilterById((currentStory as any).filter_name || 'normal').css }}
               autoPlay
               controls
             />
@@ -377,6 +379,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
               src={currentStory.media_url}
               alt="Story"
               className="max-h-full max-w-full object-contain"
+              style={{ filter: getFilterById((currentStory as any).filter_name || 'normal').css }}
             />
           )}
 

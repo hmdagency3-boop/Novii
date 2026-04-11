@@ -1,10 +1,10 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { ChevronLeft, Music2, Smile, Sparkles, Type, ChevronDown, Send, Star, X, Upload, Image as ImageIcon, Video } from "lucide-react";
+import { ChevronLeft, Music2, Smile, Sparkles, Type, ChevronDown, Send, X, Upload, Image as ImageIcon, Video } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { useCreateStory } from "@/hooks/use-data";
+import { useCreateStory, useCurrentProfile } from "@/hooks/use-data";
 import { cn } from "@/lib/utils";
 import { MusicPicker, type MusicTrack } from "@/components/music-picker";
-import { useCurrentProfile } from "@/hooks/use-data";
+import { STORY_FILTERS, getFilterById } from "@/lib/story-filters";
 
 interface CreateStoryModalProps {
   open: boolean;
@@ -21,6 +21,8 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
   const [caption, setCaption] = useState("");
   const [selectedMusic, setSelectedMusic] = useState<MusicTrack | null>(null);
   const [musicPickerOpen, setMusicPickerOpen] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('normal');
+  const [showFilters, setShowFilters] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
   const [needsTrimming, setNeedsTrimming] = useState(false);
   const [trimStart, setTrimStart] = useState(0);
@@ -89,6 +91,9 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
           artwork_url: selectedMusic.artwork_url,
         };
       }
+      if (selectedFilter && selectedFilter !== 'normal') {
+        payload.filterName = selectedFilter;
+      }
       await createStory.mutateAsync(payload);
       handleClose();
     } catch (error) {
@@ -102,6 +107,8 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
     setPreview(null);
     setCaption("");
     setSelectedMusic(null);
+    setSelectedFilter('normal');
+    setShowFilters(false);
     setNeedsTrimming(false);
     setShowTrimmer(false);
     setTrimStart(0);
@@ -206,13 +213,19 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
               ref={videoRef}
               src={preview}
               className="w-full h-full object-cover"
+              style={{ filter: getFilterById(selectedFilter).css }}
               autoPlay
               loop
               playsInline
               muted={!!selectedMusic}
             />
           ) : (
-            <img src={preview} alt="" className="w-full h-full object-cover" />
+            <img
+              src={preview}
+              alt=""
+              className="w-full h-full object-cover"
+              style={{ filter: getFilterById(selectedFilter).css }}
+            />
           )}
           {/* Gradient overlays for readability */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70" />
@@ -262,7 +275,7 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
               action: () => setMusicPickerOpen(true),
               active: !!selectedMusic,
             },
-            { icon: <Sparkles className="w-5 h-5" />, label: 'effects', action: () => {} },
+            { icon: <Sparkles className="w-5 h-5" />, label: 'filters', action: () => { setShowFilters(!showFilters); setShowTrimmer(false); }, active: showFilters },
             ...(needsTrimming ? [{ icon: <ChevronDown className="w-5 h-5" />, label: 'trim', action: () => setShowTrimmer(!showTrimmer) }] : []),
           ].map((item) => (
             <button
@@ -323,6 +336,44 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
                   className="w-full accent-white"
                 />
                 <p className="text-white text-xs font-mono text-center">{formatTime(trimEnd)}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── FILTER STRIP ── */}
+        {showFilters && (
+          <div className="absolute bottom-32 left-0 right-0 z-10">
+            <div className="overflow-x-auto scrollbar-hide">
+              <div className="flex gap-3 px-4 py-3" style={{ width: 'max-content' }}>
+                {STORY_FILTERS.map((filter) => {
+                  const isActive = selectedFilter === filter.id;
+                  return (
+                    <button
+                      key={filter.id}
+                      onClick={() => setSelectedFilter(filter.id)}
+                      className="flex flex-col items-center gap-1.5 flex-shrink-0"
+                    >
+                      <div className={cn(
+                        "w-16 h-20 rounded-xl overflow-hidden border-2 transition-all",
+                        isActive ? "border-white scale-105" : "border-transparent opacity-80"
+                      )}>
+                        <img
+                          src={preview!}
+                          alt={filter.name}
+                          className="w-full h-full object-cover"
+                          style={{ filter: filter.css }}
+                        />
+                      </div>
+                      <span className={cn(
+                        "text-[10px] font-medium transition-colors",
+                        isActive ? "text-white" : "text-white/60"
+                      )}>
+                        {isRTL ? filter.nameAr : filter.name}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
