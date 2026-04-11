@@ -233,13 +233,15 @@ interface CardProps {
 interface ActionProps {
   reel: any; isRTL: boolean; followed: boolean; saved: boolean;
   currentUserId?: string; size?: "sm" | "md";
+  muted?: boolean; showMute?: boolean;
+  setMuted?: React.Dispatch<React.SetStateAction<boolean>>;
   onLike:   (reel: any, e?: React.MouseEvent) => void;
   onFollow: (uid: string) => void;
   onSave:   (id: string) => void;
   onShare:  (reel: any) => void;
 }
 
-function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onFollow, onSave, onShare, size = "md" }: ActionProps) {
+function ActionColumn({ reel, isRTL, followed, saved, currentUserId, muted, setMuted, showMute, onLike, onFollow, onSave, onShare, size = "md" }: ActionProps) {
   const ic = size === "sm" ? "w-6 h-6" : "w-7 h-7";
   const nc = size === "sm" ? "text-[11px]" : "text-xs";
   return (
@@ -292,6 +294,17 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
         <Share2 className={cn(ic, "text-white drop-shadow group-active:scale-125 transition-transform")} />
         <span className={cn(nc, "text-white font-semibold drop-shadow")}>{isRTL ? "مشاركة" : "Share"}</span>
       </button>
+
+      {/* Mute — desktop only */}
+      {showMute && setMuted && (
+        <button onClick={() => setMuted(m => !m)} className="flex flex-col items-center gap-1 group">
+          {muted
+            ? <VolumeX className={cn(ic, "text-white drop-shadow group-active:scale-125 transition-transform")} />
+            : <Volume2 className={cn(ic, "text-white drop-shadow group-active:scale-125 transition-transform")} />
+          }
+          <span className={cn(nc, "text-white font-semibold drop-shadow")}>{muted ? (isRTL ? "صوت" : "Sound") : (isRTL ? "كتم" : "Mute")}</span>
+        </button>
+      )}
 
       {/* Spinning disc */}
       <div className={cn(
@@ -500,13 +513,6 @@ function DesktopReelCard({
             </div>
           )}
 
-          {/* Mute */}
-          <button
-            onClick={e => { e.stopPropagation(); setMuted(m => !m); }}
-            className="absolute top-4 right-4 z-30 bg-black/50 backdrop-blur-sm rounded-full p-2.5 border border-white/20 hover:bg-black/70 transition"
-          >
-            {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
-          </button>
 
           {/* Bottom info */}
           <div className="absolute bottom-0 left-0 right-0 z-20 p-5">
@@ -533,7 +539,8 @@ function DesktopReelCard({
         <div className="flex-shrink-0">
           <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
             currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
-            onSave={onSave} onShare={onShare} size="md" />
+            onSave={onSave} onShare={onShare} size="md"
+            muted={muted} setMuted={setMuted} showMute />
         </div>
       </div>
     </div>
