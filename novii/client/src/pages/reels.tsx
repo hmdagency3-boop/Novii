@@ -159,7 +159,7 @@ export default function Reels() {
       ══════════════════════════════════════════ */}
       <div
         className="mobile-reels-container fixed inset-0 top-0 lg:hidden overflow-y-scroll snap-y snap-mandatory bg-black"
-        style={{ scrollbarWidth: "none" }}
+        style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
       >
         {reels.map((reel: any, idx: number) => (
           <MobileReelCard
@@ -310,7 +310,8 @@ function MobileReelCard({
   return (
     <div
       data-id={reel.id} data-index={idx}
-      className="reel-item relative w-full h-screen snap-start overflow-hidden bg-black"
+      className="reel-item relative w-full snap-start overflow-hidden bg-black flex-shrink-0"
+      style={{ height: "100svh" }}
     >
       {/* Video */}
       <video
@@ -351,14 +352,14 @@ function MobileReelCard({
       </button>
 
       {/* Action buttons */}
-      <div className={cn("absolute bottom-28 z-30", isRTL ? "left-3" : "right-3")}>
+      <div className={cn("absolute bottom-16 z-30", isRTL ? "left-3" : "right-3")}>
         <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
           currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
           onSave={onSave} onShare={onShare} size="sm" />
       </div>
 
       {/* Bottom info */}
-      <div className={cn("absolute bottom-0 z-20 pb-8 px-4 w-full",
+      <div className={cn("absolute bottom-0 z-20 pb-6 px-4 w-full",
         isRTL ? "text-right pr-4 pl-16" : "pl-4 pr-16")}>
         <Link href={`/user?id=${reel.profile?.id}`}>
           <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity drop-shadow">
@@ -392,7 +393,8 @@ function DesktopReelCard({
   return (
     <div
       data-id={reel.id} data-index={idx}
-      className="reel-item w-full h-screen snap-start flex-shrink-0 flex items-center justify-center bg-black relative overflow-hidden"
+      className="reel-item w-full snap-start flex-shrink-0 flex items-center justify-center bg-black relative overflow-hidden"
+      style={{ height: "100svh" }}
     >
       {/* Blurred bg */}
       <div className="absolute inset-0 pointer-events-none">

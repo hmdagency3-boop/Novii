@@ -415,7 +415,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Nav */}
       <nav className={cn(
         "md:hidden fixed bottom-0 left-0 right-0 h-16 border-t border-border bg-background/90 backdrop-blur-lg z-50 flex items-center justify-around px-2",
-        chatActive && "hidden"
+        (chatActive || location === '/reels') && "hidden"
       )}>
         <Link href="/">
             <button 
