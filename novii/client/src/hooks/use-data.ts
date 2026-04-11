@@ -202,33 +202,38 @@ export function useToggleReelLike() {
   return useMutation({
     mutationFn: (reelId: string) => api.toggleReelLike(reelId),
     onMutate: async (reelId) => {
-      // Update UI immediately with optimistic like state toggle
-      const updateReel = (reel: any) => ({
-        ...reel,
-        is_liked: !reel.is_liked,
-        likes_count: reel.is_liked ? Math.max(0, reel.likes_count - 1) : reel.likes_count + 1,
-      });
+      const updateReel = (reel: any) =>
+        reel.id === reelId
+          ? {
+              ...reel,
+              is_liked: !reel.is_liked,
+              likes_count: reel.is_liked
+                ? Math.max(0, reel.likes_count - 1)
+                : reel.likes_count + 1,
+            }
+          : reel;
 
-      // Update all userReels queries
-      queryClient.setQueriesData({ queryKey: ['userReels'] }, (old: any) => {
+      const applyUpdate = (old: any) => {
         if (!old) return old;
-        return Array.isArray(old)
-          ? old.map((reel: any) => reel.id === reelId ? updateReel(reel) : reel)
-          : old;
-      });
+        return Array.isArray(old) ? old.map(updateReel) : old;
+      };
 
-      // Update reel queries (fallback)
-      queryClient.setQueriesData({ queryKey: ['reel', reelId] }, (old: any) => {
-        return old ? updateReel(old) : old;
-      });
+      // Update the main reels feed (useReels uses ['reels', limit, offset])
+      queryClient.setQueriesData({ queryKey: ['reels'] }, applyUpdate);
+      // Update profile reels
+      queryClient.setQueriesData({ queryKey: ['userReels'] }, applyUpdate);
+      // Update single reel
+      queryClient.setQueriesData({ queryKey: ['reel', reelId] }, (old: any) =>
+        old ? updateReel(old) : old
+      );
     },
-    onSuccess: (_, reelId) => {
-      // After success, invalidate all userReels to get fresh data from database
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reels'] });
       queryClient.invalidateQueries({ queryKey: ['userReels'] });
     },
     onError: (error: any) => {
       console.error('Reel like toggle error:', error);
-      // Rollback optimistic update
+      queryClient.invalidateQueries({ queryKey: ['reels'] });
       queryClient.invalidateQueries({ queryKey: ['userReels'] });
       queryClient.invalidateQueries({ queryKey: ['reel'] });
     },

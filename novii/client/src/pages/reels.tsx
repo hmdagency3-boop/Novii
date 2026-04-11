@@ -1,4 +1,5 @@
 import Layout from "@/components/layout";
+import { ReelCommentsSheet } from "@/components/reel-comments-sheet";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLanguage } from "@/lib/language-context";
 import { useReels, useToggleReelLike, useToggleFollow } from "@/hooks/use-data";
@@ -29,6 +30,7 @@ export default function Reels() {
   const [muted,         setMuted]           = useState(true);
   const [pausedReels,   setPausedReels]     = useState<Set<string>>(new Set());
   const [floatingHearts, setFloatingHearts] = useState<FloatingHeart[]>([]);
+  const [commentReelId, setCommentReelId]   = useState<string | null>(null);
   const lastTapRef = useRef<number>(0);
 
   /* ── SEPARATE ref maps so mobile & desktop don't overwrite each other ── */
@@ -114,6 +116,10 @@ export default function Reels() {
     toast.success(savedReels.has(id) ? (isRTL ? "تمت الإزالة" : "Removed") : (isRTL ? "تم الحفظ" : "Saved"));
   }, [isRTL, savedReels]);
 
+  const handleComment = useCallback((id: string) => {
+    setCommentReelId(id);
+  }, []);
+
   /* ── shared card props builder ── */
   const cardProps = (reel: any) => ({
     reel,
@@ -128,8 +134,9 @@ export default function Reels() {
     onDoubleTap: handleDoubleTap,
     onLike:   handleLike,
     onFollow: handleFollow,
-    onSave:   handleSave,
-    onShare:  handleShare,
+    onSave:    handleSave,
+    onShare:   handleShare,
+    onComment: handleComment,
   });
 
   /* ── loading / empty ── */
@@ -195,6 +202,15 @@ export default function Reels() {
         ))}
       </div>
 
+      {/* Comments Sheet */}
+      {commentReelId && (
+        <ReelCommentsSheet
+          reelId={commentReelId}
+          open={!!commentReelId}
+          onClose={() => setCommentReelId(null)}
+        />
+      )}
+
       <style>{`
         @keyframes floatHeart {
           0%   { opacity:1; transform:scale(1) translateY(0); }
@@ -223,8 +239,9 @@ interface CardProps {
   onDoubleTap: (reel: any, e: React.MouseEvent) => void;
   onLike:   (reel: any, e?: React.MouseEvent) => void;
   onFollow: (uid: string) => void;
-  onSave:   (id: string) => void;
-  onShare:  (reel: any) => void;
+  onSave:    (id: string) => void;
+  onShare:   (reel: any) => void;
+  onComment: (id: string) => void;
 }
 
 /* ════════════════════════════════════════════════════
@@ -233,13 +250,14 @@ interface CardProps {
 interface ActionProps {
   reel: any; isRTL: boolean; followed: boolean; saved: boolean;
   currentUserId?: string; size?: "sm" | "md";
-  onLike:   (reel: any, e?: React.MouseEvent) => void;
-  onFollow: (uid: string) => void;
-  onSave:   (id: string) => void;
-  onShare:  (reel: any) => void;
+  onLike:    (reel: any, e?: React.MouseEvent) => void;
+  onFollow:  (uid: string) => void;
+  onSave:    (id: string) => void;
+  onShare:   (reel: any) => void;
+  onComment: (id: string) => void;
 }
 
-function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onFollow, onSave, onShare, size = "md" }: ActionProps) {
+function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onFollow, onSave, onShare, onComment, size = "md" }: ActionProps) {
   const ic = size === "sm" ? "w-6 h-6" : "w-7 h-7";
   const nc = size === "sm" ? "text-[11px]" : "text-xs";
   return (
@@ -275,7 +293,7 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
       </button>
 
       {/* Comment */}
-      <button className="flex flex-col items-center gap-1 group">
+      <button onClick={() => onComment(reel.id)} className="flex flex-col items-center gap-1 group">
         <MessageCircle className={cn(ic, "text-white drop-shadow group-active:scale-125 transition-transform")} />
         <span className={cn(nc, "text-white font-semibold drop-shadow")}>{fmt(reel.comments_count)}</span>
       </button>
@@ -303,7 +321,7 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
 function MobileReelCard({
   reel, idx, isRTL, muted, setMuted, followed, saved,
   currentUserId, videoRefs,
-  onLike, onFollow, onSave, onShare,
+  onLike, onFollow, onSave, onShare, onComment,
 }: CardProps) {
   const longPressTimer  = useRef<ReturnType<typeof setTimeout>>();
   const isLongPress     = useRef(false);
@@ -412,7 +430,7 @@ function MobileReelCard({
       <div className={cn("absolute bottom-24 z-30", isRTL ? "left-3" : "right-3")}>
         <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
           currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
-          onSave={onSave} onShare={onShare} size="sm" />
+          onSave={onSave} onShare={onShare} onComment={onComment} size="sm" />
       </div>
 
       {/* Bottom info */}
@@ -446,7 +464,7 @@ function MobileReelCard({
 function DesktopReelCard({
   reel, idx, isRTL, muted, setMuted, paused, followed, saved,
   floatingHearts, currentUserId, videoRefs,
-  onTap, onDoubleTap, onLike, onFollow, onSave, onShare,
+  onTap, onDoubleTap, onLike, onFollow, onSave, onShare, onComment,
 }: CardProps) {
   return (
     <div
@@ -532,7 +550,7 @@ function DesktopReelCard({
         <div className="flex-shrink-0 pb-5">
           <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
             currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
-            onSave={onSave} onShare={onShare} size="md" />
+            onSave={onSave} onShare={onShare} onComment={onComment} size="md" />
         </div>
       </div>
     </div>
