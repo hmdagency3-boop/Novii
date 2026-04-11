@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useCreatePost } from "@/hooks/use-data";
+import { useQueryClient } from "@tanstack/react-query";
 import { 
   X, 
   Image as ImageIcon, 
@@ -79,6 +80,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
   const { user } = useAuth();
   const { toast } = useToast();
   const createPostMutation = useCreatePost();
+  const queryClient = useQueryClient();
   
   const [currentStep, setCurrentStep] = useState<PostStep>('select');
   const [mediaType, setMediaType] = useState<MediaType>(initialMediaType || 'post');
@@ -204,6 +206,9 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
             video_url: videoUrl,
             caption,
           });
+
+        queryClient.invalidateQueries({ queryKey: ['reels'] });
+        queryClient.invalidateQueries({ queryKey: ['profile'] });
 
         if (selectedReel) URL.revokeObjectURL(selectedReel.url);
         setCaption("");

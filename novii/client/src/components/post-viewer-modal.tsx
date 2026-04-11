@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { OfficialBadge } from "@/components/ui/official-badge";
@@ -66,6 +66,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
   const [repliesDisabled, setRepliesDisabled] = useState(post?.replies_disabled ?? false);
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+  const commentInputRef = useRef<HTMLInputElement>(null);
   
   const toggleLike = useToggleLike();
   const toggleSave = useToggleSave();
@@ -578,12 +579,18 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                     />
                   </button>
 
-                  <button className="p-1.5 sm:p-2 hover:bg-muted rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 text-foreground">
+                  <button
+                    onClick={() => commentInputRef.current?.focus()}
+                    className="p-1.5 sm:p-2 hover:bg-muted rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 text-foreground"
+                  >
                     <MessageCircle className="w-4 h-4 sm:w-6 sm:h-6 -rotate-90" />
                   </button>
 
-                  <button className="p-1.5 sm:p-2 hover:bg-muted rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 text-foreground">
-                    <Share2 className="w-4 h-4 sm:w-6 sm:h-6" />
+                  <button
+                    onClick={handleShare}
+                    className="p-1.5 sm:p-2 hover:bg-muted rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 text-foreground"
+                  >
+                    <Share2 className={cn("w-4 h-4 sm:w-6 sm:h-6", shareSuccess && "text-green-500")} />
                   </button>
                 </div>
 
@@ -660,6 +667,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                       <ImageIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </button>
                     <Input
+                      ref={commentInputRef}
                       value={commentText}
                       onChange={handleCommentInput}
                       placeholder={isRTL ? "رد..." : "Add comment..."}

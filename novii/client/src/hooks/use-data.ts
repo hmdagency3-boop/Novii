@@ -154,7 +154,9 @@ export function useToggleLike() {
       const updatePost = (post: Post) => ({
         ...post,
         is_liked: !post.is_liked,
-        // Don't change likes_count - let database trigger handle it
+        likes_count: post.is_liked
+          ? Math.max(0, (post.likes_count ?? 0) - 1)
+          : (post.likes_count ?? 0) + 1,
       });
 
       // Update feed queries
@@ -183,12 +185,12 @@ export function useToggleLike() {
       });
     },
     onSuccess: (_, postId) => {
-      // After success, refetch only the specific post to get fresh likes_count from database
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['explore'] });
       queryClient.refetchQueries({ queryKey: ['post', postId] });
     },
     onError: (error: any) => {
       console.error('Like toggle error:', error);
-      // Rollback optimistic update by invalidating (will refetch fresh data)
       queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['post'] });
       queryClient.invalidateQueries({ queryKey: ['explore'] });
@@ -350,7 +352,7 @@ export function useCreateComment() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['comments', variables.postId] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['post'] });
       queryClient.refetchQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
@@ -385,7 +387,7 @@ export function useDeleteComment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['comments'] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['post'] });
       toast({
         title: 'تم',
         description: 'تم حذف التعليق بنجاح',
