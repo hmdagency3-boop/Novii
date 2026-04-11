@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Share2, Download } from "lucide-react";
+import { Copy, Check, Share2, Download, X } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/lib/language-context";
 
@@ -86,15 +85,14 @@ export function ProfileShareModal({
     img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
   };
 
-  const ModalBody = ({ qrSize }: { qrSize: number }) => (
+  const ModalBody = () => (
     <div className="flex flex-col items-center gap-4 px-5 pb-5 pt-1">
-
       {/* QR Code */}
       <div className="bg-white p-4 rounded-2xl shadow-sm">
         <QRCodeSVG
           id="profile-qr-code"
           value={profileUrl}
-          size={qrSize}
+          size={190}
           level="H"
           includeMargin={false}
           imageSettings={
@@ -118,7 +116,7 @@ export function ProfileShareModal({
         <p className="text-xs text-muted-foreground font-mono truncate">{profileUrl}</p>
       </div>
 
-      {/* Copy Button - full width */}
+      {/* Copy Button */}
       <Button
         variant="outline"
         className="w-full rounded-xl h-11 gap-2 text-sm font-medium"
@@ -130,7 +128,7 @@ export function ProfileShareModal({
         {isRTL ? (copied ? "تم نسخ الرابط" : "نسخ الرابط") : (copied ? "Link Copied!" : "Copy Link")}
       </Button>
 
-      {/* Share Button - full width */}
+      {/* Share Button */}
       <Button
         className="w-full rounded-xl h-11 gap-2 text-sm font-medium bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white border-0"
         onClick={handleShare}
@@ -163,21 +161,44 @@ export function ProfileShareModal({
           <SheetTitle className="text-center text-base font-bold py-3">
             {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
           </SheetTitle>
-          <ModalBody qrSize={190} />
+          <ModalBody />
         </SheetContent>
       </Sheet>
     );
   }
 
-  /* ── Desktop: centered dialog ── */
+  /* ── Desktop: custom centered modal (avoids RTL positioning bugs in Radix Dialog) ── */
+  if (!open) return null;
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl">
-        <DialogTitle className="text-center text-base font-bold px-5 pt-5 pb-0">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ direction: "ltr" }}
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* Card */}
+      <div
+        className="relative z-10 w-full max-w-sm bg-background rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+        style={{ direction: direction }}
+      >
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 left-4 z-10 rounded-full p-1 bg-muted/60 hover:bg-muted transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        {/* Title */}
+        <div className="text-center text-base font-bold px-5 pt-5 pb-0">
           {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
-        </DialogTitle>
-        <ModalBody qrSize={200} />
-      </DialogContent>
-    </Dialog>
+        </div>
+
+        <ModalBody />
+      </div>
+    </div>
   );
 }
