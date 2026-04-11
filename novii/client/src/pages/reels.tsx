@@ -293,13 +293,6 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
         <span className={cn(nc, "text-white font-semibold drop-shadow")}>{isRTL ? "مشاركة" : "Share"}</span>
       </button>
 
-      {/* Spinning disc */}
-      <div className={cn(
-        "rounded-full bg-gradient-to-br from-neutral-800 to-neutral-600 border-4 border-neutral-700 flex items-center justify-center animate-spin-slow mt-1",
-        size === "sm" ? "w-8 h-8" : "w-10 h-10"
-      )}>
-        <Music2 className={cn(size === "sm" ? "w-3 h-3" : "w-4 h-4", "text-white")} />
-      </div>
     </div>
   );
 }
@@ -512,7 +505,9 @@ function DesktopReelCard({
               <p className="text-white/90 text-sm leading-relaxed line-clamp-3 mb-2 drop-shadow">{reel.caption}</p>
             )}
             <div className="flex items-center gap-2">
-              <Music2 className="w-3 h-3 text-white/60 flex-shrink-0" />
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-neutral-800 to-neutral-600 border-2 border-neutral-700 flex items-center justify-center animate-spin-slow">
+                <Music2 className="w-3.5 h-3.5 text-white" />
+              </div>
               <div className="overflow-hidden flex-1 max-w-[180px]">
                 <p className="text-white/60 text-xs whitespace-nowrap animate-marquee">
                   {reel.profile?.username} · {isRTL ? "صوت أصلي" : "Original Sound"}
