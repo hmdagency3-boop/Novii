@@ -158,8 +158,13 @@ export default function Reels() {
           MOBILE  — fullscreen snap scroll
       ══════════════════════════════════════════ */}
       <div
-        className="mobile-reels-container fixed inset-0 top-0 lg:hidden overflow-y-scroll snap-y snap-mandatory bg-black"
-        style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+        className="mobile-reels-container fixed inset-0 top-0 lg:hidden snap-y snap-mandatory bg-black"
+        style={{
+          overflowY: "scroll",
+          overflowX: "hidden",
+          scrollbarWidth: "none",
+          WebkitOverflowScrolling: "touch",
+        } as React.CSSProperties}
       >
         {reels.map((reel: any, idx: number) => (
           <MobileReelCard
@@ -310,8 +315,8 @@ function MobileReelCard({
   return (
     <div
       data-id={reel.id} data-index={idx}
-      className="reel-item relative w-full snap-start overflow-hidden bg-black flex-shrink-0"
-      style={{ height: "100svh" }}
+      className="reel-item relative w-full overflow-hidden bg-black flex-shrink-0"
+      style={{ height: "100svh", scrollSnapAlign: "start", scrollSnapStop: "always" }}
     >
       {/* Video */}
       <video
