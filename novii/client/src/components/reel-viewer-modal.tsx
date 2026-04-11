@@ -21,6 +21,30 @@ import { useToggleReelLike, useCreateComment, useToggleCommentLike, useDeleteCom
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
+const GIF_PREFIX = "__GIF__:";
+
+function renderCommentContent(content: string, isOfficial?: boolean) {
+  if (content.startsWith(GIF_PREFIX)) {
+    const url = content.slice(GIF_PREFIX.length);
+    return (
+      <img
+        src={url}
+        alt="GIF"
+        className="mt-1.5 rounded-lg max-w-[180px] max-h-[130px] object-cover border border-neutral-700"
+        loading="lazy"
+      />
+    );
+  }
+  return (
+    <p className={cn(
+      "text-xs sm:text-sm mt-1 sm:mt-1.5 break-words",
+      isOfficial ? "official-comment-content font-medium" : "text-foreground/85"
+    )}>
+      {content}
+    </p>
+  );
+}
+
 const formatTime = (timestamp: string | Date) => {
   const date = new Date(timestamp);
   const now = new Date();
@@ -403,7 +427,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                 </button>
               )}
             </div>
-            <p className="text-xs text-foreground/85 mt-0.5 break-words">{reply.content}</p>
+            {renderCommentContent(reply.content)}
             <div className={cn("flex items-center gap-2 mt-0.5", isRTL && "flex-row-reverse")}>
               <span className="text-xs text-muted-foreground">{formatTime(reply.created_at)}</span>
               {reply.likes_count > 0 && (
@@ -793,12 +817,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                                 </button>
                               )}
                             </div>
-                            <p className={cn(
-                              "text-xs sm:text-sm mt-1 sm:mt-1.5 break-words",
-                              comment.profile?.is_official ? "official-comment-content font-medium" : "text-foreground/85"
-                            )}>
-                              {comment.content}
-                            </p>
+                            {renderCommentContent(comment.content, comment.profile?.is_official)}
                             <div className="flex items-center gap-1 sm:gap-2 mt-1 sm:mt-2 text-xs flex-wrap">
                               <span className="text-muted-foreground text-xs">{formatTime(comment.created_at)}</span>
                               {comment.likes_count > 0 && (
@@ -1040,12 +1059,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                               </button>
                             )}
                           </div>
-                          <p className={cn(
-                            "text-sm mt-1.5 break-words",
-                            comment.profile?.is_official ? "official-comment-content font-medium" : "text-foreground/85"
-                          )}>
-                            {comment.content}
-                          </p>
+                          {renderCommentContent(comment.content, comment.profile?.is_official)}
                           <div className={cn("flex items-center gap-1.5 mt-1.5 text-xs flex-wrap", isRTL && "flex-row-reverse")}>
                             <span className="text-muted-foreground text-xs">{formatTime(comment.created_at)}</span>
                             {comment.likes_count > 0 && (

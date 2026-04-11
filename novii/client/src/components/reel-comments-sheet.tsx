@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Heart, Send, Trash2, Reply, X } from "lucide-react";
+import { Heart, Send, Trash2, Reply, X, ImageIcon, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
@@ -19,19 +19,108 @@ import { PremiumBadge } from "@/components/ui/premium-badge";
 import { PopularBadge } from "@/components/ui/popular-badge";
 import { ActiveBadge } from "@/components/ui/active-badge";
 
+const GIF_PREFIX = "__GIF__:";
+
 const formatTime = (timestamp: string | Date) => {
   const date = new Date(timestamp);
   const now = new Date();
-  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-  if (diffInMinutes < 1) return "now";
-  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) return `${diffInHours}h ago`;
-  const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 7) return `${diffInDays}d ago`;
+  const diff = Math.floor((now.getTime() - date.getTime()) / 60000);
+  if (diff < 1) return "now";
+  if (diff < 60) return `${diff}m ago`;
+  const h = Math.floor(diff / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
   return date.toLocaleDateString();
 };
 
+function renderContent(content: string) {
+  if (content.startsWith(GIF_PREFIX)) {
+    const url = content.slice(GIF_PREFIX.length);
+    return (
+      <img
+        src={url}
+        alt="GIF"
+        className="mt-1.5 rounded-lg max-w-[180px] max-h-[130px] object-cover border border-neutral-700"
+        loading="lazy"
+      />
+    );
+  }
+  return <p className="text-sm mt-1.5 break-words text-white/85">{content}</p>;
+}
+
+/* ── GIF Picker ──────────────────────────────────── */
+function GifPicker({ onSelect, isRTL }: { onSelect: (url: string) => void; isRTL: boolean }) {
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 400);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["gifs", debouncedQ],
+    queryFn: async () => {
+      const res = await fetch(`/api/gifs/search?q=${encodeURIComponent(debouncedQ)}`);
+      const json = await res.json();
+      return json.data as Array<{ id: string; title: string; images: { original: { url: string } } }>;
+    },
+  });
+
+  return (
+    <div className="bg-neutral-900 border border-neutral-700 rounded-xl overflow-hidden shadow-2xl"
+      style={{ height: 260 }}>
+      {/* Search */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-neutral-700">
+        <Search className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+        <input
+          ref={inputRef}
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder={isRTL ? "ابحث عن GIF..." : "Search GIFs..."}
+          className="flex-1 bg-transparent text-xs text-white outline-none placeholder:text-muted-foreground"
+          dir={isRTL ? "rtl" : "ltr"}
+        />
+      </div>
+      {/* Grid */}
+      <div className="overflow-y-auto" style={{ height: 215, scrollbarWidth: "none" }}>
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+            <div className="animate-spin mr-2">⌛</div>
+            {isRTL ? "جاري التحميل..." : "Loading..."}
+          </div>
+        ) : !data?.length ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+            {isRTL ? "لا توجد نتائج" : "No results"}
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-1 p-2">
+            {data.map(gif => (
+              <button
+                key={gif.id}
+                onClick={() => onSelect(gif.images.original.url)}
+                className="aspect-square rounded-lg overflow-hidden hover:ring-2 hover:ring-pink-500 transition-all"
+              >
+                <img
+                  src={gif.images.original.url}
+                  alt={gif.title}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Main Component ──────────────────────────────── */
 interface ReelCommentsSheetProps {
   reelId: string;
   open: boolean;
@@ -40,12 +129,14 @@ interface ReelCommentsSheetProps {
 
 export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetProps) {
   const { direction } = useLanguage();
-  const isRTL  = direction === "rtl";
+  const isRTL    = direction === "rtl";
   const isMobile = useIsMobile();
   const { data: currentUser } = useCurrentUser();
-  const [commentText, setCommentText]     = useState("");
-  const [replyingTo, setReplyingTo]       = useState<string | null>(null);
-  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+
+  const [commentText, setCommentText]             = useState("");
+  const [replyingTo, setReplyingTo]               = useState<string | null>(null);
+  const [showGifPicker, setShowGifPicker]         = useState(false);
+  const [expandedComments, setExpandedComments]   = useState<Set<string>>(new Set());
   const [replyVisibilityCount, setReplyVisibilityCount] = useState<Map<string, number>>(new Map());
 
   const toggleCommentLike = useToggleCommentLike();
@@ -55,16 +146,16 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
   const { data: comments = [], isLoading: commentsLoading, refetch } = useQuery({
     queryKey: ["reelComments", reelId],
     queryFn: async () => {
-      const { data: allComments } = await supabase
+      const { data: all } = await supabase
         .from("comments")
         .select("*, profile:profiles(*)")
         .eq("reel_id", reelId)
         .order("created_at", { ascending: false });
-      if (!allComments) return [];
+      if (!all) return [];
       const map = new Map<string, any>();
       const roots: any[] = [];
-      allComments.forEach(c => map.set(c.id, { ...c, replies: [] }));
-      allComments.forEach(c => {
+      all.forEach(c => map.set(c.id, { ...c, replies: [] }));
+      all.forEach(c => {
         if (c.parent_comment_id) {
           const parent = map.get(c.parent_comment_id);
           const reply  = map.get(c.id);
@@ -78,55 +169,38 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
     enabled: open && !!reelId,
   });
 
-  const handleAddComment = async () => {
-    if (!commentText.trim() || !currentUser?.id) return;
-    let content = commentText;
-    if (replyingTo && commentText.startsWith("@")) {
-      const spaceIdx = commentText.indexOf(" ");
-      content = spaceIdx !== -1 ? commentText.substring(spaceIdx + 1) : commentText;
+  const sendComment = async (content: string) => {
+    if (!content.trim() || !currentUser?.id) return;
+    let body = content;
+    if (replyingTo && content.startsWith("@")) {
+      const idx = content.indexOf(" ");
+      body = idx !== -1 ? content.slice(idx + 1) : content;
     }
     const { error } = await supabase.from("comments").insert({
       reel_id: reelId,
       user_id: currentUser.id,
-      content: content.trim(),
+      content: body.trim(),
       post_id: null,
       parent_comment_id: replyingTo || null,
     });
-    if (!error) {
-      setCommentText("");
-      setReplyingTo(null);
-      refetch();
-    }
+    if (!error) { setCommentText(""); setReplyingTo(null); setShowGifPicker(false); refetch(); }
   };
 
-  const handleDeleteComment = (id: string) => {
+  const handleDeleteComment = (id: string) =>
     deleteComment.mutate(id, { onSuccess: () => refetch() });
-  };
 
-  const toggleExpandReplies = (commentId: string) => {
+  const toggleExpandReplies = (id: string) => {
     const next = new Set(expandedComments);
-    if (next.has(commentId)) {
-      next.delete(commentId);
-    } else {
-      next.add(commentId);
-      setReplyVisibilityCount(prev => new Map(prev).set(commentId, 3));
-    }
+    if (next.has(id)) { next.delete(id); }
+    else { next.add(id); setReplyVisibilityCount(p => new Map(p).set(id, 3)); }
     setExpandedComments(next);
   };
 
-  const loadMoreReplies = (commentId: string) => {
-    setReplyVisibilityCount(prev => {
-      const m = new Map(prev);
-      m.set(commentId, (m.get(commentId) || 3) + 3);
-      return m;
-    });
-  };
+  const loadMoreReplies = (id: string) =>
+    setReplyVisibilityCount(p => { const m = new Map(p); m.set(id, (m.get(id) || 3) + 3); return m; });
 
-  const countReplies = (reply: any): number => {
-    let n = 1;
-    if (reply.replies?.length) n += reply.replies.reduce((s: number, r: any) => s + countReplies(r), 0);
-    return n;
-  };
+  const countReplies = (r: any): number =>
+    1 + (r.replies?.reduce((s: number, c: any) => s + countReplies(c), 0) ?? 0);
 
   const getTotalReplyCount = (replies: any[]) =>
     replies.reduce((s, r) => s + countReplies(r), 0);
@@ -168,7 +242,7 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
                 </button>
               )}
             </div>
-            <p className="text-xs text-white/85 mt-0.5 break-words">{reply.content}</p>
+            {renderContent(reply.content)}
             <div className={cn("flex items-center gap-1.5 mt-1 text-xs", isRTL && "flex-row-reverse")}>
               <span className="text-muted-foreground">{formatTime(reply.created_at)}</span>
               {reply.likes_count > 0 && (
@@ -180,7 +254,7 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
                 <button onClick={() => toggleCommentLike.mutate(reply.id)} className="text-muted-foreground hover:text-primary p-0.5">
                   <Heart className={cn("w-2.5 h-2.5", reply.is_liked && "fill-primary text-primary")} />
                 </button>
-                <button onClick={() => { setReplyingTo(reply.id); setCommentText(`@${reply.profile?.username} `); }}
+                <button onClick={() => { setReplyingTo(reply.id); setCommentText(`@${reply.profile?.username} `); setShowGifPicker(false); }}
                   className="text-muted-foreground hover:text-primary flex items-center gap-0.5 p-0.5">
                   <Reply className="w-2.5 h-2.5" />
                   <span>{isRTL ? "رد" : "Reply"}</span>
@@ -249,11 +323,9 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
               </div>
             ) : (
               comments.map((comment: any, index: number) => (
-                <div
-                  key={comment.id}
+                <div key={comment.id}
                   className={cn("animate-in fade-in-50 slide-in-from-bottom-2 duration-300", comment.profile?.is_official && "official-comment")}
-                  style={{ animationDelay: `${index * 0.03}s` }}
-                >
+                  style={{ animationDelay: `${index * 0.03}s` }}>
                   <div className={cn(
                     "p-3 rounded-lg border transition-all duration-200",
                     comment.profile?.is_official
@@ -298,10 +370,7 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
                             </button>
                           )}
                         </div>
-                        <p className={cn("text-sm mt-1.5 break-words",
-                          comment.profile?.is_official ? "official-comment-content font-medium" : "text-white/85")}>
-                          {comment.content}
-                        </p>
+                        {renderContent(comment.content)}
                         <div className={cn("flex items-center gap-1.5 mt-1.5 text-xs flex-wrap", isRTL && "flex-row-reverse")}>
                           <span className="text-muted-foreground">{formatTime(comment.created_at)}</span>
                           {comment.likes_count > 0 && (
@@ -315,7 +384,7 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
                               <Heart className={cn("w-2.5 h-2.5", comment.is_liked && "fill-primary text-primary")} />
                             </button>
                             <button
-                              onClick={() => { setReplyingTo(comment.id); setCommentText(`@${comment.profile?.username} `); }}
+                              onClick={() => { setReplyingTo(comment.id); setCommentText(`@${comment.profile?.username} `); setShowGifPicker(false); }}
                               className="text-muted-foreground hover:text-primary flex items-center gap-0.5 p-0.5">
                               <Reply className="w-2.5 h-2.5" />
                               <span>{isRTL ? "رد" : "Reply"}</span>
@@ -356,38 +425,72 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
           </div>
         </ScrollArea>
 
-        <div className="flex-none border-t border-neutral-800 p-3 space-y-2 bg-black/50" dir={isRTL ? "rtl" : "ltr"}>
-          {replyingTo && (
-            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-primary/10 border border-primary/20 rounded text-xs text-primary">
-              <Reply className="w-2.5 h-2.5 flex-shrink-0" />
-              <span className="font-medium flex-1 truncate">{isRTL ? "رد" : "Reply"}</span>
-              <button onClick={() => { setReplyingTo(null); setCommentText(""); }}
-                className="p-0.5 hover:bg-primary/20 rounded transition-colors">
-                <X className="w-2 h-2" />
-              </button>
+        {/* Bottom actions */}
+        <div className="flex-none border-t border-neutral-800 bg-black/50" dir={isRTL ? "rtl" : "ltr"}>
+
+          {/* GIF Picker */}
+          {showGifPicker && (
+            <div className="px-3 pt-2">
+              <GifPicker
+                isRTL={isRTL}
+                onSelect={(url) => {
+                  sendComment(GIF_PREFIX + url);
+                }}
+              />
             </div>
           )}
-          <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
-            <Avatar className="w-7 h-7 flex-shrink-0">
-              <AvatarImage src={currentUser?.avatar_url || undefined} />
-              <AvatarFallback>{(currentUser?.username?.[0] || "U").toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 flex gap-1.5">
-              <Input
-                placeholder={isRTL ? "أضف تعليق..." : "Add a comment..."}
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }}
-                className="bg-neutral-800/50 border-neutral-700 text-white placeholder:text-muted-foreground focus:border-pink-500 h-9 text-xs"
-              />
-              <Button
-                onClick={handleAddComment}
-                disabled={!commentText.trim() || createComment.isPending}
-                size="sm"
-                className="bg-pink-500 hover:bg-pink-600 text-white px-2.5 h-9"
+
+          <div className="p-3 space-y-2">
+            {/* Reply indicator */}
+            {replyingTo && (
+              <div className="flex items-center gap-1.5 px-2 py-1.5 bg-primary/10 border border-primary/20 rounded text-xs text-primary">
+                <Reply className="w-2.5 h-2.5 flex-shrink-0" />
+                <span className="font-medium flex-1 truncate">{isRTL ? "رد" : "Reply"}</span>
+                <button onClick={() => { setReplyingTo(null); setCommentText(""); }}
+                  className="p-0.5 hover:bg-primary/20 rounded transition-colors">
+                  <X className="w-2 h-2" />
+                </button>
+              </div>
+            )}
+
+            {/* Input row */}
+            <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
+              <Avatar className="w-7 h-7 flex-shrink-0">
+                <AvatarImage src={currentUser?.avatar_url || undefined} />
+                <AvatarFallback>{(currentUser?.username?.[0] || "U").toUpperCase()}</AvatarFallback>
+              </Avatar>
+
+              {/* GIF toggle button */}
+              <button
+                onClick={() => setShowGifPicker(s => !s)}
+                className={cn(
+                  "flex-shrink-0 p-1.5 rounded-lg transition-colors",
+                  showGifPicker
+                    ? "bg-pink-500/20 text-pink-400"
+                    : "text-muted-foreground hover:text-white hover:bg-neutral-800"
+                )}
+                title="GIF"
               >
-                <Send className="w-3 h-3" />
-              </Button>
+                <ImageIcon className="w-4 h-4" />
+              </button>
+
+              <div className="flex-1 flex gap-1.5">
+                <Input
+                  placeholder={isRTL ? "أضف تعليق..." : "Add a comment..."}
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendComment(commentText); } }}
+                  className="bg-neutral-800/50 border-neutral-700 text-white placeholder:text-muted-foreground focus:border-pink-500 h-9 text-xs"
+                />
+                <Button
+                  onClick={() => sendComment(commentText)}
+                  disabled={!commentText.trim() || createComment.isPending}
+                  size="sm"
+                  className="bg-pink-500 hover:bg-pink-600 text-white px-2.5 h-9"
+                >
+                  <Send className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
