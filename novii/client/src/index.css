@@ -248,4 +248,9 @@
     0% { transform: translateX(100%); }
     100% { transform: translateX(-100%); }
   }
+
+  @keyframes scan {
+    0%, 100% { top: 15%; }
+    50% { top: 85%; }
+  }
 }

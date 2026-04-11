@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { NoviiQRCode, downloadNoviiQR } from "@/components/novii-qr-code";
+import { QRScanner } from "@/components/qr-scanner";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Share2, Download, X } from "lucide-react";
+import { Copy, Check, Share2, Download, X, QrCode, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/lib/language-context";
 
@@ -27,12 +29,19 @@ export function ProfileShareModal({
   const isRTL = direction === "rtl";
   const [copied, setCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [activeTab, setActiveTab] = useState<"share" | "scan">("share");
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Reset tab when modal closes
+  useEffect(() => {
+    if (!open) setActiveTab("share");
+  }, [open]);
 
   const profileUrl = `https://novii.netlify.app/user?id=${userId}`;
   const displayName = fullName && fullName !== username ? fullName : null;
@@ -71,7 +80,34 @@ export function ProfileShareModal({
     }
   };
 
-  const ModalBody = () => (
+  const handleScanResult = (url: string) => {
+    onClose();
+    // Extract user id from Novii profile URLs
+    try {
+      const parsed = new URL(url);
+      if (
+        parsed.hostname === "novii.netlify.app" &&
+        parsed.pathname === "/user"
+      ) {
+        const id = parsed.searchParams.get("id");
+        if (id) {
+          navigate(`/user?id=${id}`);
+          return;
+        }
+      }
+      // Try direct navigation if it looks like a Novii URL
+      if (url.includes("novii.netlify.app")) {
+        window.location.href = url;
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+    toast.error(isRTL ? "هذا ليس QR Code خاص بـ Novii" : "Not a Novii QR Code");
+  };
+
+  /* ── Share content ── */
+  const ShareBody = () => (
     <div className="flex flex-col items-center gap-4 px-5 pb-5 pt-1">
       {/* Branded QR Code */}
       <div className="bg-white p-3 rounded-2xl shadow-md">
@@ -125,24 +161,62 @@ export function ProfileShareModal({
     </div>
   );
 
-  /* ── Mobile: bottom sheet ── */
+  /* ── Mobile: bottom sheet with tabs ── */
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={onClose}>
         <SheetContent side="bottom" className="rounded-t-3xl pb-8 px-0 pt-0">
+          {/* Drag handle */}
           <div className="flex justify-center pt-3 pb-1">
             <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
           </div>
-          <SheetTitle className="text-center text-base font-bold py-3">
+
+          {/* Title */}
+          <SheetTitle className="text-center text-base font-bold py-2">
             {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
           </SheetTitle>
-          <ModalBody />
+
+          {/* Tabs */}
+          <div className="flex mx-5 mb-3 bg-muted rounded-xl p-1 gap-1">
+            <button
+              onClick={() => setActiveTab("share")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "share"
+                  ? "bg-background shadow text-foreground"
+                  : "text-muted-foreground"
+              }`}
+            >
+              <QrCode className="w-4 h-4" />
+              {isRTL ? "مشاركة" : "Share"}
+            </button>
+            <button
+              onClick={() => setActiveTab("scan")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "scan"
+                  ? "bg-background shadow text-foreground"
+                  : "text-muted-foreground"
+              }`}
+            >
+              <ScanLine className="w-4 h-4" />
+              {isRTL ? "مسح" : "Scan"}
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          {activeTab === "share" ? (
+            <ShareBody />
+          ) : (
+            <QRScanner
+              onResult={handleScanResult}
+              onClose={() => setActiveTab("share")}
+            />
+          )}
         </SheetContent>
       </Sheet>
     );
   }
 
-  /* ── Desktop: custom centered modal (avoids RTL positioning bugs in Radix Dialog) ── */
+  /* ── Desktop: custom centered modal (no scanner on desktop) ── */
   if (!open) return null;
   return (
     <div
@@ -172,7 +246,7 @@ export function ProfileShareModal({
           {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
         </div>
 
-        <ModalBody />
+        <ShareBody />
       </div>
     </div>
   );
