@@ -11,6 +11,16 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const db = supabase;
 
+export function getUserDb(accessToken: string) {
+  return createClient(supabaseUrl!, supabaseAnonKey!, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    }
+  });
+}
+
 export const storage = {
   db,
 };

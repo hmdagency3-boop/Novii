@@ -183,6 +183,17 @@ export interface UserDevice {
   updated_at: string;
 }
 
+async function communityFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const authHeaders: Record<string, string> = {};
+  if (session?.user?.id) authHeaders['x-user-id'] = session.user.id;
+  if (session?.access_token) authHeaders['x-user-token'] = session.access_token;
+  return fetch(url, {
+    ...options,
+    headers: { ...authHeaders, ...(options.headers as Record<string, string> || {}) },
+  });
+}
+
 export const api = {
   // Profile APIs
   async getCurrentProfile(): Promise<Profile | null> {
@@ -2163,11 +2174,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch('/api/communities/create', {
+    const response = await communityFetch('/api/communities/create', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify({ name, description, isPrivate }),
     });
@@ -2183,8 +2194,8 @@ export const api = {
         return [];
       }
 
-      const response = await fetch('/api/communities', {
-        headers: { 'x-user-id': user.id },
+      const response = await communityFetch('/api/communities', {
+        headers: {},
       });
       
       if (!response.ok) {
@@ -2205,11 +2216,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/send-message`, {
+    const response = await communityFetch(`/api/communities/${communityId}/send-message`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify({ content, imageUrl }),
     });
@@ -2218,7 +2229,7 @@ export const api = {
   },
 
   async getCommunityMessages(communityId: string, limit?: number): Promise<any[]> {
-    const response = await fetch(`/api/communities/${communityId}/messages?limit=${limit || 50}`);
+    const response = await communityFetch(`/api/communities/${communityId}/messages?limit=${limit || 50}`);
     if (!response.ok) return [];
     const result = await response.json();
     return result.data || [];
@@ -2228,11 +2239,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/add-member`, {
+    const response = await communityFetch(`/api/communities/${communityId}/add-member`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify({ memberId }),
     });
@@ -2244,11 +2255,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch('/api/communities/join-with-code', {
+    const response = await communityFetch('/api/communities/join-with-code', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify({ inviteCode }),
     });
@@ -2298,8 +2309,8 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/members`, {
-      headers: { 'x-user-id': user.id }
+    const response = await communityFetch(`/api/communities/${communityId}/members`, {
+      headers: {}
     });
     if (!response.ok) throw new Error('Failed to fetch members');
     return response.json();
@@ -2309,11 +2320,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/mute-member`, {
+    const response = await communityFetch(`/api/communities/${communityId}/mute-member`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify({ targetUserId, reason }),
     });
@@ -2328,11 +2339,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/unmute-member`, {
+    const response = await communityFetch(`/api/communities/${communityId}/unmute-member`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify({ targetUserId }),
     });
@@ -2347,11 +2358,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/temporary-mute`, {
+    const response = await communityFetch(`/api/communities/${communityId}/temporary-mute`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify({ targetUserId, durationMinutes, reason }),
     });
@@ -2366,11 +2377,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/kick-member`, {
+    const response = await communityFetch(`/api/communities/${communityId}/kick-member`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify({ targetUserId, reason }),
     });
@@ -2385,11 +2396,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/make-admin`, {
+    const response = await communityFetch(`/api/communities/${communityId}/make-admin`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify({ targetUserId }),
     });
@@ -2404,11 +2415,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/remove-admin`, {
+    const response = await communityFetch(`/api/communities/${communityId}/remove-admin`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify({ targetUserId }),
     });
@@ -2423,11 +2434,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/check-kick-status`, {
+    const response = await communityFetch(`/api/communities/${communityId}/check-kick-status`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
     });
     if (!response.ok) {
@@ -2441,8 +2452,8 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/kicked-members`, {
-      headers: { 'x-user-id': user.id }
+    const response = await communityFetch(`/api/communities/${communityId}/kicked-members`, {
+      headers: {}
     });
     if (!response.ok) throw new Error('Failed to fetch kicked members');
     return response.json();
@@ -2452,11 +2463,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/unkick-member`, {
+    const response = await communityFetch(`/api/communities/${communityId}/unkick-member`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify({ targetUserId, reason }),
     });
@@ -2471,11 +2482,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}/messages/${messageId}`, {
+    const response = await communityFetch(`/api/communities/${communityId}/messages/${messageId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
     });
     if (!response.ok) {
@@ -2493,11 +2504,11 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const response = await fetch(`/api/communities/${communityId}`, {
+    const response = await communityFetch(`/api/communities/${communityId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': user.id,
+
       },
       body: JSON.stringify(updates),
     });

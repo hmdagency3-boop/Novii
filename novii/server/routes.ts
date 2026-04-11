@@ -1,6 +1,11 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
-import { storage, db } from "./storage";
+import { storage, db, getUserDb } from "./storage";
+
+function getDb(req: Request) {
+  const token = req.headers['x-user-token'] as string;
+  return token ? getUserDb(token) : db;
+}
 import { parseUserAgent, getClientIp, getGeoLocation } from "./utils/device-detector";
 import { userDevices, profiles } from "../shared/schema";
 import { sql, eq } from "drizzle-orm";
@@ -640,7 +645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const inviteCode = generateInviteCode();
       
       // Create community via Supabase
-      const { data: commData, error: commError } = await db.from('communities').insert({
+      const { data: commData, error: commError } = await getDb(req).from('communities').insert({
         id: communityId,
         name,
         description: description || null,
@@ -668,7 +673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Add creator as admin (with upsert to handle duplicates)
-      const { error: memberError } = await db.from('community_members').upsert({
+      const { error: memberError } = await getDb(req).from('community_members').upsert({
         id: crypto.randomUUID(),
         community_id: communityId,
         user_id: userId,
@@ -684,7 +689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fetch complete data with profile join
-      const { data: community, error: fetchError } = await db
+      const { data: community, error: fetchError } = await getDb(req)
         .from('communities')
         .select('*, profiles!created_by(username, avatar_url, is_official)')
         .eq('id', communityId)
@@ -718,7 +723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) return res.status(401).json({ error: 'User ID required' });
 
       // Get as creator
-      const { data: creatorComm, error: creatorErr } = await db
+      const { data: creatorComm, error: creatorErr } = await getDb(req)
         .from('communities')
         .select('*, profiles!created_by(username, avatar_url, is_official)')
         .eq('created_by', userId);
@@ -726,7 +731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (creatorErr) throw creatorErr;
 
       // Get as member
-      const { data: memberIds, error: memberErr } = await db
+      const { data: memberIds, error: memberErr } = await getDb(req)
         .from('community_members')
         .select('community_id')
         .eq('user_id', userId);
@@ -735,7 +740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let memberComm: any[] = [];
       if (memberIds?.length) {
-        const { data: mComm, error: mErr } = await db
+        const { data: mComm, error: mErr } = await getDb(req)
           .from('communities')
           .select('*, profiles!created_by(username, avatar_url, is_official)')
           .in('id', memberIds.map(m => m.community_id));
@@ -759,13 +764,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (creatorIds.length > 0) {
         try {
           // Use raw SQL to bypass any Supabase client issues
-          const { data: sqlResult, error: sqlErr } = await db.rpc('get_profiles_official', {
+          const { data: sqlResult, error: sqlErr } = await getDb(req).rpc('get_profiles_official', {
             p_ids: creatorIds
           });
           
           if (sqlErr || !sqlResult) {
             // Fallback if RPC doesn't exist
-            const { data: fallbackProfiles, error: fallbackErr } = await db
+            const { data: fallbackProfiles, error: fallbackErr } = await getDb(req)
               .from('profiles')
               .select('id, is_official')
               .in('id', creatorIds);
@@ -817,7 +822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is member AND check mute/kick status
-      const { data: member, error: memberErr } = await db
+      const { data: member, error: memberErr } = await getDb(req)
         .from('community_members')
         .select('id, role, is_muted, muted_until, kicked_at')
         .eq('community_id', communityId)
@@ -846,7 +851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } else {
           // Temp mute expired, unmute the user
-          await db
+          await getDb(req)
             .from('community_members')
             .update({ is_muted: false, muted_until: null })
             .eq('community_id', communityId)
@@ -855,7 +860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const messageId = crypto.randomUUID();
-      const { error: insertErr } = await db.from('community_messages').insert({
+      const { error: insertErr } = await getDb(req).from('community_messages').insert({
         id: messageId,
         community_id: communityId,
         sender_id: userId,
@@ -881,7 +886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id: communityId } = req.params;
       const { limit = 50 } = req.query;
 
-      const { data: messages, error } = await db
+      const { data: messages, error } = await getDb(req)
         .from('community_messages')
         .select('*, profiles!sender_id(username, avatar_url, is_verified, is_official)')
         .eq('community_id', communityId)
@@ -916,7 +921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is admin
-      const { data: admin, error: adminErr } = await db
+      const { data: admin, error: adminErr } = await getDb(req)
         .from('community_members')
         .select('id, role')
         .eq('community_id', communityId)
@@ -928,7 +933,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Soft delete - mark message as deleted instead of actually deleting it
-      const { error: updateErr } = await db
+      const { error: updateErr } = await getDb(req)
         .from('community_messages')
         .update({
           is_deleted: true,
@@ -960,7 +965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if requester is admin
-      const { data: admin, error: adminErr } = await db
+      const { data: admin, error: adminErr } = await getDb(req)
         .from('community_members')
         .select('id')
         .eq('community_id', communityId)
@@ -973,7 +978,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Add member
-      const { error: insertErr } = await db.from('community_members').insert({
+      const { error: insertErr } = await getDb(req).from('community_members').insert({
         id: crypto.randomUUID(),
         community_id: communityId,
         user_id: memberId,
@@ -1004,7 +1009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get community and verify owner
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('id, name, invite_code, created_by')
         .eq('id', communityId)
@@ -1043,7 +1048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Find community by invite code
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('id, name, created_by')
         .eq('invite_code', inviteCode)
@@ -1054,7 +1059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is already kicked from this community 👢
-      const { data: existingMember, error: existingErr } = await db
+      const { data: existingMember, error: existingErr } = await getDb(req)
         .from('community_members')
         .select('kicked_at')
         .eq('community_id', community.id)
@@ -1071,7 +1076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Add user to community
-      const { error: joinErr } = await db.from('community_members').upsert({
+      const { error: joinErr } = await getDb(req).from('community_members').upsert({
         id: crypto.randomUUID(),
         community_id: community.id,
         user_id: userId,
@@ -1086,12 +1091,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update members count
-      const { data: memberCount } = await db
+      const { data: memberCount } = await getDb(req)
         .from('community_members')
         .select('id', { count: 'exact' })
         .eq('community_id', community.id);
 
-      await db.from('communities')
+      await getDb(req).from('communities')
         .update({ members_count: memberCount?.length || 1 })
         .eq('id', community.id);
 
@@ -1120,7 +1125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is admin or owner
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('created_by')
         .eq('id', communityId)
@@ -1133,7 +1138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isOwner = community.created_by === userId;
       
       if (!isOwner) {
-        const { data: adminMember, error: adminErr } = await db
+        const { data: adminMember, error: adminErr } = await getDb(req)
           .from('community_members')
           .select('role')
           .eq('community_id', communityId)
@@ -1146,7 +1151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Mute the member
-      const { error: muteErr } = await db
+      const { error: muteErr } = await getDb(req)
         .from('community_members')
         .update({ 
           is_muted: true, 
@@ -1160,7 +1165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (muteErr) throw muteErr;
 
       // Log the action
-      await db.from('moderation_logs').insert({
+      await getDb(req).from('moderation_logs').insert({
         community_id: communityId,
         action: 'mute',
         target_user_id: targetUserId,
@@ -1188,7 +1193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is admin or owner
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('created_by')
         .eq('id', communityId)
@@ -1201,7 +1206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isOwner = community.created_by === userId;
       
       if (!isOwner) {
-        const { data: adminMember, error: adminErr } = await db
+        const { data: adminMember, error: adminErr } = await getDb(req)
           .from('community_members')
           .select('role')
           .eq('community_id', communityId)
@@ -1214,7 +1219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Unmute the member
-      const { error: unmuteErr } = await db
+      const { error: unmuteErr } = await getDb(req)
         .from('community_members')
         .update({ 
           is_muted: false, 
@@ -1228,7 +1233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (unmuteErr) throw unmuteErr;
 
       // Log the action
-      await db.from('moderation_logs').insert({
+      await getDb(req).from('moderation_logs').insert({
         community_id: communityId,
         action: 'unmute',
         target_user_id: targetUserId,
@@ -1255,7 +1260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is admin or owner
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('created_by')
         .eq('id', communityId)
@@ -1268,7 +1273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isOwner = community.created_by === userId;
       
       if (!isOwner) {
-        const { data: adminMember, error: adminErr } = await db
+        const { data: adminMember, error: adminErr } = await getDb(req)
           .from('community_members')
           .select('role')
           .eq('community_id', communityId)
@@ -1284,7 +1289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const muteUntil = new Date(Date.now() + durationMinutes * 60000).toISOString();
 
       // Temporarily mute the member
-      const { error: muteErr } = await db
+      const { error: muteErr } = await getDb(req)
         .from('community_members')
         .update({ 
           is_muted: true, 
@@ -1298,7 +1303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (muteErr) throw muteErr;
 
       // Log the action
-      await db.from('moderation_logs').insert({
+      await getDb(req).from('moderation_logs').insert({
         community_id: communityId,
         action: 'temporary_mute',
         target_user_id: targetUserId,
@@ -1327,7 +1332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is admin or owner
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('created_by')
         .eq('id', communityId)
@@ -1340,7 +1345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isOwner = community.created_by === userId;
       
       if (!isOwner) {
-        const { data: adminMember, error: adminErr } = await db
+        const { data: adminMember, error: adminErr } = await getDb(req)
           .from('community_members')
           .select('role')
           .eq('community_id', communityId)
@@ -1353,7 +1358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Mark member as kicked (soft delete)
-      const { error: kickErr } = await db
+      const { error: kickErr } = await getDb(req)
         .from('community_members')
         .update({ kicked_at: new Date().toISOString() })
         .eq('community_id', communityId)
@@ -1362,7 +1367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (kickErr) throw kickErr;
 
       // Log the action
-      await db.from('moderation_logs').insert({
+      await getDb(req).from('moderation_logs').insert({
         community_id: communityId,
         action: 'kick',
         target_user_id: targetUserId,
@@ -1371,13 +1376,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Update members count
-      const { data: memberCount } = await db
+      const { data: memberCount } = await getDb(req)
         .from('community_members')
         .select('id', { count: 'exact' })
         .eq('community_id', communityId)
         .is('kicked_at', null);
 
-      await db.from('communities')
+      await getDb(req).from('communities')
         .update({ members_count: memberCount?.length || 0 })
         .eq('id', communityId);
 
@@ -1400,7 +1405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Try to get member info (this will pass RLS policy we added)
-      const { data: member, error: memberErr } = await db
+      const { data: member, error: memberErr } = await getDb(req)
         .from('community_members')
         .select('kicked_at')
         .eq('community_id', communityId)
@@ -1440,7 +1445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all members (excluding kicked ones)
-      const { data: members, error: membersErr } = await db
+      const { data: members, error: membersErr } = await getDb(req)
         .from('community_members')
         .select(`
           *,
@@ -1471,7 +1476,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get community and verify owner
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('id, created_by')
         .eq('id', communityId)
@@ -1498,7 +1503,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newCode = generateInviteCode();
 
       // Update community with new code
-      const { data: updated, error: updateErr } = await db
+      const { data: updated, error: updateErr } = await getDb(req)
         .from('communities')
         .update({ invite_code: newCode })
         .eq('id', communityId)
@@ -1532,7 +1537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if requester is the community owner
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('created_by')
         .eq('id', communityId)
@@ -1547,7 +1552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update member role to admin
-      const { error: updateErr } = await db
+      const { error: updateErr } = await getDb(req)
         .from('community_members')
         .update({ role: 'admin' })
         .eq('community_id', communityId)
@@ -1556,7 +1561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updateErr) throw updateErr;
 
       // Log the action
-      await db.from('moderation_logs').insert({
+      await getDb(req).from('moderation_logs').insert({
         community_id: communityId,
         action: 'promote_admin',
         target_user_id: targetUserId,
@@ -1583,7 +1588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if requester is the community owner
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('created_by')
         .eq('id', communityId)
@@ -1603,7 +1608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update member role back to member
-      const { error: updateErr } = await db
+      const { error: updateErr } = await getDb(req)
         .from('community_members')
         .update({ role: 'member' })
         .eq('community_id', communityId)
@@ -1612,7 +1617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updateErr) throw updateErr;
 
       // Log the action
-      await db.from('moderation_logs').insert({
+      await getDb(req).from('moderation_logs').insert({
         community_id: communityId,
         action: 'demote_admin',
         target_user_id: targetUserId,
@@ -1638,7 +1643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is admin or owner
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('created_by')
         .eq('id', communityId)
@@ -1651,7 +1656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isOwner = community.created_by === userId;
       
       if (!isOwner) {
-        const { data: adminMember, error: adminErr } = await db
+        const { data: adminMember, error: adminErr } = await getDb(req)
           .from('community_members')
           .select('role')
           .eq('community_id', communityId)
@@ -1664,7 +1669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all kicked members
-      const { data: kickedMembers, error: membersErr } = await db
+      const { data: kickedMembers, error: membersErr } = await getDb(req)
         .from('community_members')
         .select(`
           *,
@@ -1696,7 +1701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is admin or owner
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('created_by')
         .eq('id', communityId)
@@ -1709,7 +1714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isOwner = community.created_by === userId;
       
       if (!isOwner) {
-        const { data: adminMember, error: adminErr } = await db
+        const { data: adminMember, error: adminErr } = await getDb(req)
           .from('community_members')
           .select('role')
           .eq('community_id', communityId)
@@ -1722,7 +1727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Clear kicked_at (unkick the member)
-      const { error: unkickErr } = await db
+      const { error: unkickErr } = await getDb(req)
         .from('community_members')
         .update({ kicked_at: null })
         .eq('community_id', communityId)
@@ -1731,7 +1736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (unkickErr) throw unkickErr;
 
       // Log the action
-      await db.from('moderation_logs').insert({
+      await getDb(req).from('moderation_logs').insert({
         community_id: communityId,
         action: 'unkick',
         target_user_id: targetUserId,
@@ -1740,13 +1745,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Update members count
-      const { data: memberCount } = await db
+      const { data: memberCount } = await getDb(req)
         .from('community_members')
         .select('id', { count: 'exact' })
         .eq('community_id', communityId)
         .is('kicked_at', null);
 
-      await db.from('communities')
+      await getDb(req).from('communities')
         .update({ members_count: memberCount?.length || 0 })
         .eq('id', communityId);
 
@@ -1770,7 +1775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is the owner
-      const { data: community, error: commErr } = await db
+      const { data: community, error: commErr } = await getDb(req)
         .from('communities')
         .select('created_by')
         .eq('id', communityId)
@@ -1795,7 +1800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update community
-      const { data: updated, error: updateErr } = await db
+      const { data: updated, error: updateErr } = await getDb(req)
         .from('communities')
         .update(updateData)
         .eq('id', communityId)
