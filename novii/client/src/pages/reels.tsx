@@ -233,15 +233,13 @@ interface CardProps {
 interface ActionProps {
   reel: any; isRTL: boolean; followed: boolean; saved: boolean;
   currentUserId?: string; size?: "sm" | "md";
-  muted?: boolean; showMute?: boolean;
-  setMuted?: React.Dispatch<React.SetStateAction<boolean>>;
   onLike:   (reel: any, e?: React.MouseEvent) => void;
   onFollow: (uid: string) => void;
   onSave:   (id: string) => void;
   onShare:  (reel: any) => void;
 }
 
-function ActionColumn({ reel, isRTL, followed, saved, currentUserId, muted, setMuted, showMute, onLike, onFollow, onSave, onShare, size = "md" }: ActionProps) {
+function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onFollow, onSave, onShare, size = "md" }: ActionProps) {
   const ic = size === "sm" ? "w-6 h-6" : "w-7 h-7";
   const nc = size === "sm" ? "text-[11px]" : "text-xs";
   return (
@@ -295,25 +293,12 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, muted, setM
         <span className={cn(nc, "text-white font-semibold drop-shadow")}>{isRTL ? "مشاركة" : "Share"}</span>
       </button>
 
-      {/* Spinning disc + mute side by side */}
-      <div className="flex items-center gap-2 mt-1">
-        {showMute && setMuted && (
-          <button
-            onClick={() => setMuted(m => !m)}
-            className="bg-black/40 backdrop-blur-sm rounded-full p-1.5 border border-white/20 hover:bg-black/60 transition group"
-          >
-            {muted
-              ? <VolumeX className="w-4 h-4 text-white group-active:scale-125 transition-transform" />
-              : <Volume2 className="w-4 h-4 text-white group-active:scale-125 transition-transform" />
-            }
-          </button>
-        )}
-        <div className={cn(
-          "rounded-full bg-gradient-to-br from-neutral-800 to-neutral-600 border-4 border-neutral-700 flex items-center justify-center animate-spin-slow",
-          size === "sm" ? "w-8 h-8" : "w-10 h-10"
-        )}>
-          <Music2 className={cn(size === "sm" ? "w-3 h-3" : "w-4 h-4", "text-white")} />
-        </div>
+      {/* Spinning disc */}
+      <div className={cn(
+        "rounded-full bg-gradient-to-br from-neutral-800 to-neutral-600 border-4 border-neutral-700 flex items-center justify-center animate-spin-slow mt-1",
+        size === "sm" ? "w-8 h-8" : "w-10 h-10"
+      )}>
+        <Music2 className={cn(size === "sm" ? "w-3 h-3" : "w-4 h-4", "text-white")} />
       </div>
     </div>
   );
@@ -528,11 +513,20 @@ function DesktopReelCard({
             )}
             <div className="flex items-center gap-2">
               <Music2 className="w-3 h-3 text-white/60 flex-shrink-0" />
-              <div className="overflow-hidden flex-1 max-w-[220px]">
+              <div className="overflow-hidden flex-1 max-w-[180px]">
                 <p className="text-white/60 text-xs whitespace-nowrap animate-marquee">
                   {reel.profile?.username} · {isRTL ? "صوت أصلي" : "Original Sound"}
                 </p>
               </div>
+              <button
+                onClick={e => { e.stopPropagation(); setMuted(m => !m); }}
+                className="flex-shrink-0 bg-black/40 backdrop-blur-sm rounded-full p-1 border border-white/20 hover:bg-black/60 transition"
+              >
+                {muted
+                  ? <VolumeX className="w-3.5 h-3.5 text-white" />
+                  : <Volume2 className="w-3.5 h-3.5 text-white" />
+                }
+              </button>
             </div>
           </div>
         </div>
@@ -541,8 +535,7 @@ function DesktopReelCard({
         <div className="flex-shrink-0">
           <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
             currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
-            onSave={onSave} onShare={onShare} size="md"
-            muted={muted} setMuted={setMuted} showMute />
+            onSave={onSave} onShare={onShare} size="md" />
         </div>
       </div>
     </div>
