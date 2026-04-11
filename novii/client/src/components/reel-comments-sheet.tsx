@@ -45,7 +45,7 @@ function renderContent(content: string) {
       />
     );
   }
-  return <p className="text-sm mt-1.5 break-words text-white/85">{content}</p>;
+  return <p className="text-sm mt-1.5 break-words text-foreground">{content}</p>;
 }
 
 /* ── Main Component ──────────────────────────────── */
@@ -152,7 +152,7 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
           </Link>
           <div className="flex-1 min-w-0">
             <div className={cn("flex items-center gap-1 flex-wrap", isRTL && "flex-row-reverse")}>
-              <Link href={`/user?id=${reply.user_id}`} className="font-bold text-xs text-white hover:opacity-80">
+              <Link href={`/user?id=${reply.user_id}`} className="font-bold text-xs text-foreground hover:opacity-80">
                 {reply.profile?.username}
               </Link>
               <div className="flex items-center gap-0.5">
@@ -227,13 +227,13 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
       <SheetContent
         side={isMobile ? "bottom" : (isRTL ? "left" : "right")}
         className={cn(
-          "bg-black/95 border-neutral-800 flex flex-col p-0",
+          "bg-background border-border flex flex-col p-0",
           isMobile ? "h-[85vh]" : "w-[380px] h-full top-0",
           isRTL && "dir-rtl"
         )}
       >
-        <SheetHeader className="border-b border-neutral-800 p-4 pb-3">
-          <SheetTitle className="text-white text-center text-lg">
+        <SheetHeader className="border-b border-border p-4 pb-3">
+          <SheetTitle className="text-foreground text-center text-lg">
             {isRTL ? "التعليقات" : "Comments"} ({comments.length})
           </SheetTitle>
         </SheetHeader>
@@ -354,7 +354,7 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
         </ScrollArea>
 
         {/* Bottom actions */}
-        <div className="flex-none border-t border-neutral-800 bg-black/50" dir={isRTL ? "rtl" : "ltr"}>
+        <div className="flex-none border-t border-border bg-background" dir={isRTL ? "rtl" : "ltr"}>
 
           {/* GIF Picker */}
           {showGifPicker && (
@@ -395,7 +395,7 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
                   "flex-shrink-0 p-1.5 rounded-lg transition-colors",
                   showGifPicker
                     ? "bg-pink-500/20 text-pink-400"
-                    : "text-muted-foreground hover:text-white hover:bg-neutral-800"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 title="GIF"
               >
@@ -408,7 +408,7 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
                   value={commentText}
                   onChange={e => setCommentText(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendComment(commentText); } }}
-                  className="bg-neutral-800/50 border-neutral-700 text-white placeholder:text-muted-foreground focus:border-pink-500 h-9 text-xs"
+                  className="bg-background border-input text-foreground placeholder:text-muted-foreground focus:border-pink-500 h-9 text-xs"
                 />
                 <Button
                   onClick={() => sendComment(commentText)}

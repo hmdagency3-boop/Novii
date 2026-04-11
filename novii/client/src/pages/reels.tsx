@@ -142,7 +142,7 @@ export default function Reels() {
   /* ── loading / empty ── */
   if (isLoading) return (
     <Layout>
-      <div className="fixed inset-0 lg:left-20 flex items-center justify-center bg-black">
+      <div className="fixed inset-0 lg:left-20 flex items-center justify-center bg-background">
         <Spinner />
       </div>
     </Layout>
@@ -150,10 +150,10 @@ export default function Reels() {
 
   if (!reels?.length) return (
     <Layout>
-      <div className="fixed inset-0 lg:left-20 flex flex-col items-center justify-center bg-black gap-4">
+      <div className="fixed inset-0 lg:left-20 flex flex-col items-center justify-center bg-background gap-4">
         <div className="text-6xl">🎬</div>
-        <h2 className="text-2xl font-bold text-white">{isRTL ? "لا توجد ريلز" : "No Reels Yet"}</h2>
-        <p className="text-white/60">{isRTL ? "كن أول من ينشر!" : "Be the first to post!"}</p>
+        <h2 className="text-2xl font-bold text-foreground">{isRTL ? "لا توجد ريلز" : "No Reels Yet"}</h2>
+        <p className="text-muted-foreground">{isRTL ? "كن أول من ينشر!" : "Be the first to post!"}</p>
       </div>
     </Layout>
   );
@@ -165,7 +165,7 @@ export default function Reels() {
           MOBILE  — fullscreen snap scroll
       ══════════════════════════════════════════ */}
       <div
-        className="mobile-reels-container fixed inset-0 top-0 lg:hidden snap-y snap-mandatory bg-black"
+        className="mobile-reels-container fixed inset-0 top-0 lg:hidden snap-y snap-mandatory bg-background"
         style={{
           overflowY: "scroll",
           overflowX: "hidden",
@@ -188,7 +188,7 @@ export default function Reels() {
           DESKTOP — centered 9:16 + side actions
       ══════════════════════════════════════════ */}
       <div
-        className="fixed inset-0 left-20 hidden lg:block overflow-y-scroll snap-y snap-mandatory bg-black"
+        className="fixed inset-0 left-20 hidden lg:block overflow-y-scroll snap-y snap-mandatory bg-background"
         style={{ scrollbarWidth: "none" }}
       >
         {reels.map((reel: any, idx: number) => (

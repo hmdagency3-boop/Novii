@@ -735,11 +735,11 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
 
         {/* Right Sidebar - Comments & Actions - Desktop Only */}
         <div className={cn(
-          "hidden md:flex w-96 h-full bg-gradient-to-b from-black/90 via-black/80 to-black/90 border-l border-neutral-800 flex-col backdrop-blur-xl",
+          "hidden md:flex w-96 h-full bg-background border-l border-border flex-col",
           isRTL && "border-l-0 border-r"
         )}>
             {/* User Info & Caption */}
-            <div className="flex-none p-6 border-b border-neutral-800 space-y-4">
+            <div className="flex-none p-6 border-b border-border space-y-4">
               <Link href={`/user?id=${localReel.user_id}`}>
                 <div className={cn("flex items-center gap-3 cursor-pointer group", isRTL && "flex-row-reverse")}>
                   <Avatar className="w-12 h-12 ring-2 ring-pink-500/30 group-hover:ring-pink-500/60 transition-all">
@@ -747,7 +747,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                     <AvatarFallback>{localReel.user?.username?.[0]?.toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-white group-hover:text-pink-400 transition-colors flex items-center gap-1.5 flex-wrap">
+                    <p className="font-bold text-foreground group-hover:text-pink-400 transition-colors flex items-center gap-1.5 flex-wrap">
                       {localReel.user?.username}
                       {localReel.user?.is_verified && <VerifiedBadge size="sm" />}
                       {localReel.user?.is_official && <OfficialBadge size="sm" showText={false} />}
@@ -762,7 +762,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
               </Link>
 
               {localReel.caption && (
-                <p className="text-sm text-white/80 leading-relaxed break-words">{localReel.caption}</p>
+                <p className="text-sm text-foreground/80 leading-relaxed break-words">{localReel.caption}</p>
               )}
             </div>
 
@@ -916,7 +916,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
             </ScrollArea>
 
             {/* Actions Bar */}
-            <div className="flex-none border-t border-neutral-800 p-4 space-y-4 bg-black/50">
+            <div className="flex-none border-t border-border p-4 space-y-4 bg-background">
               {/* Like & Comment Count */}
               <div className={cn("flex items-center justify-between text-sm", isRTL && "flex-row-reverse")}>
                 <div className={cn("flex items-center gap-4", isRTL && "flex-row-reverse")}>
@@ -924,19 +924,19 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                     onClick={handleLike}
                     className="flex items-center gap-2 group"
                   >
-                    <div className="bg-neutral-800/50 group-hover:bg-pink-500/20 p-2.5 rounded-full transition-all">
+                    <div className="bg-muted/50 group-hover:bg-pink-500/20 p-2.5 rounded-full transition-all">
                       <Heart className={cn(
                         "w-5 h-5 transition-colors",
-                        localReel.is_liked ? "fill-pink-500 text-pink-500" : "text-white group-hover:text-pink-500"
+                        localReel.is_liked ? "fill-pink-500 text-pink-500" : "text-foreground group-hover:text-pink-500"
                       )} />
                     </div>
-                    <span className="text-white font-semibold text-sm">{localReel.likes_count}</span>
+                    <span className="text-foreground font-semibold text-sm">{localReel.likes_count}</span>
                   </button>
                   <div className="flex items-center gap-2">
-                    <div className="bg-neutral-800/50 p-2.5 rounded-full">
-                      <MessageCircle className="w-5 h-5 text-white" />
+                    <div className="bg-muted/50 p-2.5 rounded-full">
+                      <MessageCircle className="w-5 h-5 text-foreground" />
                     </div>
-                    <span className="text-white font-semibold text-sm">{comments.length}</span>
+                    <span className="text-foreground font-semibold text-sm">{comments.length}</span>
                   </div>
                 </div>
                 <button
@@ -944,12 +944,12 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                   className="group"
                 >
                   <div className={cn(
-                    "bg-neutral-800/50 group-hover:bg-blue-500/20 p-2.5 rounded-full transition-all",
+                    "bg-muted/50 group-hover:bg-blue-500/20 p-2.5 rounded-full transition-all",
                     shareSuccess && "bg-green-500/20"
                   )}>
                     <Share2 className={cn(
                       "w-5 h-5 transition-colors",
-                      shareSuccess ? "text-green-500" : "text-white group-hover:text-blue-500"
+                      shareSuccess ? "text-green-500" : "text-foreground group-hover:text-blue-500"
                     )} />
                   </div>
                 </button>
@@ -992,7 +992,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
-                    className="bg-neutral-800/50 border-neutral-700 text-white placeholder:text-muted-foreground focus:border-pink-500 h-10 text-sm"
+                    className="bg-background border-input text-foreground placeholder:text-muted-foreground focus:border-pink-500 h-10 text-sm"
                   />
                   <Button
                     variant="ghost"
@@ -1019,9 +1019,9 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
 
       {/* Mobile Comments Sheet */}
       <Sheet open={showMobileComments} onOpenChange={setShowMobileComments}>
-        <SheetContent side="bottom" className={cn("h-[85vh] bg-black/95 border-neutral-800 flex flex-col p-0", isRTL && "dir-rtl")}>
-          <SheetHeader className="border-b border-neutral-800 p-4 pb-3">
-            <SheetTitle className="text-white text-center text-lg">
+        <SheetContent side="bottom" className={cn("h-[85vh] bg-background border-border flex flex-col p-0", isRTL && "dir-rtl")}>
+          <SheetHeader className="border-b border-border p-4 pb-3">
+            <SheetTitle className="text-foreground text-center text-lg">
               {isRTL ? "التعليقات" : "Comments"} ({comments.length})
             </SheetTitle>
           </SheetHeader>
@@ -1212,7 +1212,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
-                  className="bg-neutral-800/50 border-neutral-700 text-white placeholder:text-muted-foreground focus:border-pink-500 h-9 text-xs"
+                  className="bg-background border-input text-foreground placeholder:text-muted-foreground focus:border-pink-500 h-9 text-xs"
                 />
                 <Button
                   variant="ghost"
