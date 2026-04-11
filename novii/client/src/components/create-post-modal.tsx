@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +39,7 @@ import { supabase } from "@/lib/supabase";
 interface CreatePostModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialMediaType?: MediaType;
 }
 
 interface ImagePreview {
@@ -73,14 +74,14 @@ const STEPS: { id: PostStep; label: string; labelAr: string }[] = [
   { id: 'details', label: 'Share', labelAr: 'المشاركة' },
 ];
 
-export function CreatePostModal({ open, onOpenChange }: CreatePostModalProps) {
+export function CreatePostModal({ open, onOpenChange, initialMediaType }: CreatePostModalProps) {
   const { direction, language } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
   const createPostMutation = useCreatePost();
   
   const [currentStep, setCurrentStep] = useState<PostStep>('select');
-  const [mediaType, setMediaType] = useState<MediaType>('post');
+  const [mediaType, setMediaType] = useState<MediaType>(initialMediaType || 'post');
   const [caption, setCaption] = useState("");
   const [selectedImages, setSelectedImages] = useState<ImagePreview[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -98,6 +99,17 @@ export function CreatePostModal({ open, onOpenChange }: CreatePostModalProps) {
   const reelInputRef = useRef<HTMLInputElement>(null);
   const isRTL = direction === "rtl";
   const t = language.code === 'ar';
+
+  // Sync mediaType and step when modal opens with a specific initialMediaType
+  useEffect(() => {
+    if (open) {
+      setMediaType(initialMediaType || 'post');
+      setCurrentStep('select');
+      setSelectedImages([]);
+      setSelectedReel(null);
+      setCaption("");
+    }
+  }, [open, initialMediaType]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -266,27 +278,26 @@ export function CreatePostModal({ open, onOpenChange }: CreatePostModalProps) {
 
   return (
     <>
-      <input
-        type="file"
-        ref={fileInputRef}
-        className="hidden"
-        accept="image/*"
-        multiple
-        onChange={handleImageSelect}
-      />
-      <input
-        type="file"
-        ref={reelInputRef}
-        className="hidden"
-        accept="video/*"
-        onChange={handleReelSelect}
-      />
-
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent 
           hideDefaultClose={true}
           className="max-w-full sm:max-w-2xl lg:max-w-5xl p-0 gap-0 overflow-hidden rounded-none sm:rounded-3xl border-0 shadow-2xl bg-background h-screen sm:h-auto max-h-screen sm:max-h-[90vh]"
         >
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept="image/*"
+            multiple
+            onChange={handleImageSelect}
+          />
+          <input
+            type="file"
+            ref={reelInputRef}
+            className="hidden"
+            accept="video/*"
+            onChange={handleReelSelect}
+          />
           {/* Header */}
           <div className="bg-gradient-to-r from-primary/15 via-primary/5 to-transparent border-b border-border/50 px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">

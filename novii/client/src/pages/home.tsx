@@ -20,6 +20,7 @@ export default function Home() {
   const { data: followingUsers = [] } = useFollowing(currentUser?.id || '');
   const [location, navigate] = useLocation();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createModalInitialType, setCreateModalInitialType] = useState<'post' | 'reel'>('post');
   const [isCreateStoryModalOpen, setIsCreateStoryModalOpen] = useState(false);
   const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -47,14 +48,17 @@ export default function Home() {
   // Listen for create menu events from layout
   useEffect(() => {
     const handleOpenStory = () => setIsCreateStoryModalOpen(true);
-    const handleOpenPost = () => setIsCreateModalOpen(true);
+    const handleOpenPost = () => { setCreateModalInitialType('post'); setIsCreateModalOpen(true); };
+    const handleOpenReel = () => { setCreateModalInitialType('reel'); setIsCreateModalOpen(true); };
 
     window.addEventListener('openStoryModal', handleOpenStory);
     window.addEventListener('openPostModal', handleOpenPost);
+    window.addEventListener('openReelModal', handleOpenReel);
 
     return () => {
       window.removeEventListener('openStoryModal', handleOpenStory);
       window.removeEventListener('openPostModal', handleOpenPost);
+      window.removeEventListener('openReelModal', handleOpenReel);
     };
   }, []);
 
@@ -187,7 +191,8 @@ export default function Home() {
       {/* Create Post Modal */}
       <CreatePostModal 
         open={isCreateModalOpen} 
-        onOpenChange={handleCloseModal} 
+        onOpenChange={handleCloseModal}
+        initialMediaType={createModalInitialType}
       />
 
       {/* Create Story Modal */}
