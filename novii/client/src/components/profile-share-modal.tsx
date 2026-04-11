@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { QRCodeSVG } from "qrcode.react";
+import { NoviiQRCode, downloadNoviiQR } from "@/components/novii-qr-code";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Share2, Download, X } from "lucide-react";
@@ -63,44 +63,19 @@ export function ProfileShareModal({
     }
   };
 
-  const handleDownloadQR = () => {
-    const svg = document.getElementById("profile-qr-code");
-    if (!svg) return;
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const canvas = document.createElement("canvas");
-    canvas.width = 300;
-    canvas.height = 300;
-    const ctx = canvas.getContext("2d");
-    const img = new Image();
-    img.onload = () => {
-      if (!ctx) return;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, 300, 300);
-      ctx.drawImage(img, 0, 0, 300, 300);
-      const link = document.createElement("a");
-      link.download = `novii-${username}-qr.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    };
-    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+  const handleDownloadQR = async () => {
+    try {
+      await downloadNoviiQR(profileUrl, username, avatarUrl);
+    } catch {
+      toast.error(isRTL ? "فشل التحميل" : "Download failed");
+    }
   };
 
   const ModalBody = () => (
     <div className="flex flex-col items-center gap-4 px-5 pb-5 pt-1">
-      {/* QR Code */}
-      <div className="bg-white p-4 rounded-2xl shadow-sm">
-        <QRCodeSVG
-          id="profile-qr-code"
-          value={profileUrl}
-          size={190}
-          level="H"
-          includeMargin={false}
-          imageSettings={
-            avatarUrl
-              ? { src: avatarUrl, height: 42, width: 42, excavate: true }
-              : undefined
-          }
-        />
+      {/* Branded QR Code */}
+      <div className="bg-white p-3 rounded-2xl shadow-md">
+        <NoviiQRCode value={profileUrl} size={200} avatarUrl={avatarUrl} />
       </div>
 
       {/* Username */}
