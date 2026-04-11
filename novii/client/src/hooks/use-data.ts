@@ -464,7 +464,7 @@ export function useCreateStory() {
       mediaType: 'image' | 'video';
       trimStart?: number;
       trimEnd?: number;
-      music?: { url: string; title: string; artist: string; artwork_url: string; start_time?: number };
+      music?: { url: string; title: string; artist: string; artwork_url: string };
       filterName?: string;
     }) =>
       api.createStory(mediaUrl, mediaType, music, filterName),

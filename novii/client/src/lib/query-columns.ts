@@ -143,7 +143,6 @@ export const STORY_COLUMNS = `
   music_title,
   music_artist,
   music_artwork_url,
-  music_start_time,
   filter_name
 `;
 
@@ -160,7 +159,6 @@ export const STORY_WITH_PROFILE = `
   music_title,
   music_artist,
   music_artwork_url,
-  music_start_time,
   filter_name,
   profile:profiles!stories_user_id_fkey(${PROFILE_MINIMAL})
 `;

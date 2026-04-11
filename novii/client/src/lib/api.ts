@@ -1116,7 +1116,7 @@ export const api = {
     return (data || []) as unknown as Story[];
   },
 
-  async createStory(mediaUrl: string, mediaType: 'image' | 'video' = 'image', music?: { url: string; title: string; artist: string; artwork_url: string; start_time?: number } | null, filterName?: string): Promise<Story> {
+  async createStory(mediaUrl: string, mediaType: 'image' | 'video' = 'image', music?: { url: string; title: string; artist: string; artwork_url: string } | null, filterName?: string): Promise<Story> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
@@ -1132,7 +1132,6 @@ export const api = {
       insertData.music_title = music.title;
       insertData.music_artist = music.artist;
       insertData.music_artwork_url = music.artwork_url;
-      insertData.music_start_time = music.start_time ?? 0;
     }
 
     const { data, error } = await supabase

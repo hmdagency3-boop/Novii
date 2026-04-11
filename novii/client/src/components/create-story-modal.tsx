@@ -89,7 +89,6 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
           title: selectedMusic.title,
           artist: selectedMusic.artist,
           artwork_url: selectedMusic.artwork_url,
-          start_time: selectedMusic.start_time ?? 0,
         };
       }
       if (selectedFilter && selectedFilter !== 'normal') {
