@@ -80,67 +80,65 @@ export function ProfileShareModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-xs sm:max-w-sm p-6">
-        {/* Title */}
-        <DialogTitle className="text-center text-base font-bold mb-2">
-          {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
-        </DialogTitle>
+      <DialogContent className="max-w-xs sm:max-w-sm p-0 overflow-hidden">
+        <div className="flex flex-col items-center gap-4 p-6">
 
-        {/* QR Code */}
-        <div className="flex justify-center">
-          <div className="bg-white p-3 rounded-2xl shadow-sm inline-block">
+          {/* Title */}
+          <DialogTitle className="w-full text-center text-base font-bold">
+            {isRTL ? "مشاركة الملف الشخصي" : "Share Profile"}
+          </DialogTitle>
+
+          {/* QR Code */}
+          <div className="bg-white p-3 rounded-2xl shadow-sm">
             <QRCodeSVG
               id="profile-qr-code"
               value={profileUrl}
-              size={164}
+              size={170}
               level="H"
               includeMargin={false}
               imageSettings={
                 avatarUrl
-                  ? { src: avatarUrl, height: 36, width: 36, excavate: true }
+                  ? { src: avatarUrl, height: 38, width: 38, excavate: true }
                   : undefined
               }
             />
           </div>
-        </div>
 
-        {/* Username — LTR so @ always appears before username */}
-        <div className="text-center" dir="ltr">
-          <p className="font-bold text-sm">@{username}</p>
-          {displayName && (
-            <p className="text-xs text-muted-foreground mt-0.5">{displayName}</p>
-          )}
-        </div>
+          {/* Username — LTR so @ always appears before username */}
+          <div className="text-center" dir="ltr">
+            <p className="font-bold text-sm">@{username}</p>
+            {displayName && (
+              <p className="text-xs text-muted-foreground mt-0.5">{displayName}</p>
+            )}
+          </div>
 
-        {/* Profile URL — LTR */}
-        <div className="bg-muted rounded-lg px-3 py-2" dir="ltr">
-          <p className="text-xs text-muted-foreground font-mono truncate">{profileUrl}</p>
-        </div>
+          {/* Profile URL — LTR */}
+          <div className="w-full bg-muted rounded-lg px-3 py-2" dir="ltr">
+            <p className="text-xs text-muted-foreground font-mono truncate">{profileUrl}</p>
+          </div>
 
-        {/* Buttons */}
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            variant="outline"
-            className="rounded-xl gap-1.5 text-sm"
-            onClick={handleCopy}
-          >
-            {copied
-              ? <Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
-              : <Copy className="w-3.5 h-3.5 shrink-0" />}
-            {isRTL ? (copied ? "تم" : "نسخ") : (copied ? "Copied" : "Copy")}
-          </Button>
+          {/* Buttons */}
+          <div className="grid grid-cols-2 gap-2 w-full">
+            <Button
+              variant="outline"
+              className="rounded-xl gap-1.5 text-sm"
+              onClick={handleCopy}
+            >
+              {copied
+                ? <Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                : <Copy className="w-3.5 h-3.5 shrink-0" />}
+              {isRTL ? (copied ? "تم" : "نسخ") : (copied ? "Copied" : "Copy")}
+            </Button>
+            <Button
+              className="rounded-xl gap-1.5 text-sm bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white border-0"
+              onClick={handleShare}
+            >
+              <Share2 className="w-3.5 h-3.5 shrink-0" />
+              {isRTL ? "مشاركة" : "Share"}
+            </Button>
+          </div>
 
-          <Button
-            className="rounded-xl gap-1.5 text-sm bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white border-0"
-            onClick={handleShare}
-          >
-            <Share2 className="w-3.5 h-3.5 shrink-0" />
-            {isRTL ? "مشاركة" : "Share"}
-          </Button>
-        </div>
-
-        {/* Download QR */}
-        <div className="flex justify-center">
+          {/* Download QR */}
           <Button
             variant="ghost"
             size="sm"
@@ -150,6 +148,7 @@ export function ProfileShareModal({
             <Download className="w-3 h-3 shrink-0" />
             {isRTL ? "تحميل QR Code" : "Download QR Code"}
           </Button>
+
         </div>
       </DialogContent>
     </Dialog>
