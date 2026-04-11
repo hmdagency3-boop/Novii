@@ -51,6 +51,18 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
     getCurrentUser();
   }, []);
 
+  // Reset all state every time the modal opens or the initial index changes
+  useEffect(() => {
+    if (open) {
+      setCurrentIndex(initialIndex);
+      setProgress(0);
+      setIsPaused(false);
+      setShowViews(false);
+      setReplyText("");
+      setStoryViews([]);
+    }
+  }, [open, initialIndex]);
+
   useEffect(() => {
     if (!open || !currentStory) return;
     
