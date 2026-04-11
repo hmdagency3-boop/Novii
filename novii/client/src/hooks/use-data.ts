@@ -518,11 +518,10 @@ export function useToggleFollow() {
       }
     },
     onSuccess: (result, targetUserId) => {
-      // Refetch in background to ensure data consistency (non-blocking)
-      queryClient.refetchQueries({ queryKey: ['profile', 'current'] });
-      queryClient.refetchQueries({ queryKey: ['profile', targetUserId] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['followers'] });
       queryClient.invalidateQueries({ queryKey: ['following'] });
+      queryClient.invalidateQueries({ queryKey: ['isFollowing', targetUserId] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });

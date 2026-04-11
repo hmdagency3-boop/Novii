@@ -34,7 +34,7 @@ import { ProfileShareModal } from "@/components/profile-share-modal";
 export default function UserProfile() {
   const { user: currentUser } = useAuth();
   const { direction } = useLanguage();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [followersDialogOpen, setFollowersDialogOpen] = useState(false);
   const [followersDialogTab, setFollowersDialogTab] = useState<"followers" | "following">("followers");
@@ -67,24 +67,18 @@ export default function UserProfile() {
   const searchParams = new URLSearchParams(window.location.search);
   const userId = searchParams.get('id');
   
-  console.log('🔍 UserProfile - Current URL:', window.location.href);
-  console.log('🔍 UserProfile - UserId from URL:', userId);
-  console.log('🔍 UserProfile - Current User ID:', currentUser?.id);
-  
   // Redirect to own profile only if no userId
   if (!userId) {
-    window.location.href = '/profile';
+    setLocation('/profile');
     return null;
   }
   
   // Check if viewing own profile
   const isOwnProfile = userId === currentUser?.id;
-  console.log('🔍 UserProfile - Is Own Profile?', isOwnProfile);
 
   // Invalidate queries when userId changes
   useEffect(() => {
     if (userId) {
-      console.log('♻️ Refreshing data for userId:', userId);
       queryClient.invalidateQueries({ queryKey: ['profile', userId] });
       queryClient.invalidateQueries({ queryKey: ['userPosts', userId] });
       queryClient.invalidateQueries({ queryKey: ['isFollowing', userId] });
@@ -164,15 +158,8 @@ export default function UserProfile() {
   });
 
   // Fetch user stories
-  const { data: userStories = [], isLoading: storiesLoading } = useUserStories(userId || '');
+  const { data: userStories = [] } = useUserStories(userId || '');
   
-  // Debug log
-  useEffect(() => {
-    console.log('📖 UserProfile - User ID:', userId);
-    console.log('📖 UserProfile - User Stories:', userStories);
-    console.log('📖 UserProfile - Stories Loading:', storiesLoading);
-  }, [userId, userStories, storiesLoading]);
-
   // Use the unified toggle follow hook
   const followMutation = useToggleFollow();
   const [isRequestPending, setIsRequestPending] = useState(false);
@@ -235,9 +222,7 @@ export default function UserProfile() {
                 isOfficialProfile && "before:absolute before:inset-0 before:rounded-full before:bg-gradient-to-r before:from-purple-500 before:to-pink-500 before:opacity-30 before:blur-lg md:before:blur-2xl before:-z-10 before:animate-pulse"
               )}
               onClick={() => {
-                console.log('🖱️ UserProfile clicked avatar - stories:', userStories.length);
                 if (userStories.length > 0) setStoryViewerOpen(true);
-                else console.log('❌ No user stories to display');
               }}
             >
                 <div className={cn(

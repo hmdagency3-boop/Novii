@@ -79,19 +79,6 @@ export default function Profile() {
     }
   }, [user?.id, refetchProfile]);
 
-  // Log profile data including badges
-  useEffect(() => {
-    if (profile) {
-      console.log('🏆 Profile badges data:', {
-        is_gold_early_member: profile.is_gold_early_member,
-        is_silver_early_member: profile.is_silver_early_member,
-        is_bronze_early_member: profile.is_bronze_early_member,
-        is_beta_tester: profile.is_beta_tester,
-        full_profile: profile
-      });
-    }
-  }, [profile]);
-
   // Check if user is admin
   const { data: isAdmin = false } = useQuery({
     queryKey: ['isAdmin', user?.id],
@@ -152,15 +139,8 @@ export default function Profile() {
   });
 
   // Fetch user stories
-  const { data: userStories = [], isLoading: storiesLoading } = useUserStories(user?.id || '');
+  const { data: userStories = [] } = useUserStories(user?.id || '');
   
-  // Debug log
-  useEffect(() => {
-    console.log('📖 Profile - User ID:', user?.id);
-    console.log('📖 Profile - User Stories:', userStories);
-    console.log('📖 Profile - Stories Loading:', storiesLoading);
-  }, [user?.id, userStories, storiesLoading]);
-
   // Listen for double-click on Profile icon to refresh profile data
   useEffect(() => {
     const handleDoubleClickProfile = async () => {
@@ -241,9 +221,7 @@ export default function Profile() {
                 isOfficialProfile && "before:absolute before:inset-0 before:rounded-full before:bg-gradient-to-r before:from-purple-500 before:to-pink-500 before:opacity-30 before:blur-xl md:before:blur-2xl before:-z-10 before:animate-pulse"
               )}
               onClick={() => {
-                console.log('🖱️ Clicked avatar - stories:', userStories.length);
                 if (userStories.length > 0) setStoryViewerOpen(true);
-                else console.log('❌ No stories to display');
               }}
             >
               <div className={cn(
