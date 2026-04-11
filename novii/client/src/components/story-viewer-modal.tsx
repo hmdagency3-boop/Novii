@@ -58,6 +58,11 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   useEffect(() => {
     if (open) {
       startFromZeroRef.current = true;   // force timer to start from 0
+      // Reset music to beginning
+      if (musicRef.current) {
+        musicRef.current.pause();
+        musicRef.current.currentTime = 0;
+      }
       setCurrentIndex(initialIndex);
       setProgress(0);
       setIsPaused(false);
@@ -70,6 +75,11 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   // When the story index changes inside the modal, also force fresh start
   useEffect(() => {
     startFromZeroRef.current = true;
+    // Reset music to beginning when switching stories
+    if (musicRef.current) {
+      musicRef.current.pause();
+      musicRef.current.currentTime = 0;
+    }
   }, [currentIndex]);
 
   useEffect(() => {
