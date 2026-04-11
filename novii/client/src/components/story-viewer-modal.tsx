@@ -35,6 +35,8 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const musicRef = useRef<HTMLAudioElement | null>(null);
+  // Tells the image timer to always start from 0 on next run
+  const startFromZeroRef = useRef(true);
 
   const currentStory = stories[currentIndex];
 
@@ -52,8 +54,10 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   }, []);
 
   // Reset all state every time the modal opens or the initial index changes
+  // MUST be declared before the image timer effect so it runs first
   useEffect(() => {
     if (open) {
+      startFromZeroRef.current = true;   // force timer to start from 0
       setCurrentIndex(initialIndex);
       setProgress(0);
       setIsPaused(false);
@@ -62,6 +66,11 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
       setStoryViews([]);
     }
   }, [open, initialIndex]);
+
+  // When the story index changes inside the modal, also force fresh start
+  useEffect(() => {
+    startFromZeroRef.current = true;
+  }, [currentIndex]);
 
   useEffect(() => {
     if (!open || !currentStory) return;
@@ -139,26 +148,27 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
         clearInterval(updateProgressInterval);
       };
     } else if (currentStory.media_type === 'image') {
-      // إذا فيه موسيقى → 30 ثانية، وإلا → 10 ثواني
       const hasMusic = !!(currentStory as any).music_url;
       const DURATION = hasMusic ? 30000 : 10000;
-      const INTERVAL = 100;
 
       if (isPaused) return;
 
+      // Always start from 0 if flagged (fresh open or new story).
+      // Only continue from current progress when resuming after pause.
+      const startProgress = startFromZeroRef.current ? 0 : progress;
+      startFromZeroRef.current = false; // consume the flag
+
       const startTime = Date.now();
-      const startProgress = progress;
 
       const progressInterval = setInterval(() => {
         const elapsed = Date.now() - startTime;
-        const elapsedProgress = (elapsed / DURATION) * 100;
-        const newProgress = Math.min(startProgress + elapsedProgress, 100);
+        const newProgress = Math.min(startProgress + (elapsed / DURATION) * 100, 100);
         setProgress(newProgress);
         if (newProgress >= 100) {
           clearInterval(progressInterval);
           handleNext();
         }
-      }, INTERVAL);
+      }, 100);
 
       return () => clearInterval(progressInterval);
     }
