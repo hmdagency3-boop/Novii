@@ -880,26 +880,39 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    // Get the comment to verify permissions
+    // Get the comment to verify permissions (also fetch reel_id for reel comments)
     const { data: comment, error: fetchError } = await supabase
       .from('comments')
-      .select('user_id, post_id, parent_comment_id')
+      .select('user_id, post_id, reel_id, parent_comment_id')
       .eq('id', commentId)
       .single();
 
     if (fetchError) throw fetchError;
     if (!comment) throw new Error('Comment not found');
 
-    // Check if user is the comment author or post owner
+    // Check if user is the comment author, post owner, or reel owner
     if (comment.user_id !== user.id) {
-      // Check if user is the post owner
-      const { data: post } = await supabase
-        .from('posts')
-        .select('user_id')
-        .eq('id', comment.post_id)
-        .single();
-      
-      if (!post || post.user_id !== user.id) {
+      if (comment.reel_id) {
+        // Reel comment: check if user is the reel owner
+        const { data: reel } = await supabase
+          .from('reels')
+          .select('user_id')
+          .eq('id', comment.reel_id)
+          .single();
+        if (!reel || reel.user_id !== user.id) {
+          throw new Error('Not authorized to delete this comment');
+        }
+      } else if (comment.post_id) {
+        // Post comment: check if user is the post owner
+        const { data: post } = await supabase
+          .from('posts')
+          .select('user_id')
+          .eq('id', comment.post_id)
+          .single();
+        if (!post || post.user_id !== user.id) {
+          throw new Error('Not authorized to delete this comment');
+        }
+      } else {
         throw new Error('Not authorized to delete this comment');
       }
     }
@@ -920,8 +933,8 @@ export const api = {
 
     if (deleteError) throw deleteError;
 
-    // Only decrement comments count for root comments
-    if (!comment.parent_comment_id) {
+    // Only decrement comments count for root post comments (not reel comments)
+    if (!comment.parent_comment_id && comment.post_id) {
       await supabase.rpc('decrement_comments_count', { post_id: comment.post_id });
     }
   },
