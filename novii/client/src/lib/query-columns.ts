@@ -186,7 +186,6 @@ export const REEL_WITH_PROFILE = `
   caption,
   likes_count,
   comments_count,
-  saves_count,
   views_count,
   created_at,
   profile:profiles!reels_user_id_fkey(${PROFILE_MINIMAL})
