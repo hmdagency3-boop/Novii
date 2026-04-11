@@ -29,6 +29,18 @@
   status = 200
   force = false
 
+[[redirects]]
+  from = "/favicon.ico"
+  to = "/favicon.ico"
+  status = 200
+  force = false
+
+[[redirects]]
+  from = "/favicon.png"
+  to = "/favicon.png"
+  status = 200
+  force = false
+
 # SPA fallback — كل الروابط الأخرى → index.html
 [[redirects]]
   from = "/*"

@@ -36,7 +36,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Novii" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/assets/novii_app_logo.png" />
 
@@ -47,34 +49,50 @@
 
     <!-- Structured Data (JSON-LD) -->
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "Novii",
-      "url": "https://novii.netlify.app/",
-      "description": "Novii منصة تواصل اجتماعي عربية تتيح للمستخدمين مشاركة الصور والقصص والريلز مع أصدقائهم. Arabic social media platform for sharing photos, stories, and reels.",
-      "applicationCategory": "SocialNetworkingApplication",
-      "operatingSystem": "Web, iOS, Android",
-      "inLanguage": ["ar", "en"],
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      },
-      "author": {
+    [
+      {
+        "@context": "https://schema.org",
         "@type": "Organization",
         "name": "Novii",
-        "url": "https://novii.netlify.app/"
+        "url": "https://novii.netlify.app/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://novii.netlify.app/favicon.png",
+          "width": 1024,
+          "height": 1024
+        },
+        "sameAs": [
+          "https://novii.netlify.app/"
+        ]
       },
-      "logo": "https://novii.netlify.app/assets/novii_logo_new.png",
-      "featureList": [
-        "مشاركة الصور — Share Photos",
-        "القصص — Stories",
-        "الريلز — Reels",
-        "الرسائل المباشرة — Direct Messages",
-        "دعم العربية والإنجليزية — Arabic & English Support"
-      ]
-    }
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Novii",
+        "url": "https://novii.netlify.app/",
+        "description": "Novii منصة تواصل اجتماعي عربية تتيح للمستخدمين مشاركة الصور والقصص والريلز مع أصدقائهم. Arabic social media platform for sharing photos, stories, and reels.",
+        "applicationCategory": "SocialNetworkingApplication",
+        "operatingSystem": "Web, iOS, Android",
+        "inLanguage": ["ar", "en"],
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "author": {
+          "@type": "Organization",
+          "name": "Novii",
+          "url": "https://novii.netlify.app/"
+        },
+        "featureList": [
+          "مشاركة الصور — Share Photos",
+          "القصص — Stories",
+          "الريلز — Reels",
+          "الرسائل المباشرة — Direct Messages",
+          "دعم العربية والإنجليزية — Arabic & English Support"
+        ]
+      }
+    ]
     </script>
   </head>
   <body>
