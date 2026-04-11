@@ -295,23 +295,25 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, muted, setM
         <span className={cn(nc, "text-white font-semibold drop-shadow")}>{isRTL ? "مشاركة" : "Share"}</span>
       </button>
 
-      {/* Mute — desktop only */}
-      {showMute && setMuted && (
-        <button onClick={() => setMuted(m => !m)} className="flex flex-col items-center gap-1 group">
-          {muted
-            ? <VolumeX className={cn(ic, "text-white drop-shadow group-active:scale-125 transition-transform")} />
-            : <Volume2 className={cn(ic, "text-white drop-shadow group-active:scale-125 transition-transform")} />
-          }
-          <span className={cn(nc, "text-white font-semibold drop-shadow")}>{muted ? (isRTL ? "صوت" : "Sound") : (isRTL ? "كتم" : "Mute")}</span>
-        </button>
-      )}
-
-      {/* Spinning disc */}
-      <div className={cn(
-        "rounded-full bg-gradient-to-br from-neutral-800 to-neutral-600 border-4 border-neutral-700 flex items-center justify-center animate-spin-slow mt-1",
-        size === "sm" ? "w-8 h-8" : "w-10 h-10"
-      )}>
-        <Music2 className={cn(size === "sm" ? "w-3 h-3" : "w-4 h-4", "text-white")} />
+      {/* Spinning disc + mute side by side */}
+      <div className="flex items-center gap-2 mt-1">
+        {showMute && setMuted && (
+          <button
+            onClick={() => setMuted(m => !m)}
+            className="bg-black/40 backdrop-blur-sm rounded-full p-1.5 border border-white/20 hover:bg-black/60 transition group"
+          >
+            {muted
+              ? <VolumeX className="w-4 h-4 text-white group-active:scale-125 transition-transform" />
+              : <Volume2 className="w-4 h-4 text-white group-active:scale-125 transition-transform" />
+            }
+          </button>
+        )}
+        <div className={cn(
+          "rounded-full bg-gradient-to-br from-neutral-800 to-neutral-600 border-4 border-neutral-700 flex items-center justify-center animate-spin-slow",
+          size === "sm" ? "w-8 h-8" : "w-10 h-10"
+        )}>
+          <Music2 className={cn(size === "sm" ? "w-3 h-3" : "w-4 h-4", "text-white")} />
+        </div>
       </div>
     </div>
   );
