@@ -1,5 +1,5 @@
 import Layout from "@/components/layout";
-import { ReelViewerModal } from "@/components/reel-viewer-modal";
+import { ReelCommentsSheet } from "@/components/reel-comments-sheet";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLanguage } from "@/lib/language-context";
 import { useReels, useToggleReelLike, useToggleFollow } from "@/hooks/use-data";
@@ -30,7 +30,7 @@ export default function Reels() {
   const [muted,         setMuted]           = useState(true);
   const [pausedReels,   setPausedReels]     = useState<Set<string>>(new Set());
   const [floatingHearts, setFloatingHearts] = useState<FloatingHeart[]>([]);
-  const [viewerReel, setViewerReel]         = useState<any | null>(null);
+  const [commentReelId, setCommentReelId]   = useState<string | null>(null);
   const lastTapRef = useRef<number>(0);
 
   /* ── SEPARATE ref maps so mobile & desktop don't overwrite each other ── */
@@ -117,9 +117,8 @@ export default function Reels() {
   }, [isRTL, savedReels]);
 
   const handleComment = useCallback((id: string) => {
-    const reel = reels?.find((r: any) => r.id === id) ?? null;
-    setViewerReel(reel);
-  }, [reels]);
+    setCommentReelId(id);
+  }, []);
 
   /* ── shared card props builder ── */
   const cardProps = (reel: any) => ({
@@ -203,14 +202,14 @@ export default function Reels() {
         ))}
       </div>
 
-      {/* Reel Viewer Modal (comments) */}
-      <ReelViewerModal
-        reel={viewerReel}
-        open={!!viewerReel}
-        onOpenChange={(open) => { if (!open) setViewerReel(null); }}
-        allReels={reels ?? []}
-        onNavigate={setViewerReel}
-      />
+      {/* Comments Sheet */}
+      {commentReelId && (
+        <ReelCommentsSheet
+          reelId={commentReelId}
+          open={!!commentReelId}
+          onClose={() => setCommentReelId(null)}
+        />
+      )}
 
       <style>{`
         @keyframes floatHeart {
