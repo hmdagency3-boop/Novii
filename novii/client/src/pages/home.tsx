@@ -79,7 +79,7 @@ export default function Home() {
         </Link>
         <span className="text-muted-foreground">•</span>
         <button 
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={() => window.dispatchEvent(new CustomEvent('openPostModal'))}
           className="text-primary hover:text-primary/80 font-semibold flex items-center gap-2 transition-colors"
         >
           {isRTL ? 'إنشاء منشور' : 'Create Post'} <ArrowRight className="w-4 h-4" />

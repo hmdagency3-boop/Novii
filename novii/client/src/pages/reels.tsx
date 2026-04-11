@@ -97,7 +97,7 @@ export default function Reels() {
     const v = refs.current[id];
     if (!v) return;
     if (v.paused) { v.play().catch(() => {}); setPausedReels(p => { const n = new Set(p); n.delete(id); return n; }); }
-    else          { v.pause();                 setPausedReels(p => new Set([...p, id])); }
+    else          { v.pause();                 setPausedReels(p => new Set([...Array.from(p), id])); }
   }, []);
 
   const handleShare = useCallback((reel: any) => {
@@ -323,10 +323,10 @@ function MobileReelCard({
   currentUserId, videoRefs,
   onLike, onFollow, onSave, onShare, onComment,
 }: CardProps) {
-  const longPressTimer  = useRef<ReturnType<typeof setTimeout>>();
+  const longPressTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPress     = useRef(false);
   const lastTapTime     = useRef(0);
-  const singleTapTimer  = useRef<ReturnType<typeof setTimeout>>();
+  const singleTapTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [holdActive, setHoldActive] = useState(false);
   const [localFloatingHearts, setLocalFloatingHearts] = useState<FloatingHeart[]>([]);
 
@@ -349,7 +349,7 @@ function MobileReelCard({
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    clearTimeout(longPressTimer.current);
+    clearTimeout(longPressTimer.current ?? undefined);
     if (isLongPress.current) {
       isLongPress.current = false;
       setHoldActive(false);
@@ -359,7 +359,7 @@ function MobileReelCard({
     }
     const now = Date.now();
     if (now - lastTapTime.current < 350) {
-      clearTimeout(singleTapTimer.current);
+      clearTimeout(singleTapTimer.current ?? undefined);
       lastTapTime.current = 0;
       onLike(reel, e as any);
       spawnHeart(e);
@@ -372,7 +372,7 @@ function MobileReelCard({
   };
 
   const handlePointerLeave = () => {
-    clearTimeout(longPressTimer.current);
+    clearTimeout(longPressTimer.current ?? undefined);
     if (isLongPress.current) {
       isLongPress.current = false;
       setHoldActive(false);

@@ -1,5 +1,5 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Heart, MessageCircle, Share2, Bookmark, X, Send, Reply, Trash2, ChevronDown, MoreHorizontal, BarChart3, Pin, Eye, MessageSquare, Link as LinkIcon, Check } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, X, Send, Reply, Trash2, ChevronDown, MoreHorizontal, BarChart3, Pin, Eye, MessageSquare, Link as LinkIcon, Check, ImageIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +54,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
   const [isDoubleTapLiked, setIsDoubleTapLiked] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [selectedGif, setSelectedGif] = useState<string | null>(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [showMentions, setShowMentions] = useState(false);
   const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
@@ -627,6 +628,13 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                   </div>
                 )}
                 <form onSubmit={handleSubmitComment} className="space-y-2">
+                  {showGifPicker && (
+                    <GifPicker
+                      isRTL={!!isRTL}
+                      height={220}
+                      onSelect={(url) => { setSelectedGif(url); setShowGifPicker(false); }}
+                    />
+                  )}
                   {selectedGif && (
                     <div className="relative mx-1.5 sm:mx-3">
                       <div className="relative inline-block">
@@ -642,7 +650,15 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                     </div>
                   )}
                   <div className="flex items-end gap-1 sm:gap-2 p-1.5 sm:p-3 bg-muted/50 rounded border border-border/30 hover:border-primary/30 focus-within:border-primary/50 focus-within:shadow-sm transition-all duration-200">
-                    <GifPicker onGifSelect={setSelectedGif} disabled={createComment.isPending} />
+                    <button
+                      type="button"
+                      onClick={() => setShowGifPicker(p => !p)}
+                      disabled={createComment.isPending}
+                      className={cn("p-1 rounded hover:bg-muted transition-colors flex-shrink-0", showGifPicker && "text-pink-500")}
+                      title="GIF"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
                     <Input
                       value={commentText}
                       onChange={handleCommentInput}
