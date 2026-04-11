@@ -203,7 +203,7 @@ export default function Reels() {
         }
         @keyframes marquee { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
         @keyframes spinSlow { to { transform:rotate(360deg); } }
-        .animate-marquee   { animation: marquee 6s linear infinite; }
+        .animate-marquee   { display:flex; width:max-content; animation: marquee 7s linear infinite; }
         .animate-spin-slow { animation: spinSlow 4s linear infinite; }
       `}</style>
     </Layout>
@@ -429,9 +429,9 @@ function MobileReelCard({
         <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
           <Music2 className="w-3 h-3 text-white/60 flex-shrink-0" />
           <div className="overflow-hidden flex-1 max-w-[200px]">
-            <div className="inline-flex animate-marquee whitespace-nowrap">
-              <span className="text-white/60 text-xs pr-8">{reel.profile?.username} · {isRTL ? "صوت أصلي" : "Original Sound"}</span>
-              <span className="text-white/60 text-xs pr-8">{reel.profile?.username} · {isRTL ? "صوت أصلي" : "Original Sound"}</span>
+            <div className="animate-marquee">
+              <span className="text-white/60 text-xs whitespace-nowrap pr-10">{reel.profile?.username} · {isRTL ? "صوت أصلي" : "Original Sound"}</span>
+              <span className="text-white/60 text-xs whitespace-nowrap pr-10">{reel.profile?.username} · {isRTL ? "صوت أصلي" : "Original Sound"}</span>
             </div>
           </div>
         </div>
@@ -510,9 +510,9 @@ function DesktopReelCard({
                 <Music2 className="w-3.5 h-3.5 text-white" />
               </div>
               <div className="overflow-hidden flex-1 max-w-[180px]">
-                <div className="inline-flex animate-marquee whitespace-nowrap">
-                  <span className="text-white/60 text-xs pr-8">{reel.profile?.username} · {isRTL ? "صوت أصلي" : "Original Sound"}</span>
-                  <span className="text-white/60 text-xs pr-8">{reel.profile?.username} · {isRTL ? "صوت أصلي" : "Original Sound"}</span>
+                <div className="animate-marquee">
+                  <span className="text-white/60 text-xs whitespace-nowrap pr-10">{reel.profile?.username} · {isRTL ? "صوت أصلي" : "Original Sound"}</span>
+                  <span className="text-white/60 text-xs whitespace-nowrap pr-10">{reel.profile?.username} · {isRTL ? "صوت أصلي" : "Original Sound"}</span>
                 </div>
               </div>
               <button
