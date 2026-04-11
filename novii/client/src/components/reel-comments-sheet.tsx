@@ -1,16 +1,35 @@
-import { useState, useRef, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { useCurrentUser } from "@/hooks/use-data";
+import { useToggleCommentLike, useCreateComment, useDeleteComment, useCurrentUser } from "@/hooks/use-data";
 import { useLanguage } from "@/lib/language-context";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { X, Send, Heart, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Heart, Send, Trash2, Reply, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDistanceToNow } from "date-fns";
-import { ar } from "date-fns/locale";
-import { toast } from "sonner";
 import { Link } from "wouter";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
+import { OfficialBadge } from "@/components/ui/official-badge";
+import { CreatorBadge } from "@/components/ui/creator-badge";
+import { PremiumBadge } from "@/components/ui/premium-badge";
+import { PopularBadge } from "@/components/ui/popular-badge";
+import { ActiveBadge } from "@/components/ui/active-badge";
+
+const formatTime = (timestamp: string | Date) => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+  if (diffInMinutes < 1) return "now";
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) return `${diffInDays}d ago`;
+  return date.toLocaleDateString();
+};
 
 interface ReelCommentsSheetProps {
   reelId: string;
@@ -22,28 +41,32 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
   const { direction } = useLanguage();
   const isRTL = direction === "rtl";
   const { data: currentUser } = useCurrentUser();
-  const queryClient = useQueryClient();
-  const [text, setText] = useState("");
-  const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [commentText, setCommentText]     = useState("");
+  const [replyingTo, setReplyingTo]       = useState<string | null>(null);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [replyVisibilityCount, setReplyVisibilityCount] = useState<Map<string, number>>(new Map());
 
-  const { data: comments = [], isLoading } = useQuery({
+  const toggleCommentLike = useToggleCommentLike();
+  const createComment     = useCreateComment();
+  const deleteComment     = useDeleteComment();
+
+  const { data: comments = [], isLoading: commentsLoading, refetch } = useQuery({
     queryKey: ["reelComments", reelId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: allComments } = await supabase
         .from("comments")
         .select("*, profile:profiles(*)")
         .eq("reel_id", reelId)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-
+        .order("created_at", { ascending: false });
+      if (!allComments) return [];
       const map = new Map<string, any>();
       const roots: any[] = [];
-      (data || []).forEach(c => map.set(c.id, { ...c, replies: [] }));
-      (data || []).forEach(c => {
+      allComments.forEach(c => map.set(c.id, { ...c, replies: [] }));
+      allComments.forEach(c => {
         if (c.parent_comment_id) {
           const parent = map.get(c.parent_comment_id);
-          if (parent) parent.replies.push(map.get(c.id));
+          const reply  = map.get(c.id);
+          if (parent && reply) parent.replies.push(reply);
         } else {
           roots.push(map.get(c.id));
         }
@@ -53,248 +76,316 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
     enabled: open && !!reelId,
   });
 
-  const addComment = useMutation({
-    mutationFn: async ({ content, parentId }: { content: string; parentId?: string }) => {
-      if (!currentUser) throw new Error("Not authenticated");
-      const { error } = await supabase.from("comments").insert({
-        reel_id: reelId,
-        user_id: currentUser.id,
-        content,
-        post_id: null,
-        parent_comment_id: parentId || null,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reelComments", reelId] });
-      queryClient.invalidateQueries({ queryKey: ["reels"] });
-      setText("");
+  const handleAddComment = async () => {
+    if (!commentText.trim() || !currentUser?.id) return;
+    let content = commentText;
+    if (replyingTo && commentText.startsWith("@")) {
+      const spaceIdx = commentText.indexOf(" ");
+      content = spaceIdx !== -1 ? commentText.substring(spaceIdx + 1) : commentText;
+    }
+    const { error } = await supabase.from("comments").insert({
+      reel_id: reelId,
+      user_id: currentUser.id,
+      content: content.trim(),
+      post_id: null,
+      parent_comment_id: replyingTo || null,
+    });
+    if (!error) {
+      setCommentText("");
       setReplyingTo(null);
-    },
-    onError: () => toast.error(isRTL ? "فشل إرسال التعليق" : "Failed to send comment"),
-  });
-
-  const deleteComment = useMutation({
-    mutationFn: async (commentId: string) => {
-      const { error } = await supabase.from("comments").delete().eq("id", commentId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reelComments", reelId] });
-      queryClient.invalidateQueries({ queryKey: ["reels"] });
-    },
-  });
-
-  const likeComment = useMutation({
-    mutationFn: async (commentId: string) => {
-      if (!currentUser) throw new Error("Not authenticated");
-      const { data: existing } = await supabase
-        .from("likes")
-        .select("id")
-        .eq("comment_id", commentId)
-        .eq("user_id", currentUser.id)
-        .maybeSingle();
-      if (existing) {
-        await supabase.from("likes").delete().eq("id", existing.id);
-      } else {
-        await supabase.from("likes").insert({ comment_id: commentId, user_id: currentUser.id });
-      }
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["reelComments", reelId] }),
-  });
-
-  const handleSend = () => {
-    if (!text.trim()) return;
-    if (!currentUser) { toast.error(isRTL ? "سجّل دخولك أولاً" : "Please login first"); return; }
-    addComment.mutate({ content: text.trim(), parentId: replyingTo?.id });
+      refetch();
+    }
   };
 
-  const handleReply = (comment: any) => {
-    setReplyingTo({ id: comment.id, username: comment.profile?.username });
-    setText(`@${comment.profile?.username} `);
-    inputRef.current?.focus();
+  const handleDeleteComment = (id: string) => {
+    deleteComment.mutate(id, { onSuccess: () => refetch() });
   };
 
-  useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
+  const toggleExpandReplies = (commentId: string) => {
+    const next = new Set(expandedComments);
+    if (next.has(commentId)) {
+      next.delete(commentId);
+    } else {
+      next.add(commentId);
+      setReplyVisibilityCount(prev => new Map(prev).set(commentId, 3));
+    }
+    setExpandedComments(next);
+  };
 
-  if (!open) return null;
+  const loadMoreReplies = (commentId: string) => {
+    setReplyVisibilityCount(prev => {
+      const m = new Map(prev);
+      m.set(commentId, (m.get(commentId) || 3) + 3);
+      return m;
+    });
+  };
 
-  return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/60 z-[60]" onClick={onClose} />
+  const countReplies = (reply: any): number => {
+    let n = 1;
+    if (reply.replies?.length) n += reply.replies.reduce((s: number, r: any) => s + countReplies(r), 0);
+    return n;
+  };
 
-      {/* Sheet */}
-      <div
-        className={cn(
-          "fixed bottom-0 left-0 right-0 z-[70] bg-background rounded-t-2xl flex flex-col",
-          "lg:left-20"
-        )}
-        style={{ maxHeight: "80vh" }}
-        dir={isRTL ? "rtl" : "ltr"}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h3 className="font-semibold text-base">
-            {isRTL ? "التعليقات" : "Comments"}
-          </h3>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-muted transition">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+  const getTotalReplyCount = (replies: any[]) =>
+    replies.reduce((s, r) => s + countReplies(r), 0);
 
-        {/* Comments list */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4" style={{ scrollbarWidth: "none" }}>
-          {isLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : comments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground">
-              <span className="text-4xl">💬</span>
-              <p className="text-sm">{isRTL ? "لا توجد تعليقات بعد" : "No comments yet"}</p>
-            </div>
-          ) : (
-            comments.map((comment: any) => (
-              <CommentItem
-                key={comment.id}
-                comment={comment}
-                currentUserId={currentUser?.id}
-                isRTL={isRTL}
-                onReply={handleReply}
-                onDelete={(id) => deleteComment.mutate(id)}
-                onLike={(id) => likeComment.mutate(id)}
-              />
-            ))
-          )}
-        </div>
+  const renderReplyThread = (reply: any): React.ReactNode => {
+    const isExpanded   = expandedComments.has(reply.id);
+    const allReplies   = reply.replies || [];
+    const visibleCount = replyVisibilityCount.get(reply.id) || 0;
+    const visible      = allReplies.slice(0, visibleCount);
+    const hasMore      = allReplies.length > visibleCount;
+    const totalCount   = allReplies.reduce((s: number, r: any) => s + countReplies(r), 0);
 
-        {/* Reply banner */}
-        {replyingTo && (
-          <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-t border-border text-sm">
-            <span className="text-muted-foreground">
-              {isRTL ? `رد على @${replyingTo.username}` : `Replying to @${replyingTo.username}`}
-            </span>
-            <button onClick={() => { setReplyingTo(null); setText(""); }}>
-              <X className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
-        )}
-
-        {/* Input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-t border-border">
-          <Avatar className="w-8 h-8 flex-shrink-0">
-            <AvatarImage src={currentUser?.avatar_url} />
-            <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white text-xs font-bold">
-              {currentUser?.username?.[0]?.toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <input
-            ref={inputRef}
-            value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder={isRTL ? "أضف تعليقاً..." : "Add a comment..."}
-            className="flex-1 bg-muted rounded-full px-4 py-2 text-sm outline-none border-none placeholder:text-muted-foreground"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!text.trim() || addComment.isPending}
-            className="text-primary disabled:opacity-40 transition-opacity"
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function CommentItem({
-  comment, currentUserId, isRTL, onReply, onDelete, onLike
-}: {
-  comment: any; currentUserId?: string; isRTL: boolean;
-  onReply: (c: any) => void; onDelete: (id: string) => void; onLike: (id: string) => void;
-}) {
-  const [showReplies, setShowReplies] = useState(false);
-  const timeAgo = formatDistanceToNow(new Date(comment.created_at), {
-    addSuffix: true, locale: isRTL ? ar : undefined,
-  });
-
-  return (
-    <div className="flex gap-3">
-      <Link href={`/user?id=${comment.profile?.id}`}>
-        <Avatar className="w-8 h-8 flex-shrink-0 cursor-pointer">
-          <AvatarImage src={comment.profile?.avatar_url} />
-          <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white text-xs font-bold">
-            {comment.profile?.username?.[0]?.toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-      </Link>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <Link href={`/user?id=${comment.profile?.id}`}>
-              <span className="font-semibold text-sm mr-2 cursor-pointer hover:opacity-80">
-                {comment.profile?.username}
-              </span>
-            </Link>
-            <span className="text-sm break-words">{comment.content}</span>
-          </div>
-          <button onClick={() => onLike(comment.id)} className="flex-shrink-0 mt-0.5">
-            <Heart className={cn(
-              "w-4 h-4 transition-colors",
-              comment.is_liked ? "fill-red-500 text-red-500" : "text-muted-foreground"
-            )} />
-          </button>
-        </div>
-        <div className={cn("flex items-center gap-4 mt-1", isRTL && "flex-row-reverse")}>
-          <span className="text-xs text-muted-foreground">{timeAgo}</span>
-          <button onClick={() => onReply(comment)} className="text-xs text-muted-foreground font-semibold hover:text-foreground">
-            {isRTL ? "رد" : "Reply"}
-          </button>
-          {currentUserId === comment.user_id && (
-            <button onClick={() => onDelete(comment.id)} className="text-xs text-destructive hover:opacity-80">
-              <Trash2 className="w-3 h-3" />
-            </button>
-          )}
-          {comment.likes_count > 0 && (
-            <span className="text-xs text-muted-foreground">{comment.likes_count} ❤️</span>
-          )}
-        </div>
-
-        {/* Replies */}
-        {comment.replies?.length > 0 && (
-          <div className="mt-2">
-            <button
-              onClick={() => setShowReplies(s => !s)}
-              className="text-xs font-semibold text-primary hover:opacity-80 flex items-center gap-1"
-            >
-              <div className="w-5 h-px bg-muted-foreground/40" />
-              {showReplies
-                ? (isRTL ? "إخفاء الردود" : "Hide replies")
-                : (isRTL ? `عرض ${comment.replies.length} رد` : `View ${comment.replies.length} ${comment.replies.length === 1 ? "reply" : "replies"}`)}
-            </button>
-            {showReplies && (
-              <div className="mt-2 space-y-3 pl-2 border-l-2 border-muted">
-                {comment.replies.map((reply: any) => (
-                  <CommentItem
-                    key={reply.id}
-                    comment={reply}
-                    currentUserId={currentUserId}
-                    isRTL={isRTL}
-                    onReply={onReply}
-                    onDelete={onDelete}
-                    onLike={onLike}
-                  />
-                ))}
+    return (
+      <div key={reply.id}>
+        <div className={cn("flex gap-2 group", isRTL && "flex-row-reverse")}>
+          <Link href={`/user?id=${reply.user_id}`}>
+            <Avatar className="w-7 h-7 flex-shrink-0 border border-border/50 group-hover:border-primary/40 transition-all">
+              <AvatarImage src={reply.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + reply.user_id} />
+              <AvatarFallback>{reply.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
+            </Avatar>
+          </Link>
+          <div className="flex-1 min-w-0">
+            <div className={cn("flex items-center gap-1 flex-wrap", isRTL && "flex-row-reverse")}>
+              <Link href={`/user?id=${reply.user_id}`} className="font-bold text-xs text-white hover:opacity-80">
+                {reply.profile?.username}
+              </Link>
+              <div className="flex items-center gap-0.5">
+                {reply.profile?.is_verified && <VerifiedBadge size="sm" verifiedAt={reply.profile?.verified_at} />}
+                {reply.profile?.is_official && <OfficialBadge size="sm" showText={false} />}
+                {reply.profile?.is_creator  && <CreatorBadge size="sm" />}
+                {reply.profile?.is_premium  && <PremiumBadge size="sm" />}
+                {reply.profile?.is_popular  && <PopularBadge size="sm" />}
+                {reply.profile?.is_active   && <ActiveBadge size="sm" />}
               </div>
+              {currentUser?.id === reply.user_id && (
+                <button onClick={() => handleDeleteComment(reply.id)}
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-colors">
+                  <Trash2 className="w-2.5 h-2.5" />
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-white/85 mt-0.5 break-words">{reply.content}</p>
+            <div className={cn("flex items-center gap-1.5 mt-1 text-xs", isRTL && "flex-row-reverse")}>
+              <span className="text-muted-foreground">{formatTime(reply.created_at)}</span>
+              {reply.likes_count > 0 && (
+                <span className="text-muted-foreground flex items-center gap-0.5">
+                  <Heart className="w-2 h-2 fill-destructive text-destructive" />{reply.likes_count}
+                </span>
+              )}
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => toggleCommentLike.mutate(reply.id)} className="text-muted-foreground hover:text-primary p-0.5">
+                  <Heart className={cn("w-2.5 h-2.5", reply.is_liked && "fill-primary text-primary")} />
+                </button>
+                <button onClick={() => { setReplyingTo(reply.id); setCommentText(`@${reply.profile?.username} `); }}
+                  className="text-muted-foreground hover:text-primary flex items-center gap-0.5 p-0.5">
+                  <Reply className="w-2.5 h-2.5" />
+                  <span>{isRTL ? "رد" : "Reply"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {totalCount > 0 && (
+          <>
+            {!isExpanded ? (
+              <button onClick={() => toggleExpandReplies(reply.id)}
+                className={cn("mt-2 text-xs text-primary hover:text-primary/80 font-medium", isRTL ? "mr-8" : "ml-8")}>
+                {isRTL ? `عرض ${totalCount} رد` : `View ${totalCount} ${totalCount === 1 ? "reply" : "replies"}`}
+              </button>
+            ) : (
+              <>
+                <div className={cn("mt-2 space-y-2 py-2", isRTL ? "mr-4 pr-2 border-r-2 border-primary/20" : "ml-4 pl-2 border-l-2 border-primary/20")}>
+                  {visible.map((r: any) => renderReplyThread(r))}
+                </div>
+                {hasMore && (
+                  <button onClick={() => loadMoreReplies(reply.id)}
+                    className={cn("mt-1 text-xs text-primary hover:text-primary/80 font-medium", isRTL ? "mr-8" : "ml-8")}>
+                    {isRTL ? `عرض ${allReplies.length - visibleCount} رد آخر` : `View ${allReplies.length - visibleCount} more`}
+                  </button>
+                )}
+                <button onClick={() => toggleExpandReplies(reply.id)}
+                  className={cn("mt-1 text-xs text-muted-foreground hover:text-primary font-medium", isRTL ? "mr-8" : "ml-8")}>
+                  {isRTL ? "إخفاء الردود" : "Hide replies"}
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <SheetContent
+        side="bottom"
+        className={cn("h-[85vh] bg-black/95 border-neutral-800 flex flex-col p-0 lg:ms-20", isRTL && "dir-rtl")}
+      >
+        <SheetHeader className="border-b border-neutral-800 p-4 pb-3">
+          <SheetTitle className="text-white text-center text-lg">
+            {isRTL ? "التعليقات" : "Comments"} ({comments.length})
+          </SheetTitle>
+        </SheetHeader>
+
+        <ScrollArea className="flex-1 overflow-y-auto">
+          <div className="space-y-2 px-4 py-3" dir={isRTL ? "rtl" : "ltr"}>
+            {commentsLoading ? (
+              <div className="text-center text-muted-foreground text-xs py-8">
+                <div className="inline-block animate-spin">⌛</div>
+                <p className="mt-2">{isRTL ? "جاري تحميل التعليقات..." : "Loading comments..."}</p>
+              </div>
+            ) : comments.length === 0 ? (
+              <div className="text-center text-muted-foreground text-xs py-8">
+                💬<p className="mt-2">{isRTL ? "لا توجد تعليقات بعد" : "No comments yet"}</p>
+              </div>
+            ) : (
+              comments.map((comment: any, index: number) => (
+                <div
+                  key={comment.id}
+                  className={cn("animate-in fade-in-50 slide-in-from-bottom-2 duration-300", comment.profile?.is_official && "official-comment")}
+                  style={{ animationDelay: `${index * 0.03}s` }}
+                >
+                  <div className={cn(
+                    "p-3 rounded-lg border transition-all duration-200",
+                    comment.profile?.is_official
+                      ? "official-comment-card bg-gradient-to-r from-primary/5 to-purple-500/5 border-primary/30 hover:border-primary/50"
+                      : "bg-muted/40 border-border/50 hover:border-primary/30 hover:bg-muted/60"
+                  )}>
+                    {comment.profile?.is_official && (
+                      <div className="official-comment-badge mb-2 text-xs">الحساب الرسمي</div>
+                    )}
+                    <div className={cn("flex gap-2 group", isRTL && "flex-row-reverse")}>
+                      <Link href={`/user?id=${comment.user_id}`}>
+                        <Avatar className={cn(
+                          "flex-shrink-0 border transition-all duration-200",
+                          comment.profile?.is_official
+                            ? "w-9 h-9 border-primary/40 ring-2 ring-primary/10"
+                            : "w-9 h-9 border-border/50 group-hover:border-primary/40 group-hover:ring-2 group-hover:ring-primary/10"
+                        )}>
+                          <AvatarImage src={comment.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + comment.user_id} />
+                          <AvatarFallback>{comment.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                      </Link>
+                      <div className="flex-1 min-w-0">
+                        <div className={cn("flex items-center gap-1 flex-wrap", isRTL && "flex-row-reverse")}>
+                          <Link href={`/user?id=${comment.user_id}`}
+                            className={cn("hover:opacity-80 transition-opacity text-sm font-bold", comment.profile?.is_official && "official-username")}>
+                            {comment.profile?.username}
+                          </Link>
+                          <div className="flex items-center gap-0.5">
+                            {comment.profile?.is_official && (
+                              <div className="w-4 h-4 rounded-full bg-cover flex-shrink-0" style={{ backgroundImage: "url('/official-badge.png')" }} />
+                            )}
+                            {comment.profile?.is_verified && <VerifiedBadge size="sm" verifiedAt={comment.profile?.verified_at} />}
+                            {comment.profile?.is_creator  && <CreatorBadge size="sm" />}
+                            {comment.profile?.is_premium  && <PremiumBadge size="sm" />}
+                            {comment.profile?.is_popular  && <PopularBadge size="sm" />}
+                            {comment.profile?.is_active   && <ActiveBadge size="sm" />}
+                          </div>
+                          {currentUser?.id === comment.user_id && (
+                            <button onClick={() => handleDeleteComment(comment.id)}
+                              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
+                              <Trash2 className="w-2.5 h-2.5" />
+                            </button>
+                          )}
+                        </div>
+                        <p className={cn("text-sm mt-1.5 break-words",
+                          comment.profile?.is_official ? "official-comment-content font-medium" : "text-white/85")}>
+                          {comment.content}
+                        </p>
+                        <div className={cn("flex items-center gap-1.5 mt-1.5 text-xs flex-wrap", isRTL && "flex-row-reverse")}>
+                          <span className="text-muted-foreground">{formatTime(comment.created_at)}</span>
+                          {comment.likes_count > 0 && (
+                            <span className="text-muted-foreground flex items-center gap-0.5">
+                              <Heart className="w-2 h-2 fill-destructive text-destructive" />{comment.likes_count}
+                            </span>
+                          )}
+                          <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => toggleCommentLike.mutate(comment.id)}
+                              className="text-muted-foreground hover:text-primary p-0.5">
+                              <Heart className={cn("w-2.5 h-2.5", comment.is_liked && "fill-primary text-primary")} />
+                            </button>
+                            <button
+                              onClick={() => { setReplyingTo(comment.id); setCommentText(`@${comment.profile?.username} `); }}
+                              className="text-muted-foreground hover:text-primary flex items-center gap-0.5 p-0.5">
+                              <Reply className="w-2.5 h-2.5" />
+                              <span>{isRTL ? "رد" : "Reply"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {comment.replies?.length > 0 && (
+                    <>
+                      {!expandedComments.has(comment.id) ? (
+                        <button onClick={() => toggleExpandReplies(comment.id)}
+                          className={cn("mt-2 text-xs text-primary hover:text-primary/80 font-medium", isRTL ? "mr-4" : "ml-4")}>
+                          {(() => {
+                            const total = getTotalReplyCount(comment.replies);
+                            return isRTL ? `عرض ${total} رد` : `View ${total} ${total === 1 ? "reply" : "replies"}`;
+                          })()}
+                        </button>
+                      ) : (
+                        <>
+                          <div className={cn("mt-2 space-y-2 py-2",
+                            isRTL ? "mr-2 pr-2 border-r-2 border-primary/20" : "ml-2 pl-2 border-l-2 border-primary/20")}>
+                            {comment.replies.map((reply: any) => renderReplyThread(reply))}
+                          </div>
+                          <button onClick={() => toggleExpandReplies(comment.id)}
+                            className={cn("mt-1 text-xs text-muted-foreground hover:text-primary font-medium", isRTL ? "mr-4" : "ml-4")}>
+                            {isRTL ? "إخفاء الردود" : "Hide replies"}
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))
             )}
           </div>
-        )}
-      </div>
-    </div>
+        </ScrollArea>
+
+        <div className="flex-none border-t border-neutral-800 p-3 space-y-2 bg-black/50" dir={isRTL ? "rtl" : "ltr"}>
+          {replyingTo && (
+            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-primary/10 border border-primary/20 rounded text-xs text-primary">
+              <Reply className="w-2.5 h-2.5 flex-shrink-0" />
+              <span className="font-medium flex-1 truncate">{isRTL ? "رد" : "Reply"}</span>
+              <button onClick={() => { setReplyingTo(null); setCommentText(""); }}
+                className="p-0.5 hover:bg-primary/20 rounded transition-colors">
+                <X className="w-2 h-2" />
+              </button>
+            </div>
+          )}
+          <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
+            <Avatar className="w-7 h-7 flex-shrink-0">
+              <AvatarImage src={currentUser?.avatar_url || undefined} />
+              <AvatarFallback>{(currentUser?.username?.[0] || "U").toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 flex gap-1.5">
+              <Input
+                placeholder={isRTL ? "أضف تعليق..." : "Add a comment..."}
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }}
+                className="bg-neutral-800/50 border-neutral-700 text-white placeholder:text-muted-foreground focus:border-pink-500 h-9 text-xs"
+              />
+              <Button
+                onClick={handleAddComment}
+                disabled={!commentText.trim() || createComment.isPending}
+                size="sm"
+                className="bg-pink-500 hover:bg-pink-600 text-white px-2.5 h-9"
+              >
+                <Send className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
