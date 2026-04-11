@@ -42,10 +42,10 @@ function arrayToUUID(arr: any): string {
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
-  const authSupabase = createClient(
-    'https://ldgbbbxqfwgufhvnvojy.supabase.co',
-    'sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX'
-  );
+  const supabaseUrl = process.env.SUPABASE_URL!;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+
+  const authSupabase = createClient(supabaseUrl, supabaseAnonKey);
 
   // ===== Cloudinary Upload Route =====
   app.post("/api/upload", upload.single("file"), handleUpload);
@@ -81,8 +81,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const token = req.headers.authorization?.replace("Bearer ", "");
       if (token) {
         const client = createClient(
-          'https://ldgbbbxqfwgufhvnvojy.supabase.co',
-          'sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX',
+          supabaseUrl,
+          supabaseAnonKey,
           { global: { headers: { Authorization: `Bearer ${token}` } } }
         );
         await client.auth.signOut();
@@ -98,8 +98,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const token = req.headers.authorization?.replace("Bearer ", "");
       if (!token) return res.json({ user: null });
       const client = createClient(
-        'https://ldgbbbxqfwgufhvnvojy.supabase.co',
-        'sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX',
+        supabaseUrl,
+        supabaseAnonKey,
         { global: { headers: { Authorization: `Bearer ${token}` } } }
       );
       const { data, error } = await client.auth.getUser();
