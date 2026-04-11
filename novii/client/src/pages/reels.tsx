@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Link } from "wouter";
 
 interface FloatingHeart { id: string; x: number; y: number }
+type VideoRefMap = React.MutableRefObject<{ [k: string]: HTMLVideoElement }>;
 
 export default function Reels() {
   const { direction } = useLanguage();
@@ -21,63 +22,77 @@ export default function Reels() {
   const { data: reels, isLoading } = useReels(20);
   const { data: currentUser } = useCurrentUser();
   const toggleReelLike = useToggleReelLike();
-  const toggleFollow = useToggleFollow();
-  const [followedUsers, setFollowedUsers]   = useState<Set<string>>(new Set());
-  const [savedReels, setSavedReels]         = useState<Set<string>>(new Set());
-  const [muted, setMuted]                   = useState(true);
-  const [pausedReels, setPausedReels]       = useState<Set<string>>(new Set());
-  const [floatingHearts, setFloatingHearts] = useState<FloatingHeart[]>([]);
-  const containerRef  = useRef<HTMLDivElement>(null);
-  const videoRefs     = useRef<{ [k: string]: HTMLVideoElement }>({});
-  const lastTapRef    = useRef<number>(0);
+  const toggleFollow   = useToggleFollow();
 
-  /* ── auto-play via IntersectionObserver ── */
+  const [followedUsers, setFollowedUsers]   = useState<Set<string>>(new Set());
+  const [savedReels,    setSavedReels]      = useState<Set<string>>(new Set());
+  const [muted,         setMuted]           = useState(true);
+  const [pausedReels,   setPausedReels]     = useState<Set<string>>(new Set());
+  const [floatingHearts, setFloatingHearts] = useState<FloatingHeart[]>([]);
+  const lastTapRef = useRef<number>(0);
+
+  /* ── SEPARATE ref maps so mobile & desktop don't overwrite each other ── */
+  const mobileRefs  = useRef<{ [k: string]: HTMLVideoElement }>({});
+  const desktopRefs = useRef<{ [k: string]: HTMLVideoElement }>({});
+
+  /* ── helper: pick the correct ref map based on container class ── */
+  const getRefsForEl = (el: Element): VideoRefMap => {
+    return el.closest(".mobile-reels-container") ? mobileRefs : desktopRefs;
+  };
+
+  /* ── IntersectionObserver: only the visible container's elements play ── */
   useEffect(() => {
     if (!reels?.length) return;
+
     const obs = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        const id  = entry.target.getAttribute("data-id") || "";
-        const vid = videoRefs.current[id];
+        const id   = entry.target.getAttribute("data-id") || "";
+        const refs = getRefsForEl(entry.target);
+        const vid  = refs.current[id];
         if (!vid) return;
-        if (entry.isIntersecting) { vid.muted = muted; vid.play().catch(() => {}); }
-        else { vid.pause(); vid.currentTime = 0; }
+        if (entry.isIntersecting) {
+          vid.muted = muted;
+          vid.play().catch(() => {});
+        } else {
+          vid.pause();
+          vid.currentTime = 0;
+        }
       });
     }, { threshold: 0.6 });
+
     document.querySelectorAll(".reel-item").forEach(el => obs.observe(el));
     return () => obs.disconnect();
   }, [reels, muted]);
 
+  /* ── sync mute to whichever refs are active ── */
   useEffect(() => {
-    Object.values(videoRefs.current).forEach(v => { v.muted = muted; });
+    [...Object.values(mobileRefs.current), ...Object.values(desktopRefs.current)]
+      .forEach(v => { v.muted = muted; });
   }, [muted]);
 
-  /* ── handlers ── */
+  /* ── spawn floating heart at tap position ── */
   const spawnHeart = useCallback((e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).closest(".reel-item")!.getBoundingClientRect();
-    const id = Math.random().toString(36).slice(2);
+    const id   = Math.random().toString(36).slice(2);
     setFloatingHearts(p => [...p, { id, x: e.clientX - rect.left, y: e.clientY - rect.top }]);
     setTimeout(() => setFloatingHearts(p => p.filter(h => h.id !== id)), 900);
   }, []);
 
   const handleLike = useCallback(async (reel: any, e?: React.MouseEvent) => {
     if (!currentUser) { toast.error(isRTL ? "سجّل دخولك أولاً" : "Please login first"); return; }
-    try {
-      await toggleReelLike.mutateAsync(reel.id);
-      if (e) spawnHeart(e);
-    } catch {}
+    try { await toggleReelLike.mutateAsync(reel.id); if (e) spawnHeart(e); } catch {}
   }, [currentUser, isRTL, toggleReelLike, spawnHeart]);
 
   const handleDoubleTap = useCallback((reel: any, e: React.MouseEvent) => {
     const now = Date.now();
     if (now - lastTapRef.current < 350) {
-      if (!reel.is_liked) handleLike(reel, e);
-      else spawnHeart(e);
+      if (!reel.is_liked) handleLike(reel, e); else spawnHeart(e);
     }
     lastTapRef.current = now;
   }, [handleLike, spawnHeart]);
 
-  const handleTap = useCallback((id: string) => {
-    const v = videoRefs.current[id];
+  const handleTap = useCallback((id: string, refs: VideoRefMap) => {
+    const v = refs.current[id];
     if (!v) return;
     if (v.paused) { v.play().catch(() => {}); setPausedReels(p => { const n = new Set(p); n.delete(id); return n; }); }
     else          { v.pause();                 setPausedReels(p => new Set([...p, id])); }
@@ -98,6 +113,24 @@ export default function Reels() {
     setSavedReels(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
     toast.success(savedReels.has(id) ? (isRTL ? "تمت الإزالة" : "Removed") : (isRTL ? "تم الحفظ" : "Saved"));
   }, [isRTL, savedReels]);
+
+  /* ── shared card props builder ── */
+  const cardProps = (reel: any) => ({
+    reel,
+    isRTL,
+    muted,
+    setMuted,
+    paused:   pausedReels.has(reel.id),
+    followed: followedUsers.has(reel.profile?.id),
+    saved:    savedReels.has(reel.id),
+    floatingHearts,
+    currentUserId: currentUser?.id,
+    onDoubleTap: handleDoubleTap,
+    onLike:   handleLike,
+    onFollow: handleFollow,
+    onSave:   handleSave,
+    onShare:  handleShare,
+  });
 
   /* ── loading / empty ── */
   if (isLoading) return (
@@ -120,61 +153,39 @@ export default function Reels() {
 
   return (
     <Layout>
-      {/* ── MOBILE: fullscreen snap scroll ── */}
+
+      {/* ══════════════════════════════════════════
+          MOBILE  — fullscreen snap scroll
+      ══════════════════════════════════════════ */}
       <div
-        ref={containerRef}
-        className="fixed inset-0 top-0 lg:hidden overflow-y-scroll snap-y snap-mandatory bg-black"
+        className="mobile-reels-container fixed inset-0 top-0 lg:hidden overflow-y-scroll snap-y snap-mandatory bg-black"
         style={{ scrollbarWidth: "none" }}
       >
         {reels.map((reel: any, idx: number) => (
           <MobileReelCard
             key={reel.id}
-            reel={reel}
             idx={idx}
-            isRTL={isRTL}
-            muted={muted}
-            setMuted={setMuted}
-            paused={pausedReels.has(reel.id)}
-            followed={followedUsers.has(reel.profile?.id)}
-            saved={savedReels.has(reel.id)}
-            floatingHearts={floatingHearts}
-            currentUserId={currentUser?.id}
-            videoRefs={videoRefs}
-            onTap={handleTap}
-            onDoubleTap={handleDoubleTap}
-            onLike={handleLike}
-            onFollow={handleFollow}
-            onSave={handleSave}
-            onShare={handleShare}
+            videoRefs={mobileRefs}
+            onTap={(id) => handleTap(id, mobileRefs)}
+            {...cardProps(reel)}
           />
         ))}
       </div>
 
-      {/* ── DESKTOP: centered 9:16 card + side actions ── */}
+      {/* ══════════════════════════════════════════
+          DESKTOP — centered 9:16 + side actions
+      ══════════════════════════════════════════ */}
       <div
-        className="fixed inset-0 left-20 hidden lg:flex overflow-y-scroll snap-y snap-mandatory bg-black"
+        className="fixed inset-0 left-20 hidden lg:block overflow-y-scroll snap-y snap-mandatory bg-black"
         style={{ scrollbarWidth: "none" }}
       >
         {reels.map((reel: any, idx: number) => (
           <DesktopReelCard
             key={reel.id}
-            reel={reel}
             idx={idx}
-            isRTL={isRTL}
-            muted={muted}
-            setMuted={setMuted}
-            paused={pausedReels.has(reel.id)}
-            followed={followedUsers.has(reel.profile?.id)}
-            saved={savedReels.has(reel.id)}
-            floatingHearts={floatingHearts}
-            currentUserId={currentUser?.id}
-            videoRefs={videoRefs}
-            onTap={handleTap}
-            onDoubleTap={handleDoubleTap}
-            onLike={handleLike}
-            onFollow={handleFollow}
-            onSave={handleSave}
-            onShare={handleShare}
+            videoRefs={desktopRefs}
+            onTap={(id) => handleTap(id, desktopRefs)}
+            {...cardProps(reel)}
           />
         ))}
       </div>
@@ -185,37 +196,47 @@ export default function Reels() {
           50%  { opacity:.8; transform:scale(1.4) translateY(-40px); }
           100% { opacity:0; transform:scale(.7) translateY(-100px); }
         }
-        @keyframes marquee {
-          0%   { transform:translateX(0); }
-          100% { transform:translateX(-100%); }
-        }
+        @keyframes marquee { 0%{transform:translateX(0)} 100%{transform:translateX(-100%)} }
         @keyframes spinSlow { to { transform:rotate(360deg); } }
-        .animate-marquee   { animation:marquee 6s linear infinite; }
-        .animate-spin-slow { animation:spinSlow 4s linear infinite; }
+        .animate-marquee   { animation: marquee 6s linear infinite; }
+        .animate-spin-slow { animation: spinSlow 4s linear infinite; }
       `}</style>
     </Layout>
   );
 }
 
 /* ════════════════════════════════════════════════════
-   SHARED ACTION COLUMN
+   SHARED TYPES
+════════════════════════════════════════════════════ */
+interface CardProps {
+  reel: any; idx: number; isRTL: boolean; muted: boolean;
+  setMuted: React.Dispatch<React.SetStateAction<boolean>>;
+  paused: boolean; followed: boolean; saved: boolean;
+  floatingHearts: FloatingHeart[]; currentUserId?: string;
+  videoRefs: VideoRefMap;
+  onTap: (id: string) => void;
+  onDoubleTap: (reel: any, e: React.MouseEvent) => void;
+  onLike:   (reel: any, e?: React.MouseEvent) => void;
+  onFollow: (uid: string) => void;
+  onSave:   (id: string) => void;
+  onShare:  (reel: any) => void;
+}
+
+/* ════════════════════════════════════════════════════
+   ACTION COLUMN
 ════════════════════════════════════════════════════ */
 interface ActionProps {
-  reel: any;
-  isRTL: boolean;
-  followed: boolean;
-  saved: boolean;
-  currentUserId?: string;
-  onLike: (reel: any, e?: React.MouseEvent) => void;
+  reel: any; isRTL: boolean; followed: boolean; saved: boolean;
+  currentUserId?: string; size?: "sm" | "md";
+  onLike:   (reel: any, e?: React.MouseEvent) => void;
   onFollow: (uid: string) => void;
-  onSave: (id: string) => void;
-  onShare: (reel: any) => void;
-  size?: "sm" | "md";
+  onSave:   (id: string) => void;
+  onShare:  (reel: any) => void;
 }
 
 function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onFollow, onSave, onShare, size = "md" }: ActionProps) {
-  const iconCls = size === "sm" ? "w-6 h-6" : "w-7 h-7";
-  const numCls  = size === "sm" ? "text-[11px]" : "text-xs";
+  const ic = size === "sm" ? "w-6 h-6" : "w-7 h-7";
+  const nc = size === "sm" ? "text-[11px]" : "text-xs";
   return (
     <div className="flex flex-col items-center gap-5">
       {/* Avatar + follow */}
@@ -232,7 +253,7 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
           <button
             onClick={() => onFollow(reel.profile.id)}
             className={cn(
-              "absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center transition-all shadow",
+              "absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center shadow transition-all",
               followed ? "bg-white/30" : "bg-[#ff3b5c]"
             )}
           >
@@ -243,28 +264,28 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
 
       {/* Like */}
       <button onClick={(e) => onLike(reel, e)} className="flex flex-col items-center gap-1 group">
-        <Heart className={cn(iconCls, "transition-all drop-shadow group-active:scale-125",
+        <Heart className={cn(ic, "transition-all drop-shadow group-active:scale-125",
           reel.is_liked ? "fill-[#ff3b5c] text-[#ff3b5c] scale-110" : "text-white")} />
-        <span className={cn(numCls, "text-white font-semibold drop-shadow")}>{fmt(reel.likes_count)}</span>
+        <span className={cn(nc, "text-white font-semibold drop-shadow")}>{fmt(reel.likes_count)}</span>
       </button>
 
       {/* Comment */}
       <button className="flex flex-col items-center gap-1 group">
-        <MessageCircle className={cn(iconCls, "text-white drop-shadow group-active:scale-125 transition-transform")} />
-        <span className={cn(numCls, "text-white font-semibold drop-shadow")}>{fmt(reel.comments_count)}</span>
+        <MessageCircle className={cn(ic, "text-white drop-shadow group-active:scale-125 transition-transform")} />
+        <span className={cn(nc, "text-white font-semibold drop-shadow")}>{fmt(reel.comments_count)}</span>
       </button>
 
       {/* Bookmark */}
       <button onClick={() => onSave(reel.id)} className="flex flex-col items-center gap-1 group">
-        <Bookmark className={cn(iconCls, "drop-shadow transition-all group-active:scale-125",
+        <Bookmark className={cn(ic, "drop-shadow transition-all group-active:scale-125",
           saved ? "fill-yellow-400 text-yellow-400" : "text-white")} />
-        <span className={cn(numCls, "text-white font-semibold drop-shadow")}>{fmt(reel.saves_count || 0)}</span>
+        <span className={cn(nc, "text-white font-semibold drop-shadow")}>{fmt(reel.saves_count || 0)}</span>
       </button>
 
       {/* Share */}
       <button onClick={() => onShare(reel)} className="flex flex-col items-center gap-1 group">
-        <Share2 className={cn(iconCls, "text-white drop-shadow group-active:scale-125 transition-transform")} />
-        <span className={cn(numCls, "text-white font-semibold drop-shadow")}>{isRTL ? "مشاركة" : "Share"}</span>
+        <Share2 className={cn(ic, "text-white drop-shadow group-active:scale-125 transition-transform")} />
+        <span className={cn(nc, "text-white font-semibold drop-shadow")}>{isRTL ? "مشاركة" : "Share"}</span>
       </button>
 
       {/* Spinning disc */}
@@ -281,27 +302,17 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
 /* ════════════════════════════════════════════════════
    MOBILE CARD
 ════════════════════════════════════════════════════ */
-interface CardProps {
-  reel: any; idx: number; isRTL: boolean; muted: boolean;
-  setMuted: (fn: (m: boolean) => boolean) => void;
-  paused: boolean; followed: boolean; saved: boolean;
-  floatingHearts: FloatingHeart[]; currentUserId?: string;
-  videoRefs: React.MutableRefObject<{ [k: string]: HTMLVideoElement }>;
-  onTap: (id: string) => void;
-  onDoubleTap: (reel: any, e: React.MouseEvent) => void;
-  onLike: (reel: any, e?: React.MouseEvent) => void;
-  onFollow: (uid: string) => void;
-  onSave: (id: string) => void;
-  onShare: (reel: any) => void;
-}
-
-function MobileReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, saved,
-  floatingHearts, currentUserId, videoRefs, onTap, onDoubleTap, onLike, onFollow, onSave, onShare }: CardProps) {
+function MobileReelCard({
+  reel, idx, isRTL, muted, setMuted, paused, followed, saved,
+  floatingHearts, currentUserId, videoRefs,
+  onTap, onDoubleTap, onLike, onFollow, onSave, onShare,
+}: CardProps) {
   return (
     <div
       data-id={reel.id} data-index={idx}
-      className="reel-item relative w-full h-screen snap-start overflow-hidden bg-black flex items-center justify-center"
+      className="reel-item relative w-full h-screen snap-start overflow-hidden bg-black"
     >
+      {/* Video */}
       <video
         ref={el => { if (el) videoRefs.current[reel.id] = el; }}
         src={reel.video_url}
@@ -310,6 +321,8 @@ function MobileReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, s
         onClick={() => onTap(reel.id)}
         onDoubleClick={e => onDoubleTap(reel, e)}
       />
+
+      {/* Gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/80 pointer-events-none" />
 
       {/* Floating hearts */}
@@ -320,7 +333,7 @@ function MobileReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, s
         </div>
       ))}
 
-      {/* Paused icon */}
+      {/* Paused overlay */}
       {paused && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div className="bg-black/40 rounded-full p-5 backdrop-blur-sm">
@@ -329,7 +342,7 @@ function MobileReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, s
         </div>
       )}
 
-      {/* Mute top-right */}
+      {/* Mute */}
       <button
         onClick={() => setMuted(m => !m)}
         className="absolute top-4 right-4 z-30 bg-black/40 backdrop-blur-sm rounded-full p-2 border border-white/20"
@@ -337,7 +350,7 @@ function MobileReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, s
         {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
       </button>
 
-      {/* Action buttons right */}
+      {/* Action buttons */}
       <div className={cn("absolute bottom-28 z-30", isRTL ? "left-3" : "right-3")}>
         <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
           currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
@@ -345,14 +358,15 @@ function MobileReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, s
       </div>
 
       {/* Bottom info */}
-      <div className={cn("absolute bottom-0 z-20 pb-8 px-4 w-full", isRTL ? "text-right pr-4 pl-16" : "pl-4 pr-16")}>
+      <div className={cn("absolute bottom-0 z-20 pb-8 px-4 w-full",
+        isRTL ? "text-right pr-4 pl-16" : "pl-4 pr-16")}>
         <Link href={`/user?id=${reel.profile?.id}`}>
-          <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity">
+          <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity drop-shadow">
             @{reel.profile?.username}
           </p>
         </Link>
         {reel.caption && (
-          <p className="text-white/90 text-sm leading-relaxed line-clamp-2 mb-2">{reel.caption}</p>
+          <p className="text-white/90 text-sm leading-relaxed line-clamp-2 mb-2 drop-shadow">{reel.caption}</p>
         )}
         <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
           <Music2 className="w-3 h-3 text-white/60 flex-shrink-0" />
@@ -368,27 +382,30 @@ function MobileReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, s
 }
 
 /* ════════════════════════════════════════════════════
-   DESKTOP CARD  (TikTok web layout)
+   DESKTOP CARD
 ════════════════════════════════════════════════════ */
-function DesktopReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, saved,
-  floatingHearts, currentUserId, videoRefs, onTap, onDoubleTap, onLike, onFollow, onSave, onShare }: CardProps) {
+function DesktopReelCard({
+  reel, idx, isRTL, muted, setMuted, paused, followed, saved,
+  floatingHearts, currentUserId, videoRefs,
+  onTap, onDoubleTap, onLike, onFollow, onSave, onShare,
+}: CardProps) {
   return (
     <div
       data-id={reel.id} data-index={idx}
-      className="reel-item w-full h-screen snap-start flex-shrink-0 flex items-center justify-center bg-black relative"
+      className="reel-item w-full h-screen snap-start flex-shrink-0 flex items-center justify-center bg-black relative overflow-hidden"
     >
-      {/* Blurred background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <video src={reel.video_url} className="w-full h-full object-cover scale-110 blur-2xl opacity-30" muted loop playsInline />
+      {/* Blurred bg */}
+      <div className="absolute inset-0 pointer-events-none">
+        <video src={reel.video_url} className="w-full h-full object-cover scale-110 blur-2xl opacity-25" muted loop playsInline />
       </div>
 
-      {/* Center: video card */}
-      <div className="relative flex items-center gap-6 z-10">
+      {/* Card + actions */}
+      <div className="relative z-10 flex items-center gap-6">
 
-        {/* Video container — 9:16 aspect ratio */}
+        {/* 9:16 video card */}
         <div
           className="relative overflow-hidden rounded-2xl shadow-2xl bg-black cursor-pointer select-none"
-          style={{ height: "calc(100vh - 40px)", aspectRatio: "9/16", maxHeight: 860, maxWidth: 485 }}
+          style={{ height: "min(calc(100vh - 40px), 860px)", aspectRatio: "9/16" }}
           onClick={() => onTap(reel.id)}
           onDoubleClick={e => onDoubleTap(reel, e)}
         >
@@ -408,7 +425,7 @@ function DesktopReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, 
             </div>
           ))}
 
-          {/* Paused overlay */}
+          {/* Paused */}
           {paused && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
               <div className="bg-black/40 rounded-full p-6 backdrop-blur-sm">
@@ -417,7 +434,7 @@ function DesktopReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, 
             </div>
           )}
 
-          {/* Mute button inside video */}
+          {/* Mute */}
           <button
             onClick={e => { e.stopPropagation(); setMuted(m => !m); }}
             className="absolute top-4 right-4 z-30 bg-black/50 backdrop-blur-sm rounded-full p-2.5 border border-white/20 hover:bg-black/70 transition"
@@ -425,15 +442,15 @@ function DesktopReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, 
             {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
           </button>
 
-          {/* Bottom info inside video */}
+          {/* Bottom info */}
           <div className="absolute bottom-0 left-0 right-0 z-20 p-5">
             <Link href={`/user?id=${reel.profile?.id}`}>
-              <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity">
+              <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity drop-shadow">
                 @{reel.profile?.username}
               </p>
             </Link>
             {reel.caption && (
-              <p className="text-white/90 text-sm leading-relaxed line-clamp-3 mb-2">{reel.caption}</p>
+              <p className="text-white/90 text-sm leading-relaxed line-clamp-3 mb-2 drop-shadow">{reel.caption}</p>
             )}
             <div className="flex items-center gap-2">
               <Music2 className="w-3 h-3 text-white/60 flex-shrink-0" />
@@ -446,7 +463,7 @@ function DesktopReelCard({ reel, idx, isRTL, muted, setMuted, paused, followed, 
           </div>
         </div>
 
-        {/* Right: action column */}
+        {/* Action column */}
         <div className="flex-shrink-0">
           <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
             currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
