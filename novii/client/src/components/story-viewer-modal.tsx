@@ -1,6 +1,6 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { X, Heart, Send, MoreVertical, ChevronLeft, ChevronRight, Pause, Play, Eye, Trash2, Music2 } from "lucide-react";
+import { X, Heart, Send, MoreVertical, ChevronLeft, ChevronRight, Pause, Play, Eye, Trash2, Music2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
@@ -32,6 +32,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [viewsCount, setViewsCount] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [musicBlocked, setMusicBlocked] = useState(false);
   const { language } = useLanguage();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -76,6 +77,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   // When the story index changes inside the modal, also force fresh start
   useEffect(() => {
     startFromZeroRef.current = true;
+    setMusicBlocked(false);
     // Reset music to beginning when switching stories
     if (musicRef.current) {
       musicRef.current.pause();
@@ -119,12 +121,18 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
         musicRef.current.loop = true;
       }
       if (!isPaused) {
-        musicRef.current.play().catch(() => {});
+        const playPromise = musicRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => setMusicBlocked(false))
+            .catch(() => setMusicBlocked(true));
+        }
       } else {
         musicRef.current.pause();
       }
     } else {
       musicRef.current?.pause();
+      setMusicBlocked(false);
     }
   }, [open, currentStory?.id, isPaused]);
 
@@ -202,7 +210,21 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   };
 
   const togglePause = () => {
-    setIsPaused(!isPaused);
+    const newPaused = !isPaused;
+    setIsPaused(newPaused);
+    // If music was blocked by autoplay policy, try again on direct user click
+    if (!newPaused && musicBlocked && musicRef.current) {
+      musicRef.current.play()
+        .then(() => setMusicBlocked(false))
+        .catch(() => {});
+    }
+  };
+
+  const handleUnblockMusic = () => {
+    if (!musicRef.current) return;
+    musicRef.current.play()
+      .then(() => setMusicBlocked(false))
+      .catch(() => {});
   };
 
   const handleSendReply = async () => {
@@ -385,13 +407,27 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
 
           {/* Music Info Overlay */}
           {(currentStory as any).music_url && (
-            <div className="absolute bottom-24 left-0 right-0 flex justify-center z-20 pointer-events-none">
-              <div className="flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 max-w-[80%]">
+            <div className="absolute bottom-24 left-0 right-0 flex flex-col items-center gap-2 z-20">
+              {/* Blocked indicator — tap to unmute */}
+              {musicBlocked && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleUnblockMusic(); }}
+                  className="flex items-center gap-2 bg-white/20 backdrop-blur-sm border border-white/40 rounded-full px-4 py-2 animate-pulse"
+                >
+                  <VolumeX className="w-4 h-4 text-white" />
+                  <span className="text-white text-xs font-semibold">
+                    {isRTL ? "اضغط لتشغيل الصوت" : "Tap to play sound"}
+                  </span>
+                </button>
+              )}
+
+              {/* Music pill */}
+              <div className="pointer-events-none flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 max-w-[80%]">
                 {(currentStory as any).music_artwork_url && (
                   <img
                     src={(currentStory as any).music_artwork_url}
                     alt=""
-                    className="w-6 h-6 rounded-full object-cover flex-shrink-0 animate-spin"
+                    className={cn("w-6 h-6 rounded-full object-cover flex-shrink-0", !musicBlocked && "animate-spin")}
                     style={{ animationDuration: '4s' }}
                   />
                 )}
