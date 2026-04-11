@@ -536,19 +536,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!q || !(q as string).trim()) return res.json([]);
 
       const response = await fetch(
-        `https://api.deezer.com/search?q=${encodeURIComponent((q as string).trim())}&limit=20&output=json`
+        `https://api.deezer.com/search?q=${encodeURIComponent((q as string).trim())}&limit=40&output=json`
       );
       if (!response.ok) return res.json([]);
       const data = await response.json() as any;
-      const tracks = (data.data || []).map((track: any) => ({
-        id: track.id,
-        title: track.title,
-        artist: track.artist?.name || '',
-        preview_url: track.preview,
-        artwork_url: track.album?.cover_medium || track.album?.cover || '',
-        album: track.album?.title || '',
-        duration: track.duration,
-      }));
+      const tracks = (data.data || [])
+        .filter((track: any) => track.preview && track.preview.length > 0)
+        .map((track: any) => ({
+          id: track.id,
+          title: track.title,
+          artist: track.artist?.name || '',
+          preview_url: track.preview,
+          artwork_url: track.album?.cover_medium || track.album?.cover || '',
+          album: track.album?.title || '',
+          duration: track.duration,
+        }));
       res.json(tracks);
     } catch (error) {
       console.error("Music search error:", error);
