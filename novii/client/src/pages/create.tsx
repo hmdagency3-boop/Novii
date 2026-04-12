@@ -33,14 +33,17 @@ function useLiveCamera(active: boolean) {
   const [facing, setFacing] = useState<FacingMode>('environment');
   const [hasCamera, setHasCamera] = useState(true);
   const [ready, setReady] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   const startCamera = useCallback(async (mode: FacingMode) => {
-    // Stop previous stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
     setReady(false);
+    setTorchSupported(false);
+    setTorchOn(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 1280 } },
@@ -52,6 +55,12 @@ function useLiveCamera(active: boolean) {
         videoRef.current.onloadedmetadata = () => setReady(true);
       }
       setHasCamera(true);
+      // Check torch support on back camera only
+      if (mode === 'environment') {
+        const track = stream.getVideoTracks()[0];
+        const caps = track?.getCapabilities?.() as any;
+        if (caps?.torch) setTorchSupported(true);
+      }
     } catch {
       setHasCamera(false);
     }
@@ -59,10 +68,16 @@ function useLiveCamera(active: boolean) {
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
+      // Make sure torch is off before stopping
+      const track = streamRef.current.getVideoTracks()[0];
+      if (track) {
+        try { (track.applyConstraints as any)({ advanced: [{ torch: false }] }); } catch {}
+      }
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
     setReady(false);
+    setTorchOn(false);
   }, []);
 
   const flipCamera = useCallback(() => {
@@ -70,6 +85,19 @@ function useLiveCamera(active: boolean) {
     setFacing(next);
     startCamera(next);
   }, [facing, startCamera]);
+
+  // Toggle torch (physical flashlight)
+  const toggleTorch = useCallback(async (on: boolean) => {
+    if (!streamRef.current) return;
+    const track = streamRef.current.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      await (track.applyConstraints as any)({ advanced: [{ torch: on }] });
+      setTorchOn(on);
+    } catch {
+      // torch not supported silently
+    }
+  }, []);
 
   // Capture photo from stream → File
   const capturePhoto = useCallback((): File | null => {
@@ -80,7 +108,6 @@ function useLiveCamera(active: boolean) {
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    // Mirror if front camera
     if (facing === 'user') {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
@@ -102,7 +129,7 @@ function useLiveCamera(active: boolean) {
     return stopCamera;
   }, [active]);
 
-  return { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto };
+  return { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto, torchSupported, torchOn, toggleTorch };
 }
 
 /* ─────────────────────────────────────────
@@ -121,7 +148,8 @@ export default function CreatePage() {
   const [caption, setCaption] = useState("");
   const [locationText, setLocationText] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-  const [flashOn, setFlashOn] = useState(false);
+  const [flashMode, setFlashMode] = useState<'off' | 'on' | 'auto'>('off');
+  const [screenFlash, setScreenFlash] = useState(false);
   const [step, setStep] = useState<'camera' | 'post-pick' | 'details'>('camera');
   const [storyModalOpen, setStoryModalOpen] = useState(false);
   const [storyPreview, setStoryPreview] = useState<string | undefined>(undefined);
@@ -134,7 +162,7 @@ export default function CreatePage() {
   const galleryRef = useRef<HTMLInputElement>(null);
 
   // Camera only active on 'camera' step
-  const { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto } = useLiveCamera(step === 'camera');
+  const { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto, torchSupported, torchOn, toggleTorch } = useLiveCamera(step === 'camera');
 
   const accept =
     tab === 'reel'  ? 'video/*' :
@@ -165,14 +193,40 @@ export default function CreatePage() {
     setStoryModalOpen(true);
   }, []);
 
+  /* ── Flash mode cycle: off → on → auto ── */
+  const handleFlashToggle = useCallback(async () => {
+    if (torchSupported) {
+      // Physical torch: toggle on/off
+      const next = !torchOn;
+      await toggleTorch(next);
+      setFlashMode(next ? 'on' : 'off');
+    } else {
+      // Screen flash only: toggle off/on
+      setFlashMode(m => m === 'off' ? 'on' : 'off');
+    }
+  }, [torchSupported, torchOn, toggleTorch]);
+
   /* ── Shutter: capture from live camera ── */
   const handleShutter = useCallback(async () => {
+    const shouldFlash = flashMode === 'on' || (flashMode === 'auto');
+
+    if (shouldFlash && !torchSupported) {
+      // Screen flash: show white overlay, wait 80ms, capture, hide
+      setScreenFlash(true);
+      await new Promise(r => setTimeout(r, 80));
+    }
+
     const file = capturePhoto();
+
+    if (shouldFlash && !torchSupported) {
+      setTimeout(() => setScreenFlash(false), 200);
+    }
+
     if (!file) return;
     setShutterAnim(true);
     setTimeout(() => setShutterAnim(false), 200);
     await openStoryEditor(file);
-  }, [capturePhoto, openStoryEditor]);
+  }, [capturePhoto, openStoryEditor, flashMode, torchSupported]);
 
   /* ── Gallery pick ── */
   const handleGalleryPick = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -421,7 +475,10 @@ export default function CreatePage() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black overflow-hidden">
 
-      {/* Shutter flash */}
+      {/* Screen flash overlay */}
+      {screenFlash && <div className="absolute inset-0 bg-white z-50 pointer-events-none" style={{ opacity: 0.95 }} />}
+
+      {/* Shutter animation */}
       {shutterAnim && <div className="absolute inset-0 bg-white z-50 pointer-events-none animate-ping" style={{ animationDuration: '150ms', animationIterationCount: 1 }} />}
 
       {/* Live camera feed */}
@@ -478,9 +535,11 @@ export default function CreatePage() {
           <button onClick={() => navigate('/')} className="w-10 h-10 flex items-center justify-center">
             <X className="w-7 h-7 text-white drop-shadow-lg" />
           </button>
-          <button onClick={() => setFlashOn(f => !f)} className="w-10 h-10 flex items-center justify-center">
-            {flashOn
+          <button onClick={handleFlashToggle} className="w-10 h-10 flex items-center justify-center">
+            {flashMode === 'on'
               ? <Zap className="w-6 h-6 text-yellow-400 fill-yellow-400 drop-shadow-lg" />
+              : flashMode === 'auto'
+              ? <Zap className="w-6 h-6 text-yellow-200 drop-shadow-lg" />
               : <ZapOff className="w-6 h-6 text-white drop-shadow-lg" />}
           </button>
           <button className="w-10 h-10 flex items-center justify-center">
