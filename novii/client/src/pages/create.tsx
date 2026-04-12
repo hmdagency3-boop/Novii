@@ -1,19 +1,6 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Layout from "@/components/layout";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Textarea } from "@/components/ui/textarea";
-import { 
-  Image as ImageIcon, 
-  Video, 
-  Sparkles, 
-  Upload,
-  MapPin,
-  MoreHorizontal,
-  Check,
-  ArrowLeft,
-  Zap
-} from "lucide-react";
+import { Camera, X, ChevronDown, Grid3x3, RotateCcw, Check } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { useCreatePost } from "@/hooks/use-data";
@@ -22,8 +9,11 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { MapPin } from "lucide-react";
 
-type ContentType = 'post' | 'story' | 'reel' | null;
+type Tab = 'post' | 'story' | 'reel';
 
 export default function CreatePage() {
   const { direction } = useLanguage();
@@ -31,196 +21,146 @@ export default function CreatePage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const createPostMutation = useCreatePost();
-  
   const isRTL = direction === "rtl";
-  const t = direction === 'rtl';
 
-  // State
-  const [contentType, setContentType] = useState<ContentType>(null);
+  const [tab, setTab] = useState<Tab>('post');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [recentFiles, setRecentFiles] = useState<{ file: File; url: string }[]>([]);
   const [caption, setCaption] = useState("");
   const [location, setLocation] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+  const [step, setStep] = useState<'pick' | 'details'>('pick');
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle file selection
-  const handleFileSelect = useCallback((files: FileList) => {
-    const file = files[0];
-    if (!file) return;
+  const accept = tab === 'reel' ? 'video/*' : tab === 'story' ? 'image/*,video/*' : 'image/*';
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPreview(reader.result as string);
-      setSelectedFile(file);
-    };
-    reader.readAsDataURL(file);
+  const handleFileChosen = useCallback((file: File) => {
+    const url = URL.createObjectURL(file);
+    setSelectedFile(file);
+    setPreview(url);
+    setRecentFiles(prev => {
+      const already = prev.find(f => f.file.name === file.name && f.file.size === file.size);
+      if (already) return prev;
+      return [{ file, url }, ...prev].slice(0, 12);
+    });
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
+  const handleGalleryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileChosen(file);
+    e.target.value = '';
+  }, [handleFileChosen]);
 
-  const handleDragLeave = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (contentType && e.dataTransfer.files) {
-      handleFileSelect(e.dataTransfer.files);
-    }
-  }, [contentType, handleFileSelect]);
-
-  // Publish content
   const handlePublish = async () => {
-    if (!selectedFile || !contentType) return;
-
+    if (!selectedFile) return;
     setIsUploading(true);
     try {
-      if (contentType === 'post') {
+      if (tab === 'post') {
         const imageUrl = await api.uploadPostImage(selectedFile);
-        await createPostMutation.mutateAsync({
-          caption,
-          imageUrl,
-          location: location || undefined,
-        });
-
-        toast({
-          title: t ? "تم النشر!" : "Posted!",
-          description: t ? "تم نشر المنشور بنجاح" : "Your post has been published",
-        });
-      } else if (contentType === 'story') {
+        await createPostMutation.mutateAsync({ caption, imageUrl, location: location || undefined });
+        toast({ title: isRTL ? "تم النشر!" : "Posted!", description: isRTL ? "تم نشر المنشور" : "Post published" });
+      } else if (tab === 'story') {
         const mediaUrl = await api.uploadPostImage(selectedFile);
         await supabase.from('stories').insert({
           user_id: user?.id,
           media_url: mediaUrl,
           media_type: selectedFile.type.startsWith('image/') ? 'image' : 'video',
         });
-
-        toast({
-          title: t ? "تم النشر!" : "Posted!",
-          description: t ? "تم نشر القصة بنجاح" : "Your story has been published",
-        });
-      } else if (contentType === 'reel') {
+        toast({ title: isRTL ? "تم النشر!" : "Posted!", description: isRTL ? "تم نشر القصة" : "Story published" });
+      } else {
         const videoUrl = await api.uploadPostImage(selectedFile);
-        await supabase.from('reels').insert({
-          user_id: user?.id,
-          video_url: videoUrl,
-          caption,
-        });
-
-        toast({
-          title: t ? "تم النشر!" : "Posted!",
-          description: t ? "تم نشر الريلز بنجاح" : "Your reel has been published",
-        });
+        await supabase.from('reels').insert({ user_id: user?.id, video_url: videoUrl, caption });
+        toast({ title: isRTL ? "تم النشر!" : "Posted!", description: isRTL ? "تم نشر الريلز" : "Reel published" });
       }
-
-      // Reset and navigate back
-      setContentType(null);
-      setSelectedFile(null);
-      setPreview(null);
-      setCaption("");
-      setLocation("");
       navigate("/");
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: t ? "خطأ" : "Error",
-        description: error.message || (t ? "فشل النشر" : "Failed to publish"),
-      });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: isRTL ? "خطأ" : "Error", description: err.message });
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Content Type Selection Screen
-  if (!contentType) {
+  // Step 2: Details screen
+  if (step === 'details' && preview && selectedFile) {
     return (
       <Layout>
-        <div className="min-h-screen flex items-center justify-center px-4 py-8">
-          <div className="w-full max-w-3xl">
-            {/* Header */}
-            <div className="mb-12 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary to-primary/70 rounded-3xl mb-6 shadow-lg">
-                <Sparkles className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-primary via-purple-400 to-pink-500 bg-clip-text text-transparent">
-                {t ? "ماذا تريد أن تشارك?" : "What do you want to share?"}
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                {t ? "اختر نوع المحتوى الذي تريد نشره" : "Choose the type of content you want to create"}
-              </p>
+        <div className="flex flex-col h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] bg-background">
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+            <button onClick={() => setStep('pick')} className="p-1">
+              <X className="w-5 h-5" />
+            </button>
+            <span className="font-semibold text-sm">
+              {tab === 'post' ? (isRTL ? 'منشور جديد' : 'New post')
+                : tab === 'story' ? (isRTL ? 'قصة جديدة' : 'New story')
+                : (isRTL ? 'ريلز جديد' : 'New reel')}
+            </span>
+            <button
+              onClick={handlePublish}
+              disabled={isUploading}
+              className="text-primary font-bold text-sm disabled:opacity-50"
+            >
+              {isUploading ? (isRTL ? 'جاري النشر...' : 'Sharing...') : (isRTL ? 'مشاركة' : 'Share')}
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Preview */}
+            <div className="aspect-square w-full bg-black">
+              {selectedFile.type.startsWith('video/') ? (
+                <video src={preview} className="w-full h-full object-cover" controls />
+              ) : (
+                <img src={preview} alt="preview" className="w-full h-full object-cover" />
+              )}
             </div>
 
-            {/* Content Type Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Post Card */}
-              <button
-                onClick={() => setContentType('post')}
-                className="group relative rounded-2xl border-2 border-border/50 hover:border-primary/50 bg-card/30 p-8 transition-all duration-300 hover:shadow-xl hover:scale-105 backdrop-blur"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative z-10 text-center">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500/30 to-blue-600/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                    <ImageIcon className="w-7 h-7 text-blue-500" />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">{t ? "منشور" : "Post"}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {t ? "شارك صورة مع أصدقائك" : "Share a photo with friends"}
-                  </p>
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <p>📸 {t ? "صورة واحدة" : "Single photo"}</p>
-                    <p>✨ {t ? "مع تعليق" : "With caption"}</p>
-                  </div>
+            <div className="p-4 space-y-4">
+              {/* User + Caption */}
+              <div className="flex gap-3">
+                <Avatar className="w-9 h-9 flex-shrink-0">
+                  <AvatarImage src={user?.user_metadata?.avatar_url} />
+                  <AvatarFallback className="text-xs bg-primary text-white">
+                    {user?.user_metadata?.full_name?.[0] || user?.email?.[0]?.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold mb-1">{user?.user_metadata?.full_name || user?.email}</p>
+                  <Textarea
+                    placeholder={isRTL ? "اكتب تعليقاً..." : "Write a caption..."}
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    className={cn(
+                      "resize-none border-0 p-0 text-sm shadow-none focus-visible:ring-0 min-h-[80px] bg-transparent",
+                      isRTL && "text-right"
+                    )}
+                    dir={isRTL ? "rtl" : "ltr"}
+                  />
                 </div>
-              </button>
+              </div>
 
-              {/* Story Card */}
-              <button
-                onClick={() => setContentType('story')}
-                className="group relative rounded-2xl border-2 border-border/50 hover:border-purple-500/50 bg-card/30 p-8 transition-all duration-300 hover:shadow-xl hover:scale-105 backdrop-blur"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative z-10 text-center">
-                  <div className="w-14 h-14 bg-gradient-to-br from-purple-500/30 to-purple-600/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                    <Zap className="w-7 h-7 text-purple-500" />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">{t ? "قصة" : "Story"}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {t ? "شارك لحظة تختفي بعد 24 ساعة" : "Share a moment that disappears after 24h"}
-                  </p>
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <p>⏰ {t ? "تختفي بعد يوم واحد" : "Disappears in 24h"}</p>
-                    <p>🎬 {t ? "صورة أو فيديو" : "Photo or video"}</p>
-                  </div>
-                </div>
-              </button>
+              <div className="border-t border-border/30" />
 
-              {/* Reel Card */}
-              <button
-                onClick={() => setContentType('reel')}
-                className="group relative rounded-2xl border-2 border-border/50 hover:border-pink-500/50 bg-card/30 p-8 transition-all duration-300 hover:shadow-xl hover:scale-105 backdrop-blur"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative z-10 text-center">
-                  <div className="w-14 h-14 bg-gradient-to-br from-pink-500/30 to-pink-600/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                    <Video className="w-7 h-7 text-pink-500" />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">{t ? "ريلز" : "Reel"}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {t ? "شارك فيديو قصير وممتع" : "Share a short and fun video"}
-                  </p>
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <p>🎥 {t ? "فيديو عالي الجودة" : "High-quality video"}</p>
-                    <p>⚡ {t ? "حتى 60 ثانية" : "Up to 60 seconds"}</p>
-                  </div>
+              {/* Location */}
+              {tab === 'post' && (
+                <div className={cn("flex items-center gap-3 py-1", isRTL && "flex-row-reverse")}>
+                  <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <input
+                    type="text"
+                    placeholder={isRTL ? "إضافة موقع" : "Add location"}
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    dir={isRTL ? "rtl" : "ltr"}
+                    className={cn(
+                      "flex-1 text-sm bg-transparent border-0 outline-none text-muted-foreground placeholder:text-muted-foreground/60",
+                      isRTL && "text-right"
+                    )}
+                  />
                 </div>
-              </button>
+              )}
             </div>
           </div>
         </div>
@@ -228,173 +168,170 @@ export default function CreatePage() {
     );
   }
 
-  // Create Content Screen
+  // Step 1: Pick media (Instagram style)
   return (
     <Layout>
-      <div className="min-h-screen flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-4xl">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <button
-              onClick={() => setContentType(null)}
-              className="p-2 hover:bg-muted rounded-full transition-all"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">
-              {contentType === 'post' && (t ? "إنشاء منشور" : "Create Post")}
-              {contentType === 'story' && (t ? "إنشاء قصة" : "Create Story")}
-              {contentType === 'reel' && (t ? "إنشاء ريلز" : "Create Reel")}
-            </h1>
-          </div>
+      <div className="flex flex-col h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] bg-background overflow-hidden">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/40 flex-shrink-0">
+          <button onClick={() => navigate('/')} className="p-1">
+            <X className="w-5 h-5" />
+          </button>
+          <span className="font-semibold text-sm">
+            {tab === 'post' ? (isRTL ? 'منشور جديد' : 'New post')
+              : tab === 'story' ? (isRTL ? 'قصة جديدة' : 'New story')
+              : (isRTL ? 'ريلز جديد' : 'New reel')}
+          </span>
+          <button
+            onClick={() => preview && setStep('details')}
+            disabled={!preview}
+            className={cn(
+              "font-bold text-sm transition-opacity",
+              preview ? "text-primary" : "text-muted-foreground opacity-50"
+            )}
+          >
+            {isRTL ? 'التالي' : 'Next'}
+          </button>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Upload Area */}
-            <div className="flex flex-col">
-              {!preview ? (
-                <div
-                  className={cn(
-                    "border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 flex-1 flex flex-col items-center justify-center",
-                    isDragging
-                      ? "border-primary bg-primary/10 scale-105"
-                      : "border-border/60 hover:border-primary/50 bg-muted/30"
-                  )}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
-                    {contentType === 'post' && <ImageIcon className="w-8 h-8 text-primary" />}
-                    {contentType === 'story' && <Zap className="w-8 h-8 text-primary" />}
-                    {contentType === 'reel' && <Video className="w-8 h-8 text-primary" />}
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">
-                    {t ? "اسحب الملفات هنا" : "Drag files here"}
-                  </h3>
-                  <p className="text-muted-foreground mb-6">
-                    {t ? "أو انقر للاختيار" : "or click to select"}
-                  </p>
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    variant="default"
-                    className="rounded-lg"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {t ? "اختر ملف" : "Choose File"}
-                  </Button>
-                </div>
+        {/* Preview area */}
+        <div className="w-full aspect-square bg-black flex-shrink-0 relative">
+          {preview ? (
+            <>
+              {selectedFile?.type.startsWith('video/') ? (
+                <video src={preview} className="w-full h-full object-cover" />
               ) : (
-                <div className="relative rounded-2xl overflow-hidden bg-black/5 aspect-square flex items-center justify-center">
-                  {selectedFile?.type.startsWith('image/') ? (
-                    <img
-                      src={preview}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <video
-                      src={preview}
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                  <button
-                    onClick={() => {
-                      setPreview(null);
-                      setSelectedFile(null);
-                    }}
-                    className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 rounded-full p-2 transition-all"
-                  >
-                    <ArrowLeft className="w-5 h-5 text-white" />
-                  </button>
-                </div>
+                <img src={preview} alt="selected" className="w-full h-full object-cover" />
               )}
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={
-                  contentType === 'post' ? "image/*" :
-                  contentType === 'story' ? "image/*,video/*" :
-                  "video/*"
-                }
-                onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
-                className="hidden"
-              />
-            </div>
-
-            {/* Details Area */}
-            <div className="flex flex-col gap-6">
-              {/* User Info */}
-              <div className="flex items-center gap-3 pb-6 border-b border-border/30">
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={user?.user_metadata?.avatar_url} />
-                  <AvatarFallback>{user?.email?.[0]?.toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-semibold">{user?.user_metadata?.full_name || user?.email}</p>
-                  <p className="text-xs text-muted-foreground">{t ? "حسابك العام" : "Your Account"}</p>
-                </div>
-              </div>
-
-              {/* Caption */}
-              <div>
-                <label className="text-sm font-semibold mb-2 block">
-                  {contentType === 'post' && (t ? "التعليق" : "Caption")}
-                  {contentType === 'story' && (t ? "نص القصة (اختياري)" : "Story Text (optional)")}
-                  {contentType === 'reel' && (t ? "وصف الريلز" : "Reel Description")}
-                </label>
-                <Textarea
-                  placeholder={t ? "اكتب ما تريد..." : "Write something..."}
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  className="resize-none h-24 rounded-lg"
-                />
-              </div>
-
-              {/* Location (for posts) */}
-              {contentType === 'post' && (
-                <div>
-                  <label className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    {t ? "الموقع (اختياري)" : "Location (optional)"}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={t ? "أضف الموقع..." : "Add location..."}
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg border border-border/50 focus:border-primary focus:outline-none"
-                  />
-                </div>
-              )}
-
-              {/* Publish Button */}
-              <div className="flex gap-3 mt-auto pt-6 border-t border-border/30">
-                <Button
-                  variant="outline"
-                  onClick={() => setContentType(null)}
-                  className="flex-1 rounded-lg"
+              {/* Top-right controls */}
+              <div className="absolute top-3 right-3 flex gap-2">
+                <button
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="w-8 h-8 bg-black/60 rounded-full flex items-center justify-center backdrop-blur-sm"
                 >
-                  {t ? "إلغاء" : "Cancel"}
-                </Button>
-                <Button
-                  onClick={handlePublish}
-                  disabled={!selectedFile || isUploading}
-                  className="flex-1 rounded-lg"
-                >
-                  {isUploading ? (
-                    <>{t ? "جاري النشر..." : "Publishing..."}</>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      {t ? "نشر" : "Publish"}
-                    </>
-                  )}
-                </Button>
+                  <RotateCcw className="w-4 h-4 text-white" />
+                </button>
               </div>
+            </>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+              <Camera className="w-14 h-14 text-white/30" />
+              <p className="text-white/40 text-sm">{isRTL ? 'اختر صورة أو فيديو' : 'Select a photo or video'}</p>
             </div>
+          )}
+        </div>
+
+        {/* Gallery header */}
+        <div className={cn(
+          "flex items-center justify-between px-4 py-2.5 flex-shrink-0",
+          isRTL && "flex-row-reverse"
+        )}>
+          <button className={cn("flex items-center gap-1 font-semibold text-sm", isRTL && "flex-row-reverse")}>
+            {isRTL ? 'الأخيرة' : 'Recents'}
+            <ChevronDown className="w-4 h-4" />
+          </button>
+          <div className={cn("flex items-center gap-3", isRTL && "flex-row-reverse")}>
+            <button
+              onClick={() => galleryInputRef.current?.click()}
+              className="flex items-center gap-1.5 bg-accent/60 rounded-full px-3 py-1.5 text-xs font-medium"
+            >
+              <Grid3x3 className="w-3.5 h-3.5" />
+              {isRTL ? 'اختيار' : 'Select'}
+            </button>
           </div>
         </div>
+
+        {/* Gallery grid */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-3 gap-0.5">
+            {/* Camera button — first cell */}
+            <button
+              onClick={() => cameraInputRef.current?.click()}
+              className="aspect-square bg-muted/40 flex items-center justify-center"
+            >
+              <Camera className="w-8 h-8 text-muted-foreground" />
+            </button>
+
+            {/* Recent selected files */}
+            {recentFiles.map(({ file, url }, i) => (
+              <button
+                key={i}
+                onClick={() => { setSelectedFile(file); setPreview(url); }}
+                className={cn(
+                  "aspect-square relative overflow-hidden",
+                  preview === url && "ring-2 ring-primary ring-inset"
+                )}
+              >
+                {file.type.startsWith('video/') ? (
+                  <video src={url} className="w-full h-full object-cover" />
+                ) : (
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                )}
+                {preview === url && (
+                  <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                )}
+              </button>
+            ))}
+
+            {/* Empty cells with "+" to add more */}
+            {recentFiles.length === 0 && Array.from({ length: 8 }).map((_, i) => (
+              <button
+                key={`empty-${i}`}
+                onClick={() => galleryInputRef.current?.click()}
+                className="aspect-square bg-muted/20 flex items-center justify-center"
+              >
+                {i === 0 && <span className="text-2xl text-muted-foreground/40">+</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom tabs */}
+        <div className="flex-shrink-0 border-t border-border/40">
+          <div className="flex items-center justify-center gap-0 bg-background">
+            {(['post', 'story', 'reel'] as Tab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => { setTab(t); setPreview(null); setSelectedFile(null); }}
+                className={cn(
+                  "flex-1 py-3 text-xs font-semibold tracking-wide uppercase transition-colors",
+                  tab === t ? "text-foreground" : "text-muted-foreground"
+                )}
+              >
+                {t === 'post' ? (isRTL ? 'منشور' : 'POST')
+                  : t === 'story' ? (isRTL ? 'قصة' : 'STORY')
+                  : (isRTL ? 'ريلز' : 'REEL')}
+              </button>
+            ))}
+          </div>
+          <div className="flex">
+            {(['post', 'story', 'reel'] as Tab[]).map((t) => (
+              <div key={t} className={cn(
+                "flex-1 h-0.5 transition-colors",
+                tab === t ? "bg-foreground" : "bg-transparent"
+              )} />
+            ))}
+          </div>
+        </div>
+
+        {/* Hidden inputs */}
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept={accept}
+          onChange={handleGalleryChange}
+          className="hidden"
+        />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept={accept}
+          capture="environment"
+          onChange={handleGalleryChange}
+          className="hidden"
+        />
       </div>
     </Layout>
   );
