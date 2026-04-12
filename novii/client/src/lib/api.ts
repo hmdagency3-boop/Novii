@@ -1097,43 +1097,48 @@ export const api = {
     }
   },
 
-  // Follow APIs
+  // Follow APIs — uses dedicated `follow_requests` table for private-account requests
   async toggleFollow(targetUserId: string): Promise<{isFollowing: boolean; actorProfile: Profile | null; isPending?: boolean; wasCancelled?: boolean}> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    // Fetch all needed data in parallel for speed
     const [{ data: currentProfile }, { data: targetProfile }, { data: existingFollow }, { data: pendingRequest }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('profiles').select('is_private').eq('id', targetUserId).single(),
       supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', targetUserId).single(),
-      supabase.from('notifications').select('id').eq('user_id', targetUserId).eq('actor_id', user.id).eq('type', 'follow_request').single(),
+      supabase.from('follow_requests').select('id').eq('requester_id', user.id).eq('recipient_id', targetUserId).eq('status', 'pending').single(),
     ]);
 
     // ── Case 1: Already following → Unfollow ──
     if (existingFollow) {
       await supabase.from('follows').delete().eq('id', existingFollow.id);
-      // Clean up any stale follow_request notification
-      await supabase.from('notifications').delete()
-        .eq('user_id', targetUserId).eq('actor_id', user.id).eq('type', 'follow_request');
+      // Clean up any stale follow_request row
+      await supabase.from('follow_requests').delete()
+        .eq('requester_id', user.id).eq('recipient_id', targetUserId);
       return { isFollowing: false, actorProfile: currentProfile };
     }
 
-    // ── Case 2: Request already pending → Cancel it ──
+    // ── Case 2: Request already pending → Cancel it (requester can delete own request) ──
     if (pendingRequest) {
-      await supabase.from('notifications').delete().eq('id', pendingRequest.id);
+      await supabase.from('follow_requests').delete().eq('id', pendingRequest.id);
       return { isFollowing: false, actorProfile: currentProfile, wasCancelled: true };
     }
 
     // ── Case 3: Private account → Send follow request ──
     if (targetProfile?.is_private) {
+      // Delete any old rejected/approved request first (unique constraint)
+      await supabase.from('follow_requests').delete()
+        .eq('requester_id', user.id).eq('recipient_id', targetUserId);
+      const { error: reqError } = await supabase.from('follow_requests').insert({
+        requester_id: user.id,
+        recipient_id: targetUserId,
+        status: 'pending',
+      });
+      if (reqError) { console.error('❌ Follow request insert error:', reqError); throw reqError; }
       try {
         await this.createNotification({ userId: targetUserId, actorId: user.id, type: 'follow_request' });
-        return { isFollowing: false, actorProfile: currentProfile, isPending: true };
-      } catch (error) {
-        console.error('❌ Failed to send follow request:', error);
-        throw error;
-      }
+      } catch {}
+      return { isFollowing: false, actorProfile: currentProfile, isPending: true };
     }
 
     // ── Case 4: Public account → Follow directly ──
@@ -1150,15 +1155,15 @@ export const api = {
     if (!user) return [];
 
     const { data, error } = await supabase
-      .from('notifications')
+      .from('follow_requests')
       .select(`
         id,
-        actor_id,
+        requester_id,
         created_at,
-        actor:profiles!notifications_actor_id_fkey(*)
+        requester:profiles!follow_requests_requester_id_fkey(*)
       `)
-      .eq('user_id', user.id)
-      .eq('type', 'follow_request')
+      .eq('recipient_id', user.id)
+      .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -1166,7 +1171,12 @@ export const api = {
       return [];
     }
 
-    return data || [];
+    return (data || []).map(r => ({
+      id: r.id,
+      actor_id: r.requester_id,
+      created_at: r.created_at,
+      actor: r.requester,
+    }));
   },
 
   async approveFollowRequest(actorId: string): Promise<void> {
@@ -1174,15 +1184,24 @@ export const api = {
     if (!user) throw new Error('Not authenticated');
 
     try {
-      // 1. Create the follow relationship
-      const { error: followError } = await supabase.from('follows').insert({
-        follower_id: actorId,
-        following_id: user.id,
-      });
-      if (followError) { console.error('❌ Error creating follow:', followError); throw followError; }
+      // 1. Update follow_requests status → DB trigger should auto-create the follow
+      const { error: updateError } = await supabase.from('follow_requests')
+        .update({ status: 'approved', updated_at: new Date().toISOString() })
+        .eq('requester_id', actorId)
+        .eq('recipient_id', user.id)
+        .eq('status', 'pending');
+      if (updateError) { console.error('❌ Error approving follow request:', updateError); throw updateError; }
 
-      // 2. Delete the follow_request notification
-      await supabase.from('notifications').delete()
+      // Safety net: ensure the follow row exists (in case DB trigger is missing)
+      const { data: existingFollow } = await supabase.from('follows').select('id')
+        .eq('follower_id', actorId).eq('following_id', user.id).single();
+      if (!existingFollow) {
+        await supabase.from('follows').insert({ follower_id: actorId, following_id: user.id });
+      }
+
+      // 2. Mark the follow_request notification as read
+      await supabase.from('notifications')
+        .update({ is_read: true })
         .eq('user_id', user.id).eq('actor_id', actorId).eq('type', 'follow_request');
 
       // 3. Notify the requester that their request was accepted
@@ -1343,20 +1362,19 @@ export const api = {
     if (!user) throw new Error('Not authenticated');
 
     try {
+      // Update follow_requests status to 'rejected' (recipient can update)
+      const { error } = await supabase.from('follow_requests')
+        .update({ status: 'rejected', updated_at: new Date().toISOString() })
+        .eq('requester_id', actorId)
+        .eq('recipient_id', user.id)
+        .eq('status', 'pending');
 
-      // Delete follow request notification
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('actor_id', actorId)
-        .eq('type', 'follow_request');
+      if (error) { console.error('❌ Error rejecting follow request:', error); throw error; }
 
-      if (error) {
-        console.error('❌ Error rejecting follow request:', error);
-        throw error;
-      }
-
+      // Mark the notification as read
+      await supabase.from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', user.id).eq('actor_id', actorId).eq('type', 'follow_request');
     } catch (error) {
       console.error('❌ Error in rejectFollowRequest:', error);
       throw error;
@@ -1368,11 +1386,11 @@ export const api = {
     if (!user) return false;
 
     const { data } = await supabase
-      .from('notifications')
+      .from('follow_requests')
       .select('id')
-      .eq('user_id', targetUserId)
-      .eq('actor_id', user.id)
-      .eq('type', 'follow_request')
+      .eq('requester_id', user.id)
+      .eq('recipient_id', targetUserId)
+      .eq('status', 'pending')
       .single();
 
     return !!data;

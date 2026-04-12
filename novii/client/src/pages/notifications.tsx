@@ -209,6 +209,9 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
     onSuccess: () => {
       toast.success(isAr ? 'تمت الموافقة' : 'Request approved');
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['followers'] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      if (actorId) queryClient.invalidateQueries({ queryKey: ['hasFollowRequest', actorId] });
     },
   });
 
@@ -217,6 +220,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
     onSuccess: () => {
       toast.success(isAr ? 'تم الرفض' : 'Request rejected');
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      if (actorId) queryClient.invalidateQueries({ queryKey: ['hasFollowRequest', actorId] });
     },
   });
 
@@ -265,7 +269,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
 
   const href = getHref();
   const showFollowBack = notif.type === 'follow' && actorId && !isFollowing;
-  const showFollowRequest = notif.type === 'follow_request' && actorId;
+  const showFollowRequest = notif.type === 'follow_request' && actorId && !notif.is_read;
   const showThumbnail = !showFollowBack && !showFollowRequest && post?.image_url;
 
   const rowContent = (
