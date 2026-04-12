@@ -738,11 +738,13 @@ export default function Messages() {
     }
   }, [currentUser?.id, queryClient]);
 
-  // Fetch conversations
+  // Fetch conversations — staleTime prevents auto-refetch from overwriting optimistic updates
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery({
     queryKey: ['conversations', currentUser?.id],
     queryFn: () => api.getConversations(),
     enabled: !!currentUser,
+    staleTime: 30_000, // 30 seconds — realtime handles live updates
+    refetchOnWindowFocus: false, // prevent focus-triggered refetch overwriting optimistic state
   });
 
   // Fetch following list
@@ -1088,41 +1090,25 @@ export default function Messages() {
 
   // Mark messages as read when opening a conversation
   useEffect(() => {
-    if (selectedUserId && currentUser) {
-      // Optimistically update conversations to remove unread count immediately
-      queryClient.setQueryData(['conversations', currentUser.id], (old: any) => {
-        if (!old) return old;
-        return old.map((conv: any) => {
-          if (conv.user?.id === selectedUserId) {
-            return { ...conv, unreadCount: 0 };
-          }
-          return conv;
-        });
-      });
+    if (!selectedUserId || !currentUser) return;
 
-      // Then mark as read in database
-      api.markMessagesAsRead(selectedUserId)
-        .then(() => {
-          // Wait a bit to ensure database has processed the update
-          return new Promise(resolve => setTimeout(resolve, 500));
-        })
-        .then(() => {
-          // Force refetch with fresh data from database
-          queryClient.refetchQueries({ 
-            queryKey: ['conversations', currentUser.id],
-            type: 'active'
-          });
-          queryClient.refetchQueries({ 
-            queryKey: ['messages', selectedUserId],
-            type: 'active'
-          });
-        })
-        .catch(err => {
-          console.error('Failed to mark messages as read:', err);
-          // Revert optimistic update on error
-          queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
-        });
-    }
+    // Immediately zero out the unread count in the cache (optimistic)
+    queryClient.setQueryData(['conversations', currentUser.id], (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((conv: any) =>
+        conv.user?.id === selectedUserId ? { ...conv, unreadCount: 0 } : conv
+      );
+    });
+
+    // Mark as read in DB, then do a single clean refetch to sync
+    api.markMessagesAsRead(selectedUserId)
+      .then(() => {
+        // Refetch after DB confirms the write — now DB should return 0 unread
+        queryClient.invalidateQueries({ queryKey: ['conversations', currentUser.id] });
+      })
+      .catch(err => {
+        console.error('Failed to mark messages as read:', err);
+      });
   }, [selectedUserId, currentUser, queryClient]);
 
   const scrollToBottom = () => {
