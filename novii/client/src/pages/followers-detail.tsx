@@ -68,8 +68,8 @@ export default function FollowersDetailPage() {
     );
   }, [following, searchQuery]);
   
-  const handleFollowClick = (targetUserId: string) => {
-    toggleFollow.mutate(targetUserId);
+  const handleFollowClick = (targetUserId: string, isFollowingNow?: boolean) => {
+    toggleFollow.mutate({ targetUserId, isFollowingNow });
   };
   
   const UserListItem = ({ user, showFollowButton, isFollowersTab }: { user: Profile; showFollowButton: boolean; isFollowersTab: boolean }) => {
@@ -119,7 +119,7 @@ export default function FollowersDetailPage() {
           <Button
             size="sm"
             variant="default"
-            onClick={() => handleFollowClick(user.id)}
+            onClick={() => handleFollowClick(user.id, false)}
             disabled={toggleFollow.isPending}
             className="h-8 px-4 text-xs font-bold"
           >
@@ -135,7 +135,7 @@ export default function FollowersDetailPage() {
           <Button
             size="sm"
             variant="default"
-            onClick={() => handleFollowClick(user.id)}
+            onClick={() => handleFollowClick(user.id, false)}
             disabled={toggleFollow.isPending}
             className="h-8 px-4 text-xs font-bold"
           >

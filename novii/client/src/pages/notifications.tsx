@@ -341,7 +341,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
         )}
         {showFollowBack && (
           <button
-            onClick={e => { e.preventDefault(); e.stopPropagation(); if (actorId) toggleFollow.mutate(actorId); }}
+            onClick={e => { e.preventDefault(); e.stopPropagation(); if (actorId) toggleFollow.mutate({ targetUserId: actorId }); }}
             disabled={toggleFollow.isPending}
             className="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-60"
           >

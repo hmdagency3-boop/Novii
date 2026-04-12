@@ -107,7 +107,7 @@ export default function Reels() {
 
   const handleFollow = useCallback((uid: string) => {
     if (!currentUser) { toast.error(isRTL ? "سجّل دخولك أولاً" : "Please login first"); return; }
-    toggleFollow.mutate(uid);
+    toggleFollow.mutate({ targetUserId: uid });
     setFollowedUsers(p => { const n = new Set(p); n.has(uid) ? n.delete(uid) : n.add(uid); return n; });
   }, [currentUser, isRTL, toggleFollow]);
 

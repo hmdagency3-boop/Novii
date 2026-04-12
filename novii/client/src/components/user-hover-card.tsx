@@ -252,7 +252,7 @@ export function UserHoverCard({ userId, children, disabled = false }: UserHoverC
               {!isOwnProfile && (
                 <div className="flex gap-2 px-4 pb-4">
                   <button
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFollow.mutate(userId); }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFollow.mutate({ targetUserId: userId, isFollowingNow: isFollowing }); }}
                     disabled={toggleFollow.isPending}
                     className={cn(
                       "flex-1 h-9 rounded-xl text-[13px] font-semibold transition-all flex items-center justify-center gap-1.5",

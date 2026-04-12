@@ -429,7 +429,7 @@ export default function UserProfile() {
                           "font-semibold rounded-lg",
                           "h-8 px-3 text-sm md:h-8 md:px-4 flex-1 md:flex-none"
                         )}
-                        onClick={() => followMutation.mutate(userId)}
+                        onClick={() => followMutation.mutate({ targetUserId: userId, isPrivate: profile?.is_private, hasPending: hasRequest, isFollowingNow: isFollowing })}
                         disabled={followMutation.isPending || followLoading}
                       >
                         {followMutation.isPending ? (

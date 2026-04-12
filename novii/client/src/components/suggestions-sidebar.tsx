@@ -80,7 +80,7 @@ export default function SuggestionsSidebar() {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              followMutation.mutate(user.id);
+              followMutation.mutate({ targetUserId: user.id, isFollowingNow: isFollowing });
             }}
             disabled={followMutation.isPending}
             className={`ml-2 px-4 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 whitespace-nowrap flex-shrink-0 ${

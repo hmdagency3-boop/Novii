@@ -47,8 +47,8 @@ export function FollowersDialog({
   console.log('🔍 Followers Dialog - Followers Data:', followers);
   console.log('🔍 Followers Dialog - First follower is_following:', followers[0]?.is_following);
 
-  const handleFollowClick = (targetUserId: string) => {
-    toggleFollow.mutate(targetUserId);
+  const handleFollowClick = (targetUserId: string, isFollowingNow?: boolean) => {
+    toggleFollow.mutate({ targetUserId, isFollowingNow });
   };
 
   const UserListItem = ({ user, showFollowButton, isFollowersTab }: { user: Profile; showFollowButton: boolean; isFollowersTab: boolean }) => {
@@ -98,7 +98,7 @@ export function FollowersDialog({
           <Button
             size="sm"
             variant="default"
-            onClick={() => handleFollowClick(user.id)}
+            onClick={() => handleFollowClick(user.id, false)}
             disabled={toggleFollow.isPending}
             className="h-8 px-4 text-xs font-bold"
           >
@@ -114,7 +114,7 @@ export function FollowersDialog({
           <Button
             size="sm"
             variant="default"
-            onClick={() => handleFollowClick(user.id)}
+            onClick={() => handleFollowClick(user.id, false)}
             disabled={toggleFollow.isPending}
             className="h-8 px-4 text-xs font-bold"
           >
