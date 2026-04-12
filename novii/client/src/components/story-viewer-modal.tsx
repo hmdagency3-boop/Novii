@@ -460,16 +460,16 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
             />
           </div>
 
-          {/* Navigation Arrows */}
+          {/* Navigation Arrows — swap sides for RTL */}
           {currentIndex > 0 && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handlePrevious();
               }}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/30 p-2 rounded-full hover:bg-black/50 transition-colors z-30"
+              className={`absolute top-1/2 -translate-y-1/2 text-white bg-black/30 p-2 rounded-full hover:bg-black/50 transition-colors z-30 ${isRTL ? 'right-4' : 'left-4'}`}
             >
-              <ChevronLeft className="w-6 h-6" />
+              {isRTL ? <ChevronRight className="w-6 h-6" /> : <ChevronLeft className="w-6 h-6" />}
             </button>
           )}
           
@@ -479,9 +479,9 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
                 e.stopPropagation();
                 handleNext();
               }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/30 p-2 rounded-full hover:bg-black/50 transition-colors z-30"
+              className={`absolute top-1/2 -translate-y-1/2 text-white bg-black/30 p-2 rounded-full hover:bg-black/50 transition-colors z-30 ${isRTL ? 'left-4' : 'right-4'}`}
             >
-              <ChevronRight className="w-6 h-6" />
+              {isRTL ? <ChevronLeft className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
             </button>
           )}
         </div>
@@ -556,43 +556,45 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
           </div>
         )}
 
-        {/* Bottom Actions */}
-        <div className="absolute bottom-0 left-0 right-0 z-40 p-4 bg-gradient-to-t from-black/80 to-transparent">
-          <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-3">
-            <input
-              type="text"
-              placeholder={language.code === 'ar' ? "أرسل رسالة..." : "Send message..."}
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isSending) {
-                  handleSendReply();
-                }
-              }}
-              className="flex-1 bg-transparent text-white placeholder:text-white/50 border-none outline-none"
-              onClick={(e) => e.stopPropagation()}
-              disabled={isSending}
-            />
-            <button 
-              className="text-white hover:opacity-70 transition-opacity p-2 disabled:opacity-50"
-              disabled={isSending}
-              onClick={() => {
-                if (replyText.trim()) {
-                  handleSendReply();
-                }
-              }}
-            >
-              {isSending ? (
-                <span className="animate-spin inline-block">⏳</span>
-              ) : (
-                <Send className="w-6 h-6" />
-              )}
-            </button>
+        {/* Bottom Actions — hide for own story */}
+        {currentStory.user_id !== currentUserId && (
+          <div className="absolute bottom-0 left-0 right-0 z-40 p-4 bg-gradient-to-t from-black/80 to-transparent">
+            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-3">
+              <input
+                type="text"
+                placeholder={language.code === 'ar' ? "أرسل رسالة..." : "Send message..."}
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isSending) {
+                    handleSendReply();
+                  }
+                }}
+                className="flex-1 bg-transparent text-white placeholder:text-white/50 border-none outline-none"
+                onClick={(e) => e.stopPropagation()}
+                disabled={isSending}
+              />
+              <button 
+                className="text-white hover:opacity-70 transition-opacity p-2 disabled:opacity-50"
+                disabled={isSending}
+                onClick={() => {
+                  if (replyText.trim()) {
+                    handleSendReply();
+                  }
+                }}
+              >
+                {isSending ? (
+                  <span className="animate-spin inline-block">⏳</span>
+                ) : (
+                  <Send className="w-6 h-6" />
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-white/50 mt-2 text-center">
+              {language.code === 'ar' ? '📸 ستُرسل ردك كرسالة مع صورة الاستوري' : '📸 Your reply will be sent as a message with the story'}
+            </p>
           </div>
-          <p className="text-xs text-white/50 mt-2 text-center">
-            {language.code === 'ar' ? '📸 ستُرسل ردك كرسالة مع صورة الاستوري' : '📸 Your reply will be sent as a message with the story'}
-          </p>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );

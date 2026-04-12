@@ -976,7 +976,24 @@ export const api = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []) as unknown as Story[];
+
+    // Mark which stories the current user has already viewed
+    const stories = (data || []) as unknown as Story[];
+    if (stories.length > 0) {
+      const storyIds = stories.map(s => s.id);
+      const { data: viewedData } = await supabase
+        .from('story_views')
+        .select('story_id')
+        .eq('user_id', user.id)
+        .in('story_id', storyIds);
+
+      const viewedSet = new Set((viewedData || []).map((v: any) => v.story_id));
+      stories.forEach(story => {
+        story.is_viewed = viewedSet.has(story.id);
+      });
+    }
+
+    return stories;
   },
 
   async getUserStories(userId: string): Promise<Story[]> {
@@ -1231,6 +1248,22 @@ export const api = {
     if (!user) throw new Error('Not authenticated');
 
     try {
+      // Don't count the story owner viewing their own story
+      const { data: storyOwner } = await supabase
+        .from('stories')
+        .select('user_id')
+        .eq('id', storyId)
+        .single();
+
+      if (storyOwner && storyOwner.user_id === user.id) {
+        // Just return current count without recording a view
+        const { data: viewsData } = await supabase
+          .from('story_views')
+          .select('id')
+          .eq('story_id', storyId);
+        return viewsData?.length || 0;
+      }
+
       // Check if already viewed
       const { data: existing, error: checkError } = await supabase
         .from('story_views')

@@ -118,6 +118,7 @@ export default function Home() {
             followingUsers={followingUsers}
             currentUserAvatar={currentUser?.avatar_url || ""}
             currentUserId={currentUser?.id}
+            isRTL={isRTL}
             onAddStoryClick={() => setIsCreateStoryModalOpen(true)}
             onStoryClick={(userId) => {
               console.log('🏠 Home - Story clicked for user:', userId);
