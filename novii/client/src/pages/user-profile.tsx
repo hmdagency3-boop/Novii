@@ -90,7 +90,6 @@ export default function UserProfile() {
     queryKey: ['profile', userId],
     queryFn: () => api.getProfileById(userId),
     enabled: !!userId,
-    refetchInterval: 10000,
   });
 
   // Fetch user posts
@@ -152,7 +151,6 @@ export default function UserProfile() {
     queryKey: ['isFollowing', userId],
     queryFn: () => api.isFollowing(userId),
     enabled: !!userId && !!currentUser,
-    refetchInterval: 8000,
   });
 
   // Check if mutual follow (to show online indicator)
@@ -160,7 +158,6 @@ export default function UserProfile() {
     queryKey: ['isMutualFollow', userId],
     queryFn: () => api.isMutualFollow(userId),
     enabled: !!userId && !!currentUser && !isOwnProfile,
-    refetchInterval: 10000,
   });
 
   // Check if I sent a follow request to them (outgoing)
@@ -168,7 +165,6 @@ export default function UserProfile() {
     queryKey: ['hasFollowRequest', userId],
     queryFn: () => api.hasFollowRequest(userId),
     enabled: !!userId && !!currentUser && !isOwnProfile,
-    refetchInterval: 8000,
   });
 
   // Check if they sent a follow request to me (incoming)
@@ -176,8 +172,50 @@ export default function UserProfile() {
     queryKey: ['hasIncomingFollowRequest', userId],
     queryFn: () => api.hasIncomingFollowRequest(userId),
     enabled: !!userId && !!currentUser && !isOwnProfile,
-    refetchInterval: 8000,
   });
+
+  // Realtime: update follow-related state when follow_requests or follows change
+  useEffect(() => {
+    if (!userId || !currentUser) return;
+
+    const invalidateFollow = () => {
+      queryClient.invalidateQueries({ queryKey: ['isFollowing', userId] });
+      queryClient.invalidateQueries({ queryKey: ['isMutualFollow', userId] });
+      queryClient.invalidateQueries({ queryKey: ['hasFollowRequest', userId] });
+      queryClient.invalidateQueries({ queryKey: ['hasIncomingFollowRequest', userId] });
+      queryClient.invalidateQueries({ queryKey: ['profile', userId] });
+    };
+
+    const channel = supabase
+      .channel(`profile-follow-${userId}-${currentUser.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'follow_requests',
+        filter: `requester_id=eq.${userId}`,
+      }, invalidateFollow)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'follow_requests',
+        filter: `recipient_id=eq.${userId}`,
+      }, invalidateFollow)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'follows',
+        filter: `follower_id=eq.${userId}`,
+      }, invalidateFollow)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'follows',
+        filter: `following_id=eq.${userId}`,
+      }, invalidateFollow)
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, currentUser?.id, queryClient]);
 
   // Fetch user stories
   const { data: userStories = [] } = useUserStories(userId || '');
