@@ -471,57 +471,51 @@ export function useToggleFollow() {
   return useMutation({
     mutationFn: (targetUserId: string) => api.toggleFollow(targetUserId),
     onMutate: async (targetUserId) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['profile'] });
-      await queryClient.cancelQueries({ queryKey: ['isFollowing'] });
+      await queryClient.cancelQueries({ queryKey: ['isFollowing', targetUserId] });
+      await queryClient.cancelQueries({ queryKey: ['hasFollowRequest', targetUserId] });
 
-      // Get current data
-      const currentProfile = queryClient.getQueryData(['profile', 'current']) as any;
-      const targetProfile = queryClient.getQueryData(['profile', targetUserId]) as any;
-      const isFollowing = queryClient.getQueryData(['isFollowing', targetUserId]) as boolean;
+      const prevIsFollowing = queryClient.getQueryData(['isFollowing', targetUserId]) as boolean | undefined;
+      const prevHasRequest  = queryClient.getQueryData(['hasFollowRequest', targetUserId]) as boolean | undefined;
+      const prevCurrentProfile = queryClient.getQueryData(['profile', 'current']) as any;
+      const prevTargetProfile  = queryClient.getQueryData(['profile', targetUserId]) as any;
 
-      // Optimistically update current profile
-      if (currentProfile) {
-        const newFollowingCount = isFollowing 
-          ? currentProfile.following_count - 1 
-          : currentProfile.following_count + 1;
-        
-        queryClient.setQueryData(['profile', 'current'], {
-          ...currentProfile,
-          following_count: newFollowingCount,
-        });
+      // Only do optimistic updates for the unfollow case (we know for sure it's a toggle-off)
+      if (prevIsFollowing) {
+        queryClient.setQueryData(['isFollowing', targetUserId], false);
+        if (prevCurrentProfile) {
+          queryClient.setQueryData(['profile', 'current'], { ...prevCurrentProfile, following_count: Math.max(0, (prevCurrentProfile.following_count || 1) - 1) });
+        }
+        if (prevTargetProfile) {
+          queryClient.setQueryData(['profile', targetUserId], { ...prevTargetProfile, followers_count: Math.max(0, (prevTargetProfile.followers_count || 1) - 1) });
+        }
       }
 
-      // Optimistically update target profile
-      if (targetProfile) {
-        const newFollowersCount = isFollowing 
-          ? targetProfile.followers_count - 1 
-          : targetProfile.followers_count + 1;
-        
-        queryClient.setQueryData(['profile', targetUserId], {
-          ...targetProfile,
-          followers_count: newFollowersCount,
-        });
-      }
-
-      // Update is_following status
-      queryClient.setQueryData(['isFollowing', targetUserId], !isFollowing);
-
-      return { currentProfile, targetProfile, isFollowing };
+      return { prevIsFollowing, prevHasRequest, prevCurrentProfile, prevTargetProfile };
     },
-    onError: (err, targetUserId, context) => {
-      // Rollback on error
+    onError: (_err, targetUserId, context) => {
       if (context) {
-        queryClient.setQueryData(['profile', 'current'], context.currentProfile);
-        queryClient.setQueryData(['profile', targetUserId], context.targetProfile);
-        queryClient.setQueryData(['isFollowing', targetUserId], context.isFollowing);
+        queryClient.setQueryData(['isFollowing', targetUserId], context.prevIsFollowing);
+        queryClient.setQueryData(['hasFollowRequest', targetUserId], context.prevHasRequest);
+        queryClient.setQueryData(['profile', 'current'], context.prevCurrentProfile);
+        queryClient.setQueryData(['profile', targetUserId], context.prevTargetProfile);
       }
     },
     onSuccess: (result, targetUserId) => {
+      // Update pending/cancelled states in cache
+      if (result.isPending) {
+        queryClient.setQueryData(['hasFollowRequest', targetUserId], true);
+        queryClient.setQueryData(['isFollowing', targetUserId], false);
+      } else if (result.wasCancelled) {
+        queryClient.setQueryData(['hasFollowRequest', targetUserId], false);
+        queryClient.setQueryData(['isFollowing', targetUserId], false);
+      }
+
+      // Refresh all related queries
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['followers'] });
       queryClient.invalidateQueries({ queryKey: ['following'] });
       queryClient.invalidateQueries({ queryKey: ['isFollowing', targetUserId] });
+      queryClient.invalidateQueries({ queryKey: ['hasFollowRequest', targetUserId] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });

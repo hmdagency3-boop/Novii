@@ -104,6 +104,16 @@ export default function UserProfile() {
     queryKey: ['userReels', userId],
     queryFn: async () => {
       if (!userId) return [];
+
+      // Privacy gate
+      if (currentUser && currentUser.id !== userId) {
+        const { data: targetProf } = await supabase.from('profiles').select('is_private').eq('id', userId).single();
+        if (targetProf?.is_private) {
+          const { data: followCheck } = await supabase.from('follows').select('id').eq('follower_id', currentUser.id).eq('following_id', userId).single();
+          if (!followCheck) return [];
+        }
+      }
+
       const { data } = await supabase
         .from('reels')
         .select('*, user:profiles(*)')
@@ -425,13 +435,13 @@ export default function UserProfile() {
                         {followMutation.isPending ? (
                           <Spinner className="w-3 h-3 md:w-4 md:h-4" />
                         ) : isFollowing ? (
-                          isRTL ? "متابَع" : "Follow"
+                          isRTL ? "تابِع ✓" : "Following"
                         ) : hasRequest ? (
-                          isRTL ? "طلب" : "Request"
+                          isRTL ? "طلب مُرسَل" : "Requested"
                         ) : profile?.is_followed_by && !isFollowing ? (
-                          isRTL ? "رد" : "Back"
+                          isRTL ? "رد بالمتابعة" : "Follow Back"
                         ) : profile?.is_private ? (
-                          isRTL ? "طلب" : "Request"
+                          isRTL ? "طلب متابعة" : "Request"
                         ) : (
                           isRTL ? "متابعة" : "Follow"
                         )}

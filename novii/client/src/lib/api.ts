@@ -459,6 +459,19 @@ export const api = {
   },
 
   async getUserPosts(userId: string): Promise<Post[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Privacy gate: if private account and current user is not the owner → check follow
+    if (user && user.id !== userId) {
+      const { data: targetProfile } = await supabase
+        .from('profiles').select('is_private').eq('id', userId).single();
+      if (targetProfile?.is_private) {
+        const { data: follow } = await supabase
+          .from('follows').select('id').eq('follower_id', user.id).eq('following_id', userId).single();
+        if (!follow) return []; // Not a follower → return nothing
+      }
+    }
+
     // Optimized: use specific columns, no joins for performance
     const { data, error } = await supabase
       .from('posts')
@@ -472,7 +485,6 @@ export const api = {
     const posts = data || [];
 
     // Add is_liked and is_saved for current user
-    const { data: { user } } = await supabase.auth.getUser();
     if (user && posts.length > 0) {
       const postIds = posts.map(p => p.id);
       const [likesData, savedData] = await Promise.all([
@@ -1000,7 +1012,19 @@ export const api = {
   },
 
   async getUserStories(userId: string): Promise<Story[]> {
-    // Optimized: use specific columns
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Privacy gate: private account → must be a follower
+    if (user && user.id !== userId) {
+      const { data: targetProfile } = await supabase
+        .from('profiles').select('is_private').eq('id', userId).single();
+      if (targetProfile?.is_private) {
+        const { data: follow } = await supabase
+          .from('follows').select('id').eq('follower_id', user.id).eq('following_id', userId).single();
+        if (!follow) return [];
+      }
+    }
+
     const { data, error } = await supabase
       .from('stories')
       .select(STORY_WITH_PROFILE)
@@ -1074,75 +1098,51 @@ export const api = {
   },
 
   // Follow APIs
-  async toggleFollow(targetUserId: string): Promise<{isFollowing: boolean; actorProfile: Profile | null; isPending?: boolean}> {
+  async toggleFollow(targetUserId: string): Promise<{isFollowing: boolean; actorProfile: Profile | null; isPending?: boolean; wasCancelled?: boolean}> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    // Get current user profile
-    const { data: currentProfile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    // Fetch all needed data in parallel for speed
+    const [{ data: currentProfile }, { data: targetProfile }, { data: existingFollow }, { data: pendingRequest }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      supabase.from('profiles').select('is_private').eq('id', targetUserId).single(),
+      supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', targetUserId).single(),
+      supabase.from('notifications').select('id').eq('user_id', targetUserId).eq('actor_id', user.id).eq('type', 'follow_request').single(),
+    ]);
 
-    // Get target user profile to check if private
-    const { data: targetProfile } = await supabase
-      .from('profiles')
-      .select('is_private')
-      .eq('id', targetUserId)
-      .single();
-
-    const { data: existingFollow } = await supabase
-      .from('follows')
-      .select('id')
-      .eq('follower_id', user.id)
-      .eq('following_id', targetUserId)
-      .single();
-
+    // ── Case 1: Already following → Unfollow ──
     if (existingFollow) {
-      // Delete follow
       await supabase.from('follows').delete().eq('id', existingFollow.id);
+      // Clean up any stale follow_request notification
+      await supabase.from('notifications').delete()
+        .eq('user_id', targetUserId).eq('actor_id', user.id).eq('type', 'follow_request');
       return { isFollowing: false, actorProfile: currentProfile };
-    } else {
-      // Check if target user has private account
-      if (targetProfile?.is_private) {
-        // Send follow request instead
-        try {
-          await this.createNotification({
-            userId: targetUserId,
-            actorId: user.id,
-            type: 'follow_request',
-          });
-          return { isFollowing: false, actorProfile: currentProfile, isPending: true };
-        } catch (error) {
-          console.error('❌ Failed to send follow request:', error);
-          throw error;
-        }
-      } else {
-        // Public account - follow directly
-        const { error } = await supabase.from('follows').insert({
-          follower_id: user.id,
-          following_id: targetUserId
-        });
-        if (error) {
-          console.error('❌ Follow insert error:', error);
-          throw error;
-        }
-        
-        // Create notification for the followed user
-        try {
-          await this.createNotification({
-            userId: targetUserId,
-            actorId: user.id,
-            type: 'follow',
-          });
-        } catch (notifError) {
-          console.error('⚠️ Failed to create follow notification:', notifError);
-        }
-        
-        return { isFollowing: true, actorProfile: currentProfile };
+    }
+
+    // ── Case 2: Request already pending → Cancel it ──
+    if (pendingRequest) {
+      await supabase.from('notifications').delete().eq('id', pendingRequest.id);
+      return { isFollowing: false, actorProfile: currentProfile, wasCancelled: true };
+    }
+
+    // ── Case 3: Private account → Send follow request ──
+    if (targetProfile?.is_private) {
+      try {
+        await this.createNotification({ userId: targetUserId, actorId: user.id, type: 'follow_request' });
+        return { isFollowing: false, actorProfile: currentProfile, isPending: true };
+      } catch (error) {
+        console.error('❌ Failed to send follow request:', error);
+        throw error;
       }
     }
+
+    // ── Case 4: Public account → Follow directly ──
+    const { error } = await supabase.from('follows').insert({ follower_id: user.id, following_id: targetUserId });
+    if (error) { console.error('❌ Follow insert error:', error); throw error; }
+    try {
+      await this.createNotification({ userId: targetUserId, actorId: user.id, type: 'follow' });
+    } catch {}
+    return { isFollowing: true, actorProfile: currentProfile };
   },
 
   async getPendingFollowRequests(): Promise<any[]> {
@@ -1174,31 +1174,21 @@ export const api = {
     if (!user) throw new Error('Not authenticated');
 
     try {
-
-      // Create follow
+      // 1. Create the follow relationship
       const { error: followError } = await supabase.from('follows').insert({
         follower_id: actorId,
-        following_id: user.id
+        following_id: user.id,
       });
+      if (followError) { console.error('❌ Error creating follow:', followError); throw followError; }
 
-      if (followError) {
-        console.error('❌ Error creating follow:', followError);
-        throw followError;
-      }
+      // 2. Delete the follow_request notification
+      await supabase.from('notifications').delete()
+        .eq('user_id', user.id).eq('actor_id', actorId).eq('type', 'follow_request');
 
-
-      // Delete follow request notification
-      const { error: deleteError } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('actor_id', actorId)
-        .eq('type', 'follow_request');
-
-      if (deleteError) {
-        console.error('❌ Error deleting follow request notification:', deleteError);
-      } else {
-      }
+      // 3. Notify the requester that their request was accepted
+      try {
+        await this.createNotification({ userId: actorId, actorId: user.id, type: 'follow' });
+      } catch {}
     } catch (error) {
       console.error('❌ Error in approveFollowRequest:', error);
       throw error;
