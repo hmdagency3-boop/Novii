@@ -62,6 +62,23 @@ import Cropper, { type Area } from "react-easy-crop";
 import { formatDistanceToNow } from "date-fns";
 import { ar } from "date-fns/locale";
 
+function formatConvTime(dateStr: string | undefined | null, isRTL: boolean): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+  if (isToday) {
+    return date.toLocaleTimeString(isRTL ? 'ar' : 'en', { hour: '2-digit', minute: '2-digit' });
+  }
+  if (isYesterday) {
+    return isRTL ? 'أمس' : 'Yesterday';
+  }
+  return date.toLocaleDateString(isRTL ? 'ar' : 'en', { month: 'short', day: 'numeric' });
+}
+
 export default function Messages() {
   const { language, direction } = useLanguage();
   const t = getTranslation(language.code).messages;
@@ -1220,18 +1237,14 @@ export default function Messages() {
         
         {/* Conversations Sidebar */}
         <div className={cn(
-          "w-full md:w-[380px] flex flex-col border-e border-border bg-gradient-to-b from-background to-background/95",
+          "w-full md:w-[360px] flex flex-col border-e border-border bg-background",
           (selectedUserId || selectedCommunityId) ? "hidden md:flex" : "flex"
         )}>
           
           {/* Header */}
-          <div className="px-4 py-4 flex items-center justify-between border-b border-border/50 bg-gradient-to-r from-background via-background to-primary/5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white font-bold text-sm">
-                💬
-              </div>
-              <span className="font-bold text-base bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">{isRTL ? "الرسائل" : "Messages"}</span>
-            </div>
+          <div className="px-4 pt-5 pb-3 flex items-center justify-between">
+            <span className={cn("font-bold text-xl text-foreground", isRTL && "text-right")}>{isRTL ? "الرسائل" : "Messages"}</span>
+            
             <Popover open={showNewMessagePopover} onOpenChange={setShowNewMessagePopover}>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="hover:bg-accent/50 transition-colors h-9 w-9">
@@ -1484,42 +1497,59 @@ export default function Messages() {
           </div>
 
           {/* Search */}
-          <div className="px-4 py-3 border-b border-border/30">
-             <div className="relative">
-                <Search className={cn(
-                  "absolute top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4", 
-                  isRTL ? "right-3" : "left-3"
-                )} />
-                <Input 
-                  placeholder={isRTL ? "ابحث عن محادثة..." : "Search conversations..."} 
-                  value={conversationSearch}
-                  onChange={(e) => setConversationSearch(e.target.value)}
-                  className={cn(
-                      "bg-secondary/60 border border-border/30 rounded-2xl h-10 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all text-sm",
-                      isRTL ? "pr-10 text-right" : "pl-10"
-                  )} 
-                />
-             </div>
+          <div className="px-3 pb-2">
+            <div className="relative">
+              <Search className={cn(
+                "absolute top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5",
+                isRTL ? "right-3" : "left-3"
+              )} />
+              <Input
+                placeholder={isRTL ? "ابحث..." : "Search..."}
+                value={conversationSearch}
+                onChange={(e) => setConversationSearch(e.target.value)}
+                className={cn(
+                  "bg-accent/60 border-0 rounded-xl h-9 text-sm focus-visible:ring-1 focus-visible:ring-primary/50",
+                  isRTL ? "pr-9 text-right" : "pl-9"
+                )}
+              />
+            </div>
           </div>
 
           {/* Tabs for Chats and Communities */}
-          <div className="flex gap-2 px-4 py-3 border-b border-border/30">
-            <Button 
-              variant={selectedTab === 'chats' ? 'default' : 'ghost'}
-              size="sm"
+          <div className={cn("flex border-b border-border/40", isRTL && "flex-row-reverse")}>
+            <button
               onClick={() => setSelectedTab('chats')}
-              className="h-8"
+              className={cn(
+                "flex-1 py-2.5 text-sm font-medium transition-colors relative",
+                selectedTab === 'chats'
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
             >
-              {isRTL ? "محادثات" : "Chats"}
-            </Button>
-            <Button 
-              variant={selectedTab === 'communities' ? 'default' : 'ghost'}
-              size="sm"
+              {isRTL ? "المحادثات" : "Chats"}
+              {selectedTab === 'chats' && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />
+              )}
+            </button>
+            <button
               onClick={() => setSelectedTab('communities')}
-              className="h-8"
+              className={cn(
+                "flex-1 py-2.5 text-sm font-medium transition-colors relative",
+                selectedTab === 'communities'
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
             >
-              {isRTL ? "مجتمعات" : "Communities"} ({communities.length})
-            </Button>
+              {isRTL ? "المجتمعات" : "Communities"}
+              {communities.length > 0 && (
+                <span className="ml-1 text-xs bg-primary/15 text-primary px-1.5 py-0.5 rounded-full">
+                  {communities.length}
+                </span>
+              )}
+              {selectedTab === 'communities' && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />
+              )}
+            </button>
           </div>
 
           {/* Conversations List */}
@@ -1555,12 +1585,13 @@ export default function Messages() {
                       key={conv.user?.id}
                       onClick={() => setSelectedUserId(conv.user?.id)}
                       className={cn(
-                        "flex items-center gap-3 px-4 py-3 cursor-pointer text-left relative group w-full",
-                        "transition-all duration-200",
-                        "border-b border-border/30 last:border-0",
+                        "flex items-center gap-3 px-4 py-3.5 cursor-pointer relative w-full",
+                        "transition-colors duration-150",
+                        "border-b border-border/20 last:border-0",
+                        isRTL ? "text-right flex-row-reverse" : "text-left",
                         isSelected
-                          ? "bg-primary/10"
-                          : "hover:bg-accent/50"
+                          ? "bg-primary/8"
+                          : "hover:bg-accent/40 active:bg-accent/60"
                       )}
                     >
                       {/* Avatar Section */}
@@ -1584,7 +1615,10 @@ export default function Messages() {
                         
                         {/* Online Status */}
                         {isOnline && (
-                          <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-background" />
+                          <div className={cn(
+                            "absolute bottom-0 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-background",
+                            isRTL ? "left-0" : "right-0"
+                          )} />
                         )}
                       </div>
                       
@@ -1602,10 +1636,11 @@ export default function Messages() {
                             {isVerified && <VerifiedBadge size="sm" />}
                             {isOfficial && <OfficialBadge size="sm" />}
                           </div>
-                          <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                            {conv.lastMessage?.created_at
-                              ? new Date(conv.lastMessage.created_at).toLocaleDateString(isRTL ? 'ar' : 'en', { month: 'short', day: 'numeric' })
-                              : ''}
+                          <span className={cn(
+                            "text-[11px] flex-shrink-0",
+                            hasUnread ? "text-primary font-medium" : "text-muted-foreground"
+                          )}>
+                            {formatConvTime(conv.lastMessage?.created_at, isRTL)}
                           </span>
                         </div>
                         
