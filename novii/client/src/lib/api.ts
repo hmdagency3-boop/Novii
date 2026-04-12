@@ -1405,6 +1405,21 @@ export const api = {
     return !!data;
   },
 
+  async hasIncomingFollowRequest(fromUserId: string): Promise<boolean> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { data } = await supabase
+      .from('follow_requests')
+      .select('id')
+      .eq('requester_id', fromUserId)
+      .eq('recipient_id', user.id)
+      .eq('status', 'pending')
+      .single();
+
+    return !!data;
+  },
+
   async isFollowing(targetUserId: string): Promise<boolean> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return false;

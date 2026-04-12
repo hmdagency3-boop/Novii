@@ -16,7 +16,7 @@ import { BronzeMemberBadge } from "@/components/ui/bronze-member-badge";
 import { BetaTesterBadge } from "@/components/ui/beta-tester-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/lib/auth-context";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { getUserBadges } from "@/lib/badge-utils";
 import { Link, useLocation } from "wouter";
@@ -160,10 +160,17 @@ export default function UserProfile() {
     enabled: !!userId && !!currentUser && !isOwnProfile,
   });
 
-  // Check if follow request pending
+  // Check if I sent a follow request to them (outgoing)
   const { data: hasRequest = false } = useQuery({
     queryKey: ['hasFollowRequest', userId],
     queryFn: () => api.hasFollowRequest(userId),
+    enabled: !!userId && !!currentUser && !isOwnProfile,
+  });
+
+  // Check if they sent a follow request to me (incoming)
+  const { data: hasIncomingRequest = false } = useQuery({
+    queryKey: ['hasIncomingFollowRequest', userId],
+    queryFn: () => api.hasIncomingFollowRequest(userId),
     enabled: !!userId && !!currentUser && !isOwnProfile,
   });
 
@@ -173,6 +180,19 @@ export default function UserProfile() {
   // Use the unified toggle follow hook
   const followMutation = useToggleFollow();
   const [isRequestPending, setIsRequestPending] = useState(false);
+
+  // Approve incoming follow request
+  const approveMutation = useMutation({
+    mutationFn: () => api.approveFollowRequest(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hasIncomingFollowRequest', userId] });
+      queryClient.invalidateQueries({ queryKey: ['isMutualFollow', userId] });
+      queryClient.invalidateQueries({ queryKey: ['isFollowing', userId] });
+      queryClient.invalidateQueries({ queryKey: ['followers'] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
 
   if (profileLoading) {
     return (
@@ -423,29 +443,47 @@ export default function UserProfile() {
                 <div className="flex gap-1 md:gap-2 pt-3 md:pt-4">
                   {!isOwnProfile && (
                     <>
-                      <Button 
-                        variant={isFollowing ? "secondary" : (profile?.is_private && !hasRequest) ? "default" : hasRequest ? "outline" : "default"} 
-                        className={cn(
-                          "font-semibold rounded-lg",
-                          "h-8 px-3 text-sm md:h-8 md:px-4 flex-1 md:flex-none"
-                        )}
-                        onClick={() => followMutation.mutate({ targetUserId: userId, isPrivate: profile?.is_private, hasPending: hasRequest, isFollowingNow: isFollowing })}
-                        disabled={followMutation.isPending || followLoading}
-                      >
-                        {followMutation.isPending ? (
-                          <Spinner className="w-3 h-3 md:w-4 md:h-4" />
-                        ) : isFollowing ? (
-                          isRTL ? "تابِع ✓" : "Following"
-                        ) : hasRequest ? (
-                          isRTL ? "طلب مُرسَل" : "Requested"
-                        ) : profile?.is_followed_by && !isFollowing ? (
-                          isRTL ? "رد بالمتابعة" : "Follow Back"
-                        ) : profile?.is_private ? (
-                          isRTL ? "طلب متابعة" : "Request"
-                        ) : (
-                          isRTL ? "متابعة" : "Follow"
-                        )}
-                      </Button>
+                      {hasIncomingRequest ? (
+                        <Button
+                          variant="default"
+                          className={cn(
+                            "font-semibold rounded-lg bg-green-600 hover:bg-green-700 text-white",
+                            "h-8 px-3 text-sm md:h-8 md:px-4 flex-1 md:flex-none"
+                          )}
+                          onClick={() => approveMutation.mutate()}
+                          disabled={approveMutation.isPending}
+                        >
+                          {approveMutation.isPending ? (
+                            <Spinner className="w-3 h-3 md:w-4 md:h-4" />
+                          ) : (
+                            isRTL ? "قبول الطلب" : "Accept"
+                          )}
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant={isFollowing ? "secondary" : hasRequest ? "outline" : "default"} 
+                          className={cn(
+                            "font-semibold rounded-lg",
+                            "h-8 px-3 text-sm md:h-8 md:px-4 flex-1 md:flex-none"
+                          )}
+                          onClick={() => followMutation.mutate({ targetUserId: userId, isPrivate: profile?.is_private, hasPending: hasRequest, isFollowingNow: isFollowing })}
+                          disabled={followMutation.isPending || followLoading}
+                        >
+                          {followMutation.isPending ? (
+                            <Spinner className="w-3 h-3 md:w-4 md:h-4" />
+                          ) : isFollowing ? (
+                            isRTL ? "تابِع ✓" : "Following"
+                          ) : hasRequest ? (
+                            isRTL ? "طلب مُرسَل" : "Requested"
+                          ) : profile?.is_followed_by && !isFollowing ? (
+                            isRTL ? "رد بالمتابعة" : "Follow Back"
+                          ) : profile?.is_private ? (
+                            isRTL ? "طلب متابعة" : "Request"
+                          ) : (
+                            isRTL ? "متابعة" : "Follow"
+                          )}
+                        </Button>
+                      )}
                       <Link href={`/messages?user=${userId}`}>
                         <Button variant="secondary" className={cn(
                           "font-semibold rounded-lg",
