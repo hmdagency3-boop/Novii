@@ -133,13 +133,18 @@ CREATE TABLE IF NOT EXISTS follow_requests (
 -- 2.5 STORIES
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stories (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  media_url  TEXT NOT NULL,
-  media_type TEXT DEFAULT 'image' CHECK (media_type IN ('image', 'video')),
-  views_count INTEGER DEFAULT 0,
-  expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '24 hours'),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  media_url        TEXT NOT NULL,
+  media_type       TEXT DEFAULT 'image' CHECK (media_type IN ('image', 'video')),
+  views_count      INTEGER DEFAULT 0,
+  expires_at       TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '24 hours'),
+  created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  music_url        TEXT,
+  music_title      TEXT,
+  music_artist     TEXT,
+  music_artwork_url TEXT,
+  filter_name      TEXT DEFAULT 'normal'
 );
 
 -- -----------------------------------------------------------------------
@@ -669,6 +674,11 @@ CREATE POLICY "Active stories are viewable"
 
 CREATE POLICY "Users can insert own stories"
   ON stories FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own stories"
+  ON stories FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete own stories"
   ON stories FOR DELETE USING (auth.uid() = user_id);
