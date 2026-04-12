@@ -976,7 +976,7 @@ export const api = {
       .select(STORY_WITH_PROFILE)
       .in('user_id', userIdsToInclude)
       .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: true });
 
     if (error) throw error;
 
