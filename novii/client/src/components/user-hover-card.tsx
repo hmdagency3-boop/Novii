@@ -73,8 +73,10 @@ export function UserHoverCard({ userId, children, disabled = false }: UserHoverC
         side="bottom"
         align="start"
         sideOffset={8}
+        avoidCollisions
+        collisionPadding={12}
         className={cn(
-          "w-[300px] p-0 rounded-2xl overflow-hidden shadow-2xl border border-border/60",
+          "!z-[9999] w-[300px] p-0 rounded-2xl overflow-hidden shadow-2xl border border-border/60",
           "bg-card/95 backdrop-blur-xl",
           isRTL && "rtl"
         )}
