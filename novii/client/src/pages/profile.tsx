@@ -79,6 +79,40 @@ export default function Profile() {
     }
   }, [user?.id, refetchProfile]);
 
+  // Realtime: invalidate profile when someone follows/unfollows or sends a request
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['followers'] });
+    };
+
+    const channel = supabase
+      .channel(`own-profile-follow-${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'follows',
+        filter: `following_id=eq.${user.id}`,
+      }, invalidate)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'follows',
+        filter: `follower_id=eq.${user.id}`,
+      }, invalidate)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'follow_requests',
+        filter: `recipient_id=eq.${user.id}`,
+      }, invalidate)
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, queryClient]);
+
   // Check if user is admin
   const { data: isAdmin = false } = useQuery({
     queryKey: ['isAdmin', user?.id],
