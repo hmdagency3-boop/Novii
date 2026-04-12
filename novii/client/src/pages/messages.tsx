@@ -170,7 +170,7 @@ export default function Messages() {
       const next = new Set(prev);
       if (next.has(selectedUserId)) { next.delete(selectedUserId); }
       else { next.add(selectedUserId); }
-      localStorage.setItem(mutedConvsKey, JSON.stringify([...next]));
+      localStorage.setItem(mutedConvsKey, JSON.stringify(Array.from(next)));
       toast.success(next.has(selectedUserId)
         ? (isRTL ? "تم كتم المحادثة" : "Conversation muted")
         : (isRTL ? "تم إلغاء الكتم" : "Conversation unmuted"));

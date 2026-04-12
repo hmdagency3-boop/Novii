@@ -315,6 +315,8 @@ export function useTypingIndicator(postId: string, userId: string) {
     };
   }, [postId, userId]);
 
+  const channelRef = { current: supabase.channel(`typing:${postId}`) };
+
   const startTyping = async () => {
     const { data: currentProfile } = await supabase
       .from('profiles')
@@ -322,7 +324,7 @@ export function useTypingIndicator(postId: string, userId: string) {
       .eq('id', userId)
       .single();
 
-    supabase.channel(`typing:${postId}`).track({
+    channelRef.current.track({
       user_id: userId,
       username: currentProfile?.username || 'User',
       avatar_url: currentProfile?.avatar_url,
@@ -332,7 +334,7 @@ export function useTypingIndicator(postId: string, userId: string) {
   };
 
   const stopTyping = () => {
-    supabase.channel(`typing:${postId}`).track({
+    channelRef.current.track({
       user_id: userId,
       typing: false,
       timestamp: Date.now()

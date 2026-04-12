@@ -44,6 +44,70 @@ function arrayToUUID(arr: any): string {
   ].join('-');
 }
 
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string;
+    }
+  }
+}
+
+async function requireAuth(req: Request, res: Response, next: Function) {
+  const token = req.headers['x-user-token'] as string;
+  const userId = req.headers['x-user-id'] as string;
+
+  if (token) {
+    try {
+      const supabaseUrl = process.env.SUPABASE_URL!;
+      const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+      const verifier = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: { user }, error } = await verifier.auth.getUser(token);
+      if (error || !user) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+      }
+      req.userId = user.id;
+      return next();
+    } catch {
+      return res.status(401).json({ error: 'Token verification failed' });
+    }
+  }
+
+  if (userId) {
+    req.userId = userId;
+    return next();
+  }
+
+  return res.status(401).json({ error: 'Authentication required' });
+}
+
+const uploadRateLimit = new Map<string, { count: number; resetAt: number }>();
+function rateLimitUpload(req: Request, res: Response, next: Function) {
+  const userId = req.userId || 'anonymous';
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxUploads = 10;
+
+  const entry = uploadRateLimit.get(userId);
+  if (!entry || now > entry.resetAt) {
+    uploadRateLimit.set(userId, { count: 1, resetAt: now + windowMs });
+    return next();
+  }
+  if (entry.count >= maxUploads) {
+    return res.status(429).json({ error: 'Too many uploads. Try again later.' });
+  }
+  entry.count++;
+  return next();
+}
+
+const ALLOWED_MIMETYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm', 'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/webm', 'audio/ogg'];
+
+function validateUploadFile(req: Request, res: Response, next: Function) {
+  if (req.file && !ALLOWED_MIMETYPES.includes(req.file.mimetype)) {
+    return res.status(400).json({ error: 'File type not allowed' });
+  }
+  return next();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
@@ -52,8 +116,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const authSupabase = createClient(supabaseUrl, supabaseAnonKey);
 
-  // ===== Cloudinary Upload Route =====
-  app.post("/api/upload", upload.single("file"), handleUpload);
+  // ===== Cloudinary Upload Route (with auth, rate limit, file validation) =====
+  app.post("/api/upload", requireAuth as any, upload.single("file") as any, validateUploadFile as any, rateLimitUpload as any, handleUpload as any);
 
   // ===== Server-side Auth Routes (browser calls backend → backend calls Supabase) =====
 
@@ -464,7 +528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/suggestions/recommended", async (req: Request, res: Response) => {
     try {
       const { limit = 50 } = req.query;
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
 
       if (!userId) {
         return res.status(401).json({ error: 'User ID required' });
@@ -623,7 +687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new community
   app.post("/api/communities/create", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { name, description, isPrivate } = req.body;
 
       if (!userId || !name) {
@@ -719,7 +783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's communities
   app.get("/api/communities", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       if (!userId) return res.status(401).json({ error: 'User ID required' });
 
       // Get as creator
@@ -813,7 +877,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Send message to community
   app.post("/api/communities/:id/send-message", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
       const { content, imageUrl } = req.body;
 
@@ -913,7 +977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete community message (admin only) - Soft Delete
   app.delete("/api/communities/:id/messages/:messageId", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId, messageId } = req.params;
 
       if (!userId || !communityId || !messageId) {
@@ -956,7 +1020,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add member to community
   app.post("/api/communities/:id/add-member", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
       const { memberId } = req.body;
 
@@ -1001,7 +1065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get community invite code (owner only) 🔐
   app.get("/api/communities/:id/invite-code", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
 
       if (!userId || !communityId) {
@@ -1040,7 +1104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Join community with invite code 🎫
   app.post("/api/communities/join-with-code", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { inviteCode } = req.body;
 
       if (!userId || !inviteCode) {
@@ -1116,7 +1180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mute member (admin or owner only) 🔇
   app.post("/api/communities/:id/mute-member", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
       const { targetUserId, reason } = req.body;
 
@@ -1184,7 +1248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Unmute member (admin or owner only) 🔊
   app.post("/api/communities/:id/unmute-member", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
       const { targetUserId } = req.body;
 
@@ -1251,7 +1315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Temporary mute (admin or owner only) ⏱️
   app.post("/api/communities/:id/temporary-mute", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
       const { targetUserId, durationMinutes, reason } = req.body;
 
@@ -1323,7 +1387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Kick member (admin or owner only) 👢
   app.post("/api/communities/:id/kick-member", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
       const { targetUserId, reason } = req.body;
 
@@ -1397,7 +1461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check if user is kicked from community 👢
   app.get("/api/communities/:id/check-kick-status", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
 
       if (!userId || !communityId) {
@@ -1437,7 +1501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get community members (with moderation info) 👥
   app.get("/api/communities/:id/members", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
 
       if (!userId || !communityId) {
@@ -1468,7 +1532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Regenerate invite code (owner only) 🔄
   app.post("/api/communities/:id/regenerate-code", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
 
       if (!userId || !communityId) {
@@ -1528,7 +1592,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Make member admin (community owner only) 👑
   app.post("/api/communities/:id/make-admin", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
       const { targetUserId } = req.body;
 
@@ -1579,7 +1643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Remove admin privileges from admin (community owner only) 🔽
   app.post("/api/communities/:id/remove-admin", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
       const { targetUserId } = req.body;
 
@@ -1635,7 +1699,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get kicked members (admin or owner only) 👢📋
   app.get("/api/communities/:id/kicked-members", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
 
       if (!userId || !communityId) {
@@ -1692,7 +1756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Unkick member (admin or owner only) 🔄👢
   app.post("/api/communities/:id/unkick-member", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
       const { targetUserId, reason } = req.body;
 
@@ -1766,7 +1830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update community info (owner only) ✏️
   app.patch("/api/communities/:id", async (req: Request, res: Response) => {
     try {
-      const userId = req.headers['x-user-id'] as string;
+      const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
       const { name, description, avatarUrl } = req.body;
 

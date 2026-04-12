@@ -679,7 +679,7 @@ export function MessageBubble({
                     <AvatarFallback>{user.username?.[0]?.toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{user.display_name || user.username}</p>
+                    <p className="text-sm font-medium truncate">{user.full_name || user.username}</p>
                     <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
                   </div>
                 </button>

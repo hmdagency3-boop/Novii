@@ -9,6 +9,7 @@ import { ThemeProvider } from "next-themes";
 import { LanguageProvider } from "@/lib/language-context";
 import { AuthProvider } from "@/lib/auth-context";
 import { SettingsProvider } from "@/lib/settings-context";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { GlobalMessageListener } from "@/components/global-message-listener";
 import { TimeTracker } from "@/components/time-tracker";
 import { VisitorDetector } from "@/components/visitor-detector";
@@ -218,25 +219,27 @@ function App() {
   const [showSplash] = useState(true);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <LanguageProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <SettingsProvider>
-            <TooltipProvider>
-              <ShadcnToaster />
-              <Toaster richColors position="top-right" />
-              <GlobalMessageListener />
-              <TimeTracker />
-              <VisitorDetector />
-              {showSplash && <SplashOverlay />}
-              <Router />
-            </TooltipProvider>
-          </SettingsProvider>
-          </AuthProvider>
-        </QueryClientProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <LanguageProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <SettingsProvider>
+                <TooltipProvider>
+                  <ShadcnToaster />
+                  <Toaster richColors position="top-right" />
+                  <GlobalMessageListener />
+                  <TimeTracker />
+                  <VisitorDetector />
+                  {showSplash && <SplashOverlay />}
+                  <Router />
+                </TooltipProvider>
+              </SettingsProvider>
+            </AuthProvider>
+          </QueryClientProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
