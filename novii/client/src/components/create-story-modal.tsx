@@ -10,13 +10,15 @@ interface CreateStoryModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isRTL?: boolean;
+  initialPreview?: string;
+  initialMediaType?: 'image' | 'video';
 }
 
 const MAX_VIDEO_DURATION = 30;
 
-export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModalProps) {
-  const [preview, setPreview] = useState<string | null>(null);
-  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+export function CreateStoryModal({ open, onOpenChange, isRTL, initialPreview, initialMediaType }: CreateStoryModalProps) {
+  const [preview, setPreview] = useState<string | null>(initialPreview ?? null);
+  const [mediaType, setMediaType] = useState<'image' | 'video'>(initialMediaType ?? 'image');
   const [isUploading, setIsUploading] = useState(false);
   const [caption, setCaption] = useState("");
   const [selectedMusic, setSelectedMusic] = useState<MusicTrack | null>(null);
@@ -35,6 +37,14 @@ export function CreateStoryModal({ open, onOpenChange, isRTL }: CreateStoryModal
   const videoRef = useRef<HTMLVideoElement>(null);
   const createStory = useCreateStory();
   const { data: currentProfile } = useCurrentProfile();
+
+  // Sync when initialPreview changes (e.g. new camera capture)
+  useEffect(() => {
+    if (initialPreview) {
+      setPreview(initialPreview);
+      setMediaType(initialMediaType ?? 'image');
+    }
+  }, [initialPreview, initialMediaType]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

@@ -13,6 +13,7 @@ import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { CreateStoryModal } from "@/components/create-story-modal";
 
 type Tab = 'post' | 'story' | 'reel' | 'live';
 type FacingMode = 'environment' | 'user';
@@ -122,6 +123,9 @@ export default function CreatePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [flashOn, setFlashOn] = useState(false);
   const [step, setStep] = useState<'camera' | 'post-pick' | 'details'>('camera');
+  const [storyModalOpen, setStoryModalOpen] = useState(false);
+  const [storyPreview, setStoryPreview] = useState<string | undefined>(undefined);
+  const [storyMediaType, setStoryMediaType] = useState<'image' | 'video'>('image');
   const [gallery, setGallery] = useState<MediaItem[]>([]);
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const [shutterAnim, setShutterAnim] = useState(false);
@@ -136,33 +140,47 @@ export default function CreatePage() {
     tab === 'story' ? 'image/*,video/*' :
     'image/*';
 
+  /* ── File → data URL (needed by CreateStoryModal) ── */
+  const fileToDataUrl = (file: File): Promise<string> =>
+    new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onloadend = () => res(r.result as string);
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+
   /* ── Add file to gallery ── */
   const addMedia = useCallback((file: File): MediaItem => {
     const url = URL.createObjectURL(file);
     return { file, url, isVideo: file.type.startsWith('video/') };
   }, []);
 
+  /* ── Open story editor modal ── */
+  const openStoryEditor = useCallback(async (file: File) => {
+    const dataUrl = await fileToDataUrl(file);
+    const mtype: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image';
+    setStoryPreview(dataUrl);
+    setStoryMediaType(mtype);
+    setStoryModalOpen(true);
+  }, []);
+
   /* ── Shutter: capture from live camera ── */
-  const handleShutter = useCallback(() => {
+  const handleShutter = useCallback(async () => {
     const file = capturePhoto();
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    const item: MediaItem = { file, url, isVideo: false };
     setShutterAnim(true);
     setTimeout(() => setShutterAnim(false), 200);
-    setCapturedMedia(item);
-    setStep('details');
-  }, [capturePhoto]);
+    await openStoryEditor(file);
+  }, [capturePhoto, openStoryEditor]);
 
   /* ── Gallery pick ── */
-  const handleGalleryPick = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGalleryPick = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const item = addMedia(file);
     if (tab === 'story') {
-      setCapturedMedia(item);
-      setStep('details');
+      await openStoryEditor(file);
     } else {
+      const item = addMedia(file);
       setSelected(item);
       setGallery(prev => {
         const dup = prev.find(i => i.file.name === file.name && i.file.size === file.size);
@@ -171,7 +189,7 @@ export default function CreatePage() {
       });
     }
     e.target.value = '';
-  }, [addMedia, tab]);
+  }, [addMedia, tab, openStoryEditor]);
 
   /* ── Publish ── */
   const handlePublish = async () => {
@@ -538,6 +556,21 @@ export default function CreatePage() {
       </div>
 
       <input ref={galleryRef} type="file" accept={accept} onChange={handleGalleryPick} className="hidden" />
+
+      {/* Story editor modal — opens after capture or gallery pick */}
+      <CreateStoryModal
+        open={storyModalOpen}
+        onOpenChange={(open) => {
+          setStoryModalOpen(open);
+          if (!open) {
+            // Reset preview so next capture starts fresh
+            setStoryPreview(undefined);
+          }
+        }}
+        isRTL={isRTL}
+        initialPreview={storyPreview}
+        initialMediaType={storyMediaType}
+      />
     </div>
   );
 }
