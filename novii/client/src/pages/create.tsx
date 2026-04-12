@@ -211,7 +211,43 @@ function useLiveCamera(active: boolean) {
     return stopCamera;
   }, [active]);
 
-  return { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto, torchSupported, torchOn, toggleTorch };
+  // Live Photo: record 3-second video clip from the stream
+  const [isCapturingLive, setIsCapturingLive] = useState(false);
+
+  const captureLivePhoto = useCallback((): Promise<{ still: File; video: File } | null> => {
+    if (!streamRef.current || !ready) return Promise.resolve(null);
+
+    // Capture still immediately
+    const still = capturePhoto();
+    if (!still) return Promise.resolve(null);
+
+    setIsCapturingLive(true);
+
+    // Pick best supported MIME type
+    const mimeType =
+      MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' :
+      MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' :
+      'video/mp4';
+
+    return new Promise((resolve) => {
+      const chunks: Blob[] = [];
+      const recorder = new MediaRecorder(streamRef.current!, { mimeType });
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        setIsCapturingLive(false);
+        const blob = new Blob(chunks, { type: mimeType });
+        const ext  = mimeType.includes('webm') ? 'webm' : 'mp4';
+        const videoFile = new File([blob], `live_${Date.now()}.${ext}`, { type: mimeType });
+        resolve({ still, video: videoFile });
+      };
+      recorder.start();
+      setTimeout(() => {
+        if (recorder.state !== 'inactive') recorder.stop();
+      }, 3000); // 3-second live clip
+    });
+  }, [ready, capturePhoto]);
+
+  return { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto, torchSupported, torchOn, toggleTorch, isCapturingLive, captureLivePhoto };
 }
 
 /* ─────────────────────────────────────────
@@ -244,7 +280,10 @@ export default function CreatePage() {
   const galleryRef = useRef<HTMLInputElement>(null);
 
   // Camera only active on 'camera' step
-  const { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto, torchSupported, torchOn, toggleTorch } = useLiveCamera(step === 'camera');
+  const [livePhotoActive, setLivePhotoActive] = useState(false);
+  // Reset live photo mode when switching away from story tab
+  useEffect(() => { if (tab !== 'story') setLivePhotoActive(false); }, [tab]);
+  const { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto, torchSupported, torchOn, toggleTorch, isCapturingLive, captureLivePhoto } = useLiveCamera(step === 'camera');
 
   const accept =
     tab === 'reel'  ? 'video/*' :
@@ -290,25 +329,34 @@ export default function CreatePage() {
 
   /* ── Shutter: capture from live camera ── */
   const handleShutter = useCallback(async () => {
-    const shouldFlash = flashMode === 'on' || (flashMode === 'auto');
+    if (isCapturingLive) return; // prevent double-tap during live recording
+
+    const shouldFlash = flashMode === 'on' || flashMode === 'auto';
 
     if (shouldFlash && !torchSupported) {
-      // Screen flash: show white overlay, wait 80ms, capture, hide
       setScreenFlash(true);
       await new Promise(r => setTimeout(r, 80));
     }
 
-    const file = capturePhoto();
-
-    if (shouldFlash && !torchSupported) {
-      setTimeout(() => setScreenFlash(false), 200);
+    if (tab === 'story' && livePhotoActive) {
+      // ── Live Photo mode: record 3-second video clip ──
+      if (shouldFlash && !torchSupported) setTimeout(() => setScreenFlash(false), 200);
+      setShutterAnim(true);
+      setTimeout(() => setShutterAnim(false), 200);
+      const result = await captureLivePhoto();
+      if (!result) return;
+      // Open story editor with the VIDEO (live photo = short looping video)
+      await openStoryEditor(result.video);
+    } else {
+      // ── Normal photo capture ──
+      const file = capturePhoto();
+      if (shouldFlash && !torchSupported) setTimeout(() => setScreenFlash(false), 200);
+      if (!file) return;
+      setShutterAnim(true);
+      setTimeout(() => setShutterAnim(false), 200);
+      await openStoryEditor(file);
     }
-
-    if (!file) return;
-    setShutterAnim(true);
-    setTimeout(() => setShutterAnim(false), 200);
-    await openStoryEditor(file);
-  }, [capturePhoto, openStoryEditor, flashMode, torchSupported]);
+  }, [capturePhoto, captureLivePhoto, openStoryEditor, flashMode, torchSupported, tab, livePhotoActive, isCapturingLive]);
 
   /* ── Gallery pick ── */
   const handleGalleryPick = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -613,20 +661,45 @@ export default function CreatePage() {
         )}
 
         {/* ── Top controls ── */}
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-10 pb-3 bg-gradient-to-b from-black/60 to-transparent">
-          <button onClick={() => navigate('/')} className="w-10 h-10 flex items-center justify-center">
-            <X className="w-7 h-7 text-white drop-shadow-lg" />
-          </button>
-          <button onClick={handleFlashToggle} className="w-10 h-10 flex items-center justify-center">
-            {flashMode === 'on'
-              ? <Zap className="w-6 h-6 text-yellow-400 fill-yellow-400 drop-shadow-lg" />
-              : flashMode === 'auto'
-              ? <Zap className="w-6 h-6 text-yellow-200 drop-shadow-lg" />
-              : <ZapOff className="w-6 h-6 text-white drop-shadow-lg" />}
-          </button>
-          <button className="w-10 h-10 flex items-center justify-center">
-            <Settings2 className="w-6 h-6 text-white drop-shadow-lg" />
-          </button>
+        <div className="absolute top-0 left-0 right-0 flex flex-col items-center px-4 pt-10 pb-3 bg-gradient-to-b from-black/60 to-transparent">
+          <div className="flex items-center justify-between w-full">
+            <button onClick={() => navigate('/')} className="w-10 h-10 flex items-center justify-center">
+              <X className="w-7 h-7 text-white drop-shadow-lg" />
+            </button>
+            <button onClick={handleFlashToggle} className="w-10 h-10 flex items-center justify-center">
+              {flashMode === 'on'
+                ? <Zap className="w-6 h-6 text-yellow-400 fill-yellow-400 drop-shadow-lg" />
+                : flashMode === 'auto'
+                ? <Zap className="w-6 h-6 text-yellow-200 drop-shadow-lg" />
+                : <ZapOff className="w-6 h-6 text-white drop-shadow-lg" />}
+            </button>
+            <button className="w-10 h-10 flex items-center justify-center">
+              <Settings2 className="w-6 h-6 text-white drop-shadow-lg" />
+            </button>
+          </div>
+
+          {/* LIVE PHOTO button — only shown in STORY tab */}
+          {tab === 'story' && (
+            <button
+              onClick={() => setLivePhotoActive(v => !v)}
+              className={cn(
+                "mt-2 px-3 py-1 rounded-full text-xs font-bold tracking-wider border transition-all",
+                livePhotoActive
+                  ? "bg-yellow-400 border-yellow-400 text-black"
+                  : "bg-black/30 border-white/40 text-white"
+              )}
+            >
+              LIVE
+            </button>
+          )}
+
+          {/* Recording indicator during live capture */}
+          {isCapturingLive && (
+            <div className="mt-2 flex items-center gap-1.5 bg-red-600/90 px-3 py-1 rounded-full">
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              <span className="text-white text-xs font-bold">جاري تسجيل اللايف...</span>
+            </div>
+          )}
         </div>
 
         {/* ── Left tools ── */}
