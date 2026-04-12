@@ -79,6 +79,7 @@ export default function Messages() {
   const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
   const [showNewMessagePopover, setShowNewMessagePopover] = useState(false);
   const [searchFollowingQuery, setSearchFollowingQuery] = useState("");
+  const [conversationSearch, setConversationSearch] = useState("");
   const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<'chats' | 'communities'>('chats');
@@ -98,6 +99,7 @@ export default function Messages() {
   const [userMuteStatus, setUserMuteStatus] = useState<{ isMuted: boolean; mutedUntil?: string } | null>(null);
   const [muteTimeRemaining, setMuteTimeRemaining] = useState<number | null>(null);
   const muteCountdownRef = useRef<NodeJS.Timeout | null>(null);
+  const selectedUserIdRef = useRef<string | null>(null);
   const [userKickedStatus, setUserKickedStatus] = useState<{ isKicked: boolean; isMember: boolean }>({ isKicked: false, isMember: false });
   const communitiesSubscriptionRef = useRef<any>(null);
   const membersSubscriptionRef = useRef<any>(null);
@@ -123,6 +125,11 @@ export default function Messages() {
   
   // Community info modal
   const [showCommunityInfoModal, setShowCommunityInfoModal] = useState(false);
+
+  // Keep selectedUserIdRef in sync with state (for use in realtime closures)
+  useEffect(() => {
+    selectedUserIdRef.current = selectedUserId;
+  }, [selectedUserId]);
 
   // Hide bottom nav in mobile when chat/community is selected
   useEffect(() => {
@@ -798,8 +805,8 @@ export default function Messages() {
           
           // Message is already filtered to current user as receiver
           
-          // Check if message is for currently open chat
-          const isActiveChat = selectedUserId === newMessage.sender_id;
+          // Use ref to get latest selectedUserId (avoids stale closure)
+          const isActiveChat = selectedUserIdRef.current === newMessage.sender_id;
           
           if (isActiveChat) {
             // Mark messages as read immediately if chat is open
@@ -1088,6 +1095,16 @@ export default function Messages() {
       sendTypingEvent(false);
     }
   };
+
+  // Filter conversations by search query
+  const filteredConversations = conversations.filter((conv: any) => {
+    if (!conversationSearch.trim()) return true;
+    const q = conversationSearch.toLowerCase();
+    return (
+      (conv.user?.username?.toLowerCase() || '').includes(q) ||
+      (conv.user?.full_name?.toLowerCase() || '').includes(q)
+    );
+  });
 
   // Find existing conversation or create temporary one from selected user profile
   const selectedConversation = selectedUserId 
@@ -1385,6 +1402,8 @@ export default function Messages() {
                 )} />
                 <Input 
                   placeholder={isRTL ? "ابحث عن محادثة..." : "Search conversations..."} 
+                  value={conversationSearch}
+                  onChange={(e) => setConversationSearch(e.target.value)}
                   className={cn(
                       "bg-secondary/60 border border-border/30 rounded-2xl h-10 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all text-sm",
                       isRTL ? "pr-10 text-right" : "pl-10"
@@ -1425,13 +1444,21 @@ export default function Messages() {
                 <MessageCircle className="w-12 h-12 text-muted-foreground mb-2" />
                 <p className="text-muted-foreground">{isRTL ? "لا توجد محادثات بعد" : "No conversations yet"}</p>
               </div>
+            ) : filteredConversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                <Search className="w-10 h-10 text-muted-foreground mb-2" />
+                <p className="text-muted-foreground text-sm">
+                  {isRTL ? `لا نتائج لـ "${conversationSearch}"` : `No results for "${conversationSearch}"`}
+                </p>
+              </div>
             ) : (
               <div className="flex flex-col">
-                {conversations.map((conv: any) => {
+                {filteredConversations.map((conv: any) => {
                   const hasUnread = conv.unreadCount > 0 && selectedUserId !== conv.user?.id;
                   const isVerified = conv.user?.is_verified;
                   const isOfficial = conv.user?.is_official;
                   const isSelected = selectedUserId === conv.user?.id;
+                  const isOnline = conv.user?.is_online === true;
                   
                   return (
                     <button
@@ -1492,13 +1519,15 @@ export default function Messages() {
                           </AvatarFallback>
                         </Avatar>
                         
-                        {/* Online Status Indicator */}
-                        <div className={cn(
-                          "absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2.5 border-background ring-2 animate-pulse",
-                          isVerified && !isOfficial && "bg-blue-500 ring-blue-400",
-                          isOfficial && "bg-amber-500 ring-amber-400",
-                          !isVerified && !isOfficial && "bg-green-500 ring-green-400"
-                        )}></div>
+                        {/* Online Status Indicator — only shown if user is actually online */}
+                        {isOnline && (
+                          <div className={cn(
+                            "absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-background",
+                            isVerified && !isOfficial && "bg-blue-500",
+                            isOfficial && "bg-amber-500",
+                            !isVerified && !isOfficial && "bg-green-500"
+                          )} />
+                        )}
                         
                         {/* Unread Badge */}
                         {hasUnread && (
