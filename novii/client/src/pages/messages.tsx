@@ -1879,7 +1879,67 @@ export default function Messages() {
                           </div>
                         )}
                       </ScrollArea>
-                      
+
+                      {/* Desktop Input Box - Community Chat */}
+                      <div className="hidden md:flex px-4 py-3 bg-background border-t border-border shrink-0 gap-2">
+                        <div className="flex items-center gap-2 w-full">
+                          <Input
+                            value={communityMessageInput}
+                            disabled={userMuteStatus?.isMuted || userKickedStatus?.isKicked}
+                            onChange={(e) => {
+                              if (userMuteStatus?.isMuted || userKickedStatus?.isKicked) return;
+                              setCommunityMessageInput(e.target.value);
+                              if (selectedCommunityId && currentUser) {
+                                api.updateCommunityTypingStatus(selectedCommunityId, true);
+                                if (communityTypingTimeoutRef.current) clearTimeout(communityTypingTimeoutRef.current);
+                                communityTypingTimeoutRef.current = setTimeout(() => {
+                                  api.updateCommunityTypingStatus(selectedCommunityId, false);
+                                }, 3000);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (userMuteStatus?.isMuted || userKickedStatus?.isKicked) return;
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                if (communityMessageInput.trim() && selectedCommunityId) {
+                                  sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: communityMessageInput });
+                                  setCommunityMessageInput("");
+                                  api.updateCommunityTypingStatus(selectedCommunityId, false);
+                                }
+                              }
+                            }}
+                            placeholder={
+                              userKickedStatus?.isKicked
+                                ? (isRTL ? "مطرود من المجتمع..." : "You are kicked...")
+                                : userMuteStatus?.isMuted
+                                ? (isRTL ? "أنت معطل..." : "You are muted...")
+                                : (isRTL ? "اكتب رسالة..." : "Type a message...")
+                            }
+                            className={cn(
+                              "flex-1 rounded-full bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-10 text-sm px-4",
+                              isRTL && "text-right",
+                              (userMuteStatus?.isMuted || userKickedStatus?.isKicked) && "opacity-50 cursor-not-allowed"
+                            )}
+                          />
+                          <Button
+                            onClick={() => {
+                              if (communityMessageInput.trim() && selectedCommunityId) {
+                                sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: communityMessageInput });
+                                setCommunityMessageInput("");
+                              }
+                            }}
+                            disabled={!communityMessageInput.trim() || sendCommunityMessageMutation.isPending || userMuteStatus?.isMuted || userKickedStatus?.isKicked}
+                            className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg transition-all h-10 w-10 p-0"
+                            size="icon"
+                          >
+                            {sendCommunityMessageMutation.isPending ? (
+                              <Spinner className="w-4 h-4" />
+                            ) : (
+                              <Send className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
 
                 </>
