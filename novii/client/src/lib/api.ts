@@ -1492,8 +1492,7 @@ export const api = {
       .select(`
         *,
         sender:profiles!messages_sender_id_fkey(*),
-        receiver:profiles!messages_receiver_id_fkey(*),
-        reply_to:messages!messages_reply_to_id_fkey(id, content, audio_url, image_url, sender_id, sender:profiles!messages_sender_id_fkey(username, avatar_url))
+        receiver:profiles!messages_receiver_id_fkey(*)
       `)
       .or(`and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`)
       .order('created_at', { ascending: true });
