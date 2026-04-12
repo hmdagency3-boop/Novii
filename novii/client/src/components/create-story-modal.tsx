@@ -35,6 +35,7 @@ export function CreateStoryModal({ open, onOpenChange, isRTL, initialPreview, in
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const bgAudioRef = useRef<HTMLAudioElement | null>(null);
   const createStory = useCreateStory();
   const { data: currentProfile } = useCurrentProfile();
 
@@ -45,6 +46,37 @@ export function CreateStoryModal({ open, onOpenChange, isRTL, initialPreview, in
       setMediaType(initialMediaType ?? 'image');
     }
   }, [initialPreview, initialMediaType]);
+
+  // Play / stop background music while in editor
+  useEffect(() => {
+    if (!bgAudioRef.current) {
+      bgAudioRef.current = new Audio();
+      bgAudioRef.current.loop = true;
+    }
+    const audio = bgAudioRef.current;
+
+    if (selectedMusic?.preview_url) {
+      if (audio.src !== selectedMusic.preview_url) {
+        audio.src = selectedMusic.preview_url;
+      }
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+      audio.src = '';
+    }
+
+    return () => {
+      audio.pause();
+    };
+  }, [selectedMusic]);
+
+  // Stop music when modal closes
+  useEffect(() => {
+    if (!open) {
+      bgAudioRef.current?.pause();
+      if (bgAudioRef.current) bgAudioRef.current.src = '';
+    }
+  }, [open]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
