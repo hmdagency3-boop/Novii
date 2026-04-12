@@ -25,6 +25,84 @@ interface MediaItem {
 }
 
 /* ─────────────────────────────────────────
+   iPhone-style image processing via Canvas
+───────────────────────────────────────── */
+function applyIPhoneProcessing(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const { width, height } = canvas;
+
+  // ── 1. Pixel-level: tone curve + warmth + saturation ──
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  // Precompute tone-curve LUT: lift blacks, boost midtones, compress highlights
+  const lut = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) {
+    const n = i / 255;
+    // Lift blacks by ~18pts and gently compress highlights
+    const lifted = n * 0.90 + 0.07;
+    // Soft midtone brightness push (sine bump)
+    const boosted = lifted + 0.025 * Math.sin(Math.PI * lifted);
+    lut[i] = Math.min(255, Math.max(0, Math.round(boosted * 255)));
+  }
+
+  for (let i = 0; i < data.length; i += 4) {
+    let r = lut[data[i]];
+    let g = lut[data[i + 1]];
+    let b = lut[data[i + 2]];
+
+    // Warm color grade (iPhone's signature orange warmth)
+    r = Math.min(255, r + 9);
+    g = Math.min(255, g + 3);
+    b = Math.max(0,   b - 11);
+
+    // Saturation boost (+14%) using luminance pivot
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    const sat = 1.14;
+    r = Math.min(255, Math.max(0, Math.round(lum + sat * (r - lum))));
+    g = Math.min(255, Math.max(0, Math.round(lum + sat * (g - lum))));
+    b = Math.min(255, Math.max(0, Math.round(lum + sat * (b - lum))));
+
+    data[i]     = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  // ── 2. Subtle vignette (iPhone edge darkening) ──
+  const cx = width / 2, cy = height / 2;
+  const innerR = Math.min(width, height) * 0.38;
+  const outerR = Math.max(width, height) * 0.75;
+  const vignette = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.18)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, width, height);
+
+  // ── 3. Sharpening via unsharp-mask (lightweight single-pass approx) ──
+  const sharp = ctx.getImageData(0, 0, width, height);
+  const blurred = ctx.getImageData(0, 0, width, height);
+  // Simple box-blur approximation: average 3×1 horizontal neighbours
+  const bd = blurred.data;
+  const sd = sharp.data;
+  const amount = 0.4; // sharpening strength
+  for (let y = 0; y < height; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const p = (y * width + x) * 4;
+      const l = p - 4, r2 = p + 4;
+      for (let c = 0; c < 3; c++) {
+        const blurVal = (bd[l + c] + bd[p + c] + bd[r2 + c]) / 3;
+        sd[p + c] = Math.min(255, Math.max(0,
+          Math.round(bd[p + c] + amount * (bd[p + c] - blurVal))
+        ));
+      }
+    }
+  }
+  ctx.putImageData(sharp, 0, 0);
+}
+
+/* ─────────────────────────────────────────
    Camera hook — live stream via getUserMedia
 ───────────────────────────────────────── */
 function useLiveCamera(active: boolean) {
@@ -99,7 +177,7 @@ function useLiveCamera(active: boolean) {
     }
   }, []);
 
-  // Capture photo from stream → File
+  // Capture photo from stream → File (with iPhone-style processing)
   const capturePhoto = useCallback((): File | null => {
     const video = videoRef.current;
     if (!video || !ready) return null;
@@ -113,6 +191,10 @@ function useLiveCamera(active: boolean) {
       ctx.scale(-1, 1);
     }
     ctx.drawImage(video, 0, 0);
+
+    // Apply iPhone-style processing
+    applyIPhoneProcessing(canvas);
+
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
     const arr = dataUrl.split(',');
     const mime = arr[0].match(/:(.*?);/)![1];
