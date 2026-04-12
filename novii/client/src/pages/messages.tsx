@@ -2312,7 +2312,7 @@ export default function Messages() {
                               <div className="flex-1 min-w-0">
                                 <p className="text-[10px] text-primary font-semibold">{isRTL ? "ردًا على" : "Replying to"} {replyingTo.sender?.username || (replyingTo.sender_id === currentUser?.id ? (isRTL ? "أنت" : "You") : "")}</p>
                                 <p className="text-xs text-muted-foreground truncate">
-                                  {replyingTo.audio_url ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message") : replyingTo.image_url ? (isRTL ? "📷 صورة" : "📷 Image") : replyingTo.content}
+                                  {replyingTo.image_url?.startsWith('[voice]') ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message") : replyingTo.image_url ? (isRTL ? "📷 صورة" : "📷 Image") : replyingTo.content}
                                 </p>
                               </div>
                               <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => setReplyingTo(null)}>
@@ -2483,7 +2483,7 @@ export default function Messages() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] text-primary font-semibold">{isRTL ? "ردًا على" : "Replying to"} {replyingTo.sender?.username || (replyingTo.sender_id === currentUser?.id ? (isRTL ? "أنت" : "You") : "")}</p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {replyingTo.audio_url ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message") : replyingTo.image_url ? (isRTL ? "📷 صورة" : "📷 Image") : replyingTo.content}
+                      {replyingTo.image_url?.startsWith('[voice]') ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message") : replyingTo.image_url ? (isRTL ? "📷 صورة" : "📷 Image") : replyingTo.content}
                     </p>
                   </div>
                   <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => setReplyingTo(null)}>

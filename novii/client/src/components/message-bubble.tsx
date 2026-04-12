@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -34,6 +34,89 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { ar } from "date-fns/locale";
+
+// ---------- Voice Message Player Sub-Component ----------
+function VoiceMessagePlayer({ audioUrl, isMe, isRead, isRTL }: { audioUrl: string; isMe: boolean; isRead: boolean; isRTL: boolean }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const getAudio = useCallback(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(audioUrl);
+      audioRef.current.onended = () => { setIsPlaying(false); setProgress(0); };
+      audioRef.current.ontimeupdate = () => {
+        if (audioRef.current) setProgress(audioRef.current.currentTime / (audioRef.current.duration || 1));
+      };
+      audioRef.current.onloadedmetadata = () => {
+        if (audioRef.current) setDuration(audioRef.current.duration);
+      };
+    }
+    return audioRef.current;
+  }, [audioUrl]);
+
+  const togglePlay = () => {
+    const audio = getAudio();
+    if (isPlaying) { audio.pause(); setIsPlaying(false); }
+    else { audio.play(); setIsPlaying(true); }
+  };
+
+  useEffect(() => () => { audioRef.current?.pause(); }, []);
+
+  const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const bars = [3, 5, 4, 7, 5, 8, 4, 9, 6, 5, 8, 4, 6, 7, 5, 4, 8, 6, 5, 7];
+
+  return (
+    <div className={cn(
+      "rounded-2xl px-3 py-2.5 shadow-sm max-w-[260px] flex items-center gap-2.5",
+      isMe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+    )}>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-9 w-9 shrink-0 rounded-full hover:bg-white/20 border border-current/30"
+        onClick={togglePlay}
+      >
+        {isPlaying ? (
+          <span className="flex gap-[3px] items-center justify-center">
+            <span className="w-[3px] h-4 bg-current rounded-sm" />
+            <span className="w-[3px] h-4 bg-current rounded-sm" />
+          </span>
+        ) : (
+          <Volume2 className="w-4 h-4" />
+        )}
+      </Button>
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        <div className="flex items-end gap-[2px] h-6">
+          {bars.map((h, i) => (
+            <div
+              key={i}
+              className="w-[3px] rounded-full transition-colors duration-100"
+              style={{
+                height: `${h * 2.5}px`,
+                backgroundColor: 'currentColor',
+                opacity: i / bars.length <= progress ? 1 : 0.3,
+              }}
+            />
+          ))}
+        </div>
+        <div className="flex items-center justify-between text-[10px] opacity-60">
+          <span className="flex items-center gap-0.5">
+            <Mic className="w-2.5 h-2.5" />
+            {isRTL ? "صوتي" : "Voice"}
+          </span>
+          <span>{duration > 0 ? formatTime(isPlaying ? progress * duration : duration) : '—'}</span>
+        </div>
+      </div>
+      {isMe && (
+        <span className="self-end opacity-60">
+          {isRead ? <CheckCheck className="w-3 h-3" /> : <CheckCheck className="w-3 h-3 opacity-50" />}
+        </span>
+      )}
+    </div>
+  );
+}
 
 interface MessageBubbleProps {
   message: Message;
@@ -378,7 +461,7 @@ export function MessageBubble({
                   <p className="font-semibold text-[10px] mb-0.5 opacity-70">
                     {isRTL ? "ردًا على" : "Reply to"} {(message.reply_to as any).sender?.username}
                   </p>
-                  {message.reply_to.audio_url ? (
+                  {message.reply_to.image_url?.startsWith('[voice]') ? (
                     <span className="flex items-center gap-1"><Mic className="w-3 h-3" />{isRTL ? "رسالة صوتية" : "Voice message"}</span>
                   ) : message.reply_to.image_url ? (
                     <span className="flex items-center gap-1">📷 {isRTL ? "صورة" : "Image"}</span>
@@ -388,48 +471,18 @@ export function MessageBubble({
                 </div>
               )}
 
-              {/* Audio Message */}
-              {message.audio_url ? (
-                <div className={cn(
-                  "rounded-2xl px-3 py-2 shadow-sm max-w-xs flex items-center gap-2",
-                  isMe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
-                )}>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 shrink-0 hover:bg-white/20"
-                    onClick={() => {
-                      const audio = new Audio(message.audio_url!);
-                      audio.play();
-                    }}
-                  >
-                    <Volume2 className="w-4 h-4" />
-                  </Button>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-0.5">
-                      {[...Array(20)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="w-0.5 rounded-full bg-current opacity-60"
-                          style={{ height: `${Math.random() * 16 + 4}px` }}
-                        />
-                      ))}
-                    </div>
-                    <div className={cn("flex items-center gap-1 mt-1 text-[10px] opacity-60", isRTL ? "flex-row-reverse" : "")}>
-                      <Mic className="w-2.5 h-2.5" />
-                      <span>{isRTL ? "رسالة صوتية" : "Voice message"}</span>
-                    </div>
-                  </div>
-                  <div className={cn("flex items-center gap-1 self-end text-[10px] opacity-60", isMe && "text-primary-foreground/70")}>
-                    {isMe && (
-                      <span>{message.is_read ? <CheckCheck className="w-3 h-3" /> : <CheckCheck className="w-3 h-3 opacity-50" />}</span>
-                    )}
-                  </div>
-                </div>
+              {/* Voice Message — detected by [voice] prefix in image_url */}
+              {message.image_url?.startsWith('[voice]') ? (
+                <VoiceMessagePlayer
+                  audioUrl={message.image_url.replace('[voice]', '')}
+                  isMe={isMe}
+                  isRead={message.is_read}
+                  isRTL={isRTL}
+                />
               ) : (
                 <>
-                  {/* Image */}
-                  {message.image_url && (
+                  {/* Regular Image */}
+                  {message.image_url && !message.image_url.startsWith('[voice]') && (
                     <img
                       src={message.image_url}
                       alt="Message image"
@@ -535,7 +588,7 @@ export function MessageBubble({
               </DropdownMenuItem>
 
               {/* Copy — only for text messages */}
-              {message.content && message.content !== '🎤' && !message.audio_url && (
+              {message.content && message.content !== '🎤' && !message.image_url?.startsWith('[voice]') && (
                 <DropdownMenuItem onClick={handleCopy} className="gap-2 cursor-pointer">
                   <Copy className="w-4 h-4" />
                   {isRTL ? "نسخ النص" : "Copy text"}
@@ -552,7 +605,7 @@ export function MessageBubble({
               {isMe && (
                 <>
                   <DropdownMenuSeparator />
-                  {!message.audio_url && (
+                  {!message.image_url?.startsWith('[voice]') && (
                     <DropdownMenuItem onClick={() => setIsEditing(true)} className="gap-2 cursor-pointer">
                       <Pencil className="w-4 h-4" />
                       {isRTL ? "تعديل" : "Edit"}
@@ -573,7 +626,7 @@ export function MessageBubble({
       </div>
 
       {/* Image Modal */}
-      {message.image_url && (
+      {message.image_url && !message.image_url.startsWith('[voice]') && (
         <Dialog open={showImageModal} onOpenChange={setShowImageModal}>
           <DialogContent className="max-w-4xl p-0 bg-black border-0">
             <div className="relative w-full flex flex-col items-center justify-center">

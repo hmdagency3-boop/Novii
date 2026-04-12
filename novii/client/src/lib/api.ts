@@ -1532,9 +1532,9 @@ export const api = {
         sender_id: user.id,
         receiver_id: receiverId,
         content: content || (audioUrl ? '🎤' : ''),
-        image_url: imageUrl || null,
-        audio_url: audioUrl || null,
-        reply_to_id: replyToId || null,
+        // Store audio with a special prefix in image_url (no DB migration needed)
+        image_url: audioUrl ? `[voice]${audioUrl}` : (imageUrl || null),
+        // reply_to_id: replyToId || null, // requires DB migration — skipping for now
       })
       .select(`
         *,
