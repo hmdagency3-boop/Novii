@@ -17,6 +17,7 @@ import { ar } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSettings } from "@/lib/settings-context";
 
 type FilterType = 'all' | 'like' | 'comment' | 'follow' | 'follow_request' | 'mention';
 
@@ -50,6 +51,7 @@ export default function Notifications() {
   const { data: notifications = [], isLoading, refetch } = useNotifications();
   const markAsRead = useMarkNotificationAsRead();
   const markAllAsRead = useMarkAllNotificationsAsRead();
+  const { blockedIds } = useSettings();
   const [filter, setFilter] = useState<FilterType>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -60,12 +62,17 @@ export default function Notifications() {
     setIsRefreshing(false);
   };
 
-  const filtered = useMemo(() =>
-    filter === 'all' ? notifications : notifications.filter(n => n.type === filter),
-    [notifications, filter]
+  const visibleNotifications = useMemo(() =>
+    notifications.filter(n => !n.actor_id || !blockedIds.has(n.actor_id)),
+    [notifications, blockedIds]
   );
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const filtered = useMemo(() =>
+    filter === 'all' ? visibleNotifications : visibleNotifications.filter(n => n.type === filter),
+    [visibleNotifications, filter]
+  );
+
+  const unreadCount = visibleNotifications.filter(n => !n.is_read).length;
 
   // Group by time
   const grouped = useMemo(() => {

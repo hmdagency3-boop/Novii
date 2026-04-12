@@ -17,10 +17,11 @@ interface StoryBarProps {
   onStoryClick?: (userId: string) => void;
   onViewOwnStories?: () => void;
   currentUserId?: string;
+  closeFriendIds?: Set<string>;
   isRTL?: boolean;
 }
 
-export default function StoryBar({ stories, followingUsers = [], currentUserAvatar, onAddStoryClick, onStoryClick, onViewOwnStories, currentUserId, isRTL }: StoryBarProps) {
+export default function StoryBar({ stories, followingUsers = [], currentUserAvatar, onAddStoryClick, onStoryClick, onViewOwnStories, currentUserId, closeFriendIds, isRTL }: StoryBarProps) {
   // Group stories by user_id and get the first (most recent) story for each user
   const groupedStories = useMemo(() => {
     const grouped = new Map<string, Story>();
@@ -112,6 +113,7 @@ export default function StoryBar({ stories, followingUsers = [], currentUserAvat
           .map((story) => {
             const userId = story.user_id;
             const isUnviewed = !story.is_viewed;
+            const isCloseFriend = closeFriendIds?.has(userId);
             const username = story.profile?.username || 'User';
             const avatar = story.profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`;
             
@@ -127,7 +129,9 @@ export default function StoryBar({ stories, followingUsers = [], currentUserAvat
                 <div className={cn(
                     "w-16 h-16 md:w-20 md:h-20 rounded-full p-[2px] transition-all duration-300 relative",
                     isUnviewed 
-                        ? "bg-gradient-to-tr from-yellow-400 via-orange-500 to-primary" 
+                        ? isCloseFriend
+                          ? "bg-gradient-to-tr from-green-400 via-emerald-500 to-green-600"
+                          : "bg-gradient-to-tr from-yellow-400 via-orange-500 to-primary"
                         : "bg-border"
                 )}>
                 <div className="w-full h-full rounded-full border-2 border-background overflow-hidden bg-background relative z-10">

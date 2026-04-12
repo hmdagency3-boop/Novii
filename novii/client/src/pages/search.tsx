@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { useLanguage } from "@/lib/language-context";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
+import { useSettings } from "@/lib/settings-context";
 
 interface SearchProfile {
   id: string;
@@ -22,6 +23,7 @@ export default function Search() {
   const [results, setResults] = useState<SearchProfile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { language } = useLanguage();
+  const { blockedIds } = useSettings();
 
   useEffect(() => {
     const searchUsers = async () => {
@@ -79,7 +81,7 @@ export default function Search() {
             </div>
           ) : results.length > 0 ? (
             <div className="space-y-2">
-              {results.map((user) => (
+              {results.filter(user => !blockedIds.has(user.id)).map((user) => (
                 <Link key={user.id} href={`/user?id=${user.id}`}>
                   <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent/50 transition-colors cursor-pointer group">
                     {user.avatar_url ? (

@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 import { LanguageProvider } from "@/lib/language-context";
 import { AuthProvider } from "@/lib/auth-context";
+import { SettingsProvider } from "@/lib/settings-context";
 import { GlobalMessageListener } from "@/components/global-message-listener";
 import { TimeTracker } from "@/components/time-tracker";
 import { VisitorDetector } from "@/components/visitor-detector";
@@ -221,6 +222,7 @@ function App() {
       <LanguageProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
+            <SettingsProvider>
             <TooltipProvider>
               <ShadcnToaster />
               <Toaster richColors position="top-right" />
@@ -230,6 +232,7 @@ function App() {
               {showSplash && <SplashOverlay />}
               <Router />
             </TooltipProvider>
+          </SettingsProvider>
           </AuthProvider>
         </QueryClientProvider>
       </LanguageProvider>

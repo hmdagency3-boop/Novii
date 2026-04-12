@@ -1,6 +1,6 @@
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Grid3X3, Bookmark, UserSquare2, Heart, MessageCircle, ArrowLeft, Lock, QrCode } from "lucide-react";
+import { Grid3X3, Bookmark, UserSquare2, Heart, MessageCircle, ArrowLeft, Lock, QrCode, MoreHorizontal, ShieldBan, VolumeX, ShieldAlert, Star, Users } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
@@ -30,6 +30,14 @@ import { useToggleFollow, useUserStories } from "@/hooks/use-data";
 import { OnlineIndicator } from "@/components/online-indicator";
 import { supabase } from "@/lib/supabase";
 import { ProfileShareModal } from "@/components/profile-share-modal";
+import { useSettings } from "@/lib/settings-context";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 export default function UserProfile() {
   const { user: currentUser } = useAuth();
@@ -52,6 +60,7 @@ export default function UserProfile() {
   });
 
   const isRTL = direction === "rtl";
+  const { isBlocked, isMuted, isRestricted, isCloseFriend, isFavorite, blockUser, unblockUser, muteUser, unmuteUser, restrictUser, unrestrictUser, addCloseFriend, removeCloseFriend, addFavorite, removeFavorite, settings } = useSettings();
 
   // Track mobile size
   useEffect(() => {
@@ -313,7 +322,7 @@ export default function UserProfile() {
                     </div>
                 </div>
                 {/* Online Indicator Badge */}
-                {(isOwnProfile || isMutualFollow) && (
+                {(isOwnProfile || isMutualFollow) && !settings.hide_online_status && (
                   <div className="absolute bottom-0 right-0">
                     <OnlineIndicator userId={userId} size={isMobile ? "md" : "lg"} shouldShow={isOwnProfile || isMutualFollow} />
                   </div>
@@ -546,6 +555,38 @@ export default function UserProfile() {
                   >
                     <QrCode className="w-4 h-4" />
                   </Button>
+                  {!isOwnProfile && userId && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={() => isBlocked(userId) ? unblockUser(userId) : blockUser(userId)}>
+                          <ShieldBan className="w-4 h-4 mr-2" />
+                          {isBlocked(userId) ? (isRTL ? "إلغاء الحظر" : "Unblock") : (isRTL ? "حظر" : "Block")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => isMuted(userId) ? unmuteUser(userId) : muteUser(userId)}>
+                          <VolumeX className="w-4 h-4 mr-2" />
+                          {isMuted(userId) ? (isRTL ? "إلغاء الكتم" : "Unmute") : (isRTL ? "كتم" : "Mute")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => isRestricted(userId) ? unrestrictUser(userId) : restrictUser(userId)}>
+                          <ShieldAlert className="w-4 h-4 mr-2" />
+                          {isRestricted(userId) ? (isRTL ? "إلغاء التقييد" : "Unrestrict") : (isRTL ? "تقييد" : "Restrict")}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => isFavorite(userId) ? removeFavorite(userId) : addFavorite(userId)}>
+                          <Star className={cn("w-4 h-4 mr-2", isFavorite(userId) && "fill-yellow-400 text-yellow-400")} />
+                          {isFavorite(userId) ? (isRTL ? "إزالة من المفضلة" : "Remove from Favorites") : (isRTL ? "إضافة للمفضلة" : "Add to Favorites")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => isCloseFriend(userId) ? removeCloseFriend(userId) : addCloseFriend(userId)}>
+                          <Users className={cn("w-4 h-4 mr-2", isCloseFriend(userId) && "text-green-500")} />
+                          {isCloseFriend(userId) ? (isRTL ? "إزالة من الأصدقاء المقربين" : "Remove Close Friend") : (isRTL ? "إضافة للأصدقاء المقربين" : "Add Close Friend")}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               </div>
 

@@ -11,12 +11,14 @@ import { useLanguage } from "@/lib/language-context";
 import { toast } from "sonner";
 import { Heart, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
+import { useSettings } from "@/lib/settings-context";
 
 export default function Home() {
   const { data: posts, isLoading: postsLoading, refetch: refetchFeed } = useFeed();
   const { data: stories, isLoading: storiesLoading } = useStories();
   const { data: currentUser } = useCurrentProfile();
   const { data: followingUsers = [] } = useFollowing(currentUser?.id || '');
+  const { blockedIds, mutedIds, favoriteIds, closeFriendIds } = useSettings();
   const [location] = useLocation();
   const [isCreateStoryModalOpen, setIsCreateStoryModalOpen] = useState(false);
   const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
@@ -114,10 +116,11 @@ export default function Home() {
           </div>
         ) : (
           <StoryBar 
-            stories={stories || []} 
+            stories={(stories || []).filter(s => !blockedIds.has(s.user_id) && !mutedIds.has(s.user_id))} 
             followingUsers={followingUsers}
             currentUserAvatar={currentUser?.avatar_url || ""}
             currentUserId={currentUser?.id}
+            closeFriendIds={closeFriendIds}
             isRTL={isRTL}
             onAddStoryClick={() => setIsCreateStoryModalOpen(true)}
             onStoryClick={(userId) => {
@@ -147,7 +150,15 @@ export default function Home() {
               </div>
             ))
           ) : posts && posts.length > 0 ? (
-            posts.map(post => (
+            [...posts]
+              .filter(post => !blockedIds.has(post.user_id) && !mutedIds.has(post.user_id))
+              .sort((a, b) => {
+                const aFav = favoriteIds.has(a.user_id) ? 1 : 0;
+                const bFav = favoriteIds.has(b.user_id) ? 1 : 0;
+                if (aFav !== bFav) return bFav - aFav;
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+              })
+              .map(post => (
               <PostCard key={post.id} post={post} />
             ))
           ) : (

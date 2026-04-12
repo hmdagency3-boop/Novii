@@ -25,6 +25,7 @@ import { PostViewerModal } from "./post-viewer-modal";
 import { UserHoverCard } from "./user-hover-card";
 import { StoryAwareAvatar } from "./story-aware-avatar";
 import { useLanguage } from "@/lib/language-context";
+import { useSettings } from "@/lib/settings-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,7 +68,9 @@ export default function PostCard({ post }: PostCardProps) {
   
   const { data: currentUser } = useCurrentUser();
   const { direction } = useLanguage();
+  const { settings } = useSettings();
   const t = direction === "rtl";
+  const shouldHideLikes = hideLikes || (currentUser?.id === post.user_id ? settings.likes.hide_like_counts_own : settings.likes.hide_like_counts_others);
 
   // Record view when post is viewed
   useEffect(() => {
@@ -373,7 +376,7 @@ export default function PostCard({ post }: PostCardProps) {
       {/* Content */}
       <div className="px-3 sm:px-4 pb-4 sm:pb-6 space-y-3">
         {/* Likes Counter - Hidden if hide_likes is true */}
-        {!hideLikes && (
+        {!shouldHideLikes && (
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded-full bg-gradient-to-r from-destructive/40 to-destructive/20 flex items-center justify-center">
               <Heart className="w-3 h-3 text-destructive fill-destructive" />

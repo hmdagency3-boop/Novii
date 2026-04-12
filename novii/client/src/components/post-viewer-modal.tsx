@@ -22,6 +22,7 @@ import { PopularBadge } from "@/components/ui/popular-badge";
 import { ActiveBadge } from "@/components/ui/active-badge";
 import { useToggleLike, useToggleSave, useComments, useCreateComment, useToggleCommentLike, useDeleteComment, useCurrentUser, useTogglePinPost, useToggleHideLikes, useToggleRepliesDisabled, useDeletePost, useTypingIndicator } from "@/hooks/use-data";
 import { useLanguage } from "@/lib/language-context";
+import { useSettings } from "@/lib/settings-context";
 import { formatDistanceToNow } from "date-fns";
 import { ar } from "date-fns/locale";
 import { MentionAutocomplete } from "./mention-autocomplete";
@@ -81,7 +82,20 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(post?.id || "", currentUser?.id || "");
   const createComment = useCreateComment();
   const { direction } = useLanguage();
+  const { blockedIds, restrictedIds, settings } = useSettings();
   const t = direction === "rtl";
+
+  const hiddenWords = settings.hidden_words.enabled ? settings.hidden_words.custom_words.map(w => w.toLowerCase()) : [];
+
+  const filteredComments = comments.filter(c => {
+    if (blockedIds.has(c.user_id)) return false;
+    if (restrictedIds.has(c.user_id) && post?.user_id === currentUser?.id) return false;
+    if (hiddenWords.length > 0 && c.content) {
+      const lower = c.content.toLowerCase();
+      if (hiddenWords.some(w => lower.includes(w))) return false;
+    }
+    return true;
+  });
 
   if (!post) return null;
 
@@ -360,13 +374,13 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                     <div className="inline-block animate-spin">⌛</div>
                     <p className="mt-1 sm:mt-2">{isRTL ? "جاري تحميل التعليقات..." : "Loading comments..."}</p>
                   </div>
-                ) : comments.length === 0 ? (
+                ) : filteredComments.length === 0 ? (
                   <div className="text-center text-muted-foreground text-xs sm:text-sm py-4 sm:py-8">
                     💬
                     <p className="mt-1 sm:mt-2">{isRTL ? "لا توجد تعليقات بعد" : "No comments yet"}</p>
                   </div>
                 ) : (
-                  comments.map((comment, index) => (
+                  filteredComments.map((comment, index) => (
                     <div 
                       key={comment.id}
                       className={cn(
@@ -488,7 +502,15 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                           "mt-2 space-y-2 py-2 animate-in fade-in duration-200",
                           isRTL ? "mr-4 pr-2 border-r-2 border-primary/20" : "ml-4 pl-2 border-l-2 border-primary/20"
                         )}>
-                          {comment.replies.map((reply) => (
+                          {comment.replies.filter(r => {
+                            if (blockedIds.has(r.user_id)) return false;
+                            if (restrictedIds.has(r.user_id) && post?.user_id === currentUser?.id) return false;
+                            if (hiddenWords.length > 0 && r.content) {
+                              const lower = r.content.toLowerCase();
+                              if (hiddenWords.some(w => lower.includes(w))) return false;
+                            }
+                            return true;
+                          }).map((reply) => (
                             <div key={reply.id} className="flex gap-2 group">
                               <Link href={`/user?id=${reply.user_id}`}>
                                 <Avatar className="w-6 h-6 border border-border/50 flex-shrink-0 group-hover:border-primary/40 transition-all duration-200">
@@ -608,7 +630,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
               </div>
 
               {/* Likes Count - Hidden if hide_likes is true */}
-              {!post.hide_likes && (
+              {!(post.hide_likes || (currentUser?.id === post.user_id ? settings.likes.hide_like_counts_own : settings.likes.hide_like_counts_others)) && (
                 <div className="text-xs font-bold flex items-center gap-1">
                   <Heart className="w-3 h-3 sm:w-4 sm:h-4 fill-destructive text-destructive" />
                   <span className="truncate">{post.likes_count.toLocaleString()} {isRTL ? "إعجاب" : "likes"}</span>
