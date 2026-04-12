@@ -174,9 +174,8 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   const handlePointerUp = (e: React.PointerEvent, side: 'left' | 'right') => {
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
     if (isHoldingRef.current) { setIsPaused(false); isHoldingRef.current = false; return; }
-    // short tap = navigate
-    if (isRTL) { side === 'left' ? handleNext() : handlePrevious(); }
-    else { side === 'left' ? handlePrevious() : handleNext(); }
+    // short tap = navigate (right = next, left = previous — same for both RTL and LTR)
+    side === 'right' ? handleNext() : handlePrevious();
   };
 
   const handleDoubleTap = () => {
@@ -313,29 +312,17 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
           {currentIndex > 0 && (
             <button
               onClick={handlePrevious}
-              className={cn(
-                "hidden md:flex absolute top-1/2 -translate-y-1/2 z-30",
-                "items-center justify-center w-10 h-10 rounded-full",
-                "bg-white/20 backdrop-blur-sm border border-white/30 text-white",
-                "hover:bg-white/35 transition-all",
-                isRTL ? "right-3" : "left-3"
-              )}
+              className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-30 left-3 items-center justify-center w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/35 transition-all"
             >
-              {isRTL ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+              <ChevronLeft className="w-5 h-5" />
             </button>
           )}
           {currentIndex < stories.length - 1 && (
             <button
               onClick={handleNext}
-              className={cn(
-                "hidden md:flex absolute top-1/2 -translate-y-1/2 z-30",
-                "items-center justify-center w-10 h-10 rounded-full",
-                "bg-white/20 backdrop-blur-sm border border-white/30 text-white",
-                "hover:bg-white/35 transition-all",
-                isRTL ? "left-3" : "right-3"
-              )}
+              className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-30 right-3 items-center justify-center w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/35 transition-all"
             >
-              {isRTL ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+              <ChevronRight className="w-5 h-5" />
             </button>
           )}
 
