@@ -1612,8 +1612,8 @@ export default function Messages() {
                       {/* Content Section */}
                       <div className="flex flex-col flex-1 min-w-0 gap-0.5">
                         {/* Name + Time row */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1 min-w-0">
+                        <div className={cn("flex items-center justify-between gap-2", isRTL && "flex-row-reverse")}>
+                          <div className={cn("flex items-center gap-1 min-w-0", isRTL && "flex-row-reverse")}>
                             <span className={cn(
                               "text-sm truncate",
                               hasUnread || isSelected ? "font-bold text-foreground" : "font-medium text-foreground/90"
@@ -1632,8 +1632,8 @@ export default function Messages() {
                         </div>
                         
                         {/* Message preview + unread badge row */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1 min-w-0 flex-1">
+                        <div className={cn("flex items-center justify-between gap-2", isRTL && "flex-row-reverse")}>
+                          <div className={cn("flex items-center gap-1 min-w-0 flex-1", isRTL && "flex-row-reverse")}>
                             {mutedConvIds.has(conv.user?.id) && (
                               <span className="text-[11px] text-muted-foreground flex-shrink-0">🔇</span>
                             )}
