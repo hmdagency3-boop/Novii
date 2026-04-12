@@ -133,23 +133,32 @@ function useLiveCamera(active: boolean) {
         videoRef.current.onloadedmetadata = () => setReady(true);
       }
       setHasCamera(true);
-      // Check torch support on back camera only
+      // Check torch support on back camera only (wrapped — may throw on some browsers)
       if (mode === 'environment') {
-        const track = stream.getVideoTracks()[0];
-        const caps = track?.getCapabilities?.() as any;
-        if (caps?.torch) setTorchSupported(true);
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = (track?.getCapabilities?.() ?? {}) as any;
+          if (caps?.torch) setTorchSupported(true);
+        } catch {
+          // torch capability check not supported — ignore
+        }
       }
     } catch {
       setHasCamera(false);
     }
   }, []);
 
+  const torchOnRef = useRef(false);
+
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      // Make sure torch is off before stopping
-      const track = streamRef.current.getVideoTracks()[0];
-      if (track) {
-        try { (track.applyConstraints as any)({ advanced: [{ torch: false }] }); } catch {}
+      // Turn off torch only if it was actually activated
+      if (torchOnRef.current) {
+        const track = streamRef.current.getVideoTracks()[0];
+        if (track) {
+          try { (track.applyConstraints as any)({ advanced: [{ torch: false }] }); } catch {}
+        }
+        torchOnRef.current = false;
       }
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
@@ -172,8 +181,9 @@ function useLiveCamera(active: boolean) {
     try {
       await (track.applyConstraints as any)({ advanced: [{ torch: on }] });
       setTorchOn(on);
+      torchOnRef.current = on;
     } catch {
-      // torch not supported silently
+      // torch not supported — fail silently
     }
   }, []);
 
