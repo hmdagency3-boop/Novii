@@ -856,9 +856,6 @@ export default function SettingsPage() {
       case "website_permissions":
       case "account_type":
       case "verified":
-      case "help":
-      case "privacy_center":
-      case "about":
         return (
           <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in fade-in zoom-in duration-300 pb-20">
             <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-6 border border-blue-500/20">
@@ -868,10 +865,80 @@ export default function SettingsPage() {
               {direction === 'rtl' ? 'قيد التطوير' : 'Coming Soon'}
             </h2>
             <p className="text-muted-foreground max-w-md">
-              {direction === 'rtl' 
+              {direction === 'rtl'
                 ? 'هذا القسم سيتم تطويره قريباً. شكراً لصبرك!'
                 : 'This section will be available soon. Thank you for your patience!'}
             </p>
+          </div>
+        );
+      case "help":
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in fade-in zoom-in duration-300 pb-20">
+            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20">
+              <HelpCircle className="w-10 h-10 text-primary" />
+            </div>
+            <h2 className="text-2xl font-bold mb-3">
+              {direction === 'rtl' ? 'مركز المساعدة' : 'Help Center'}
+            </h2>
+            <p className="text-muted-foreground max-w-md mb-6">
+              {direction === 'rtl'
+                ? 'تصفح الأسئلة الشائعة واحصل على إجابات لجميع استفساراتك'
+                : 'Browse FAQs and get answers to all your questions'}
+            </p>
+            <Link href="/help">
+              <button className="bg-primary text-primary-foreground px-6 py-2.5 rounded-full text-sm font-medium hover:bg-primary/90 transition-colors">
+                {direction === 'rtl' ? 'فتح مركز المساعدة' : 'Open Help Center'}
+              </button>
+            </Link>
+          </div>
+        );
+      case "privacy_center":
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in fade-in zoom-in duration-300 pb-20">
+            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20">
+              <Shield className="w-10 h-10 text-primary" />
+            </div>
+            <h2 className="text-2xl font-bold mb-3">
+              {direction === 'rtl' ? 'سياسة الخصوصية' : 'Privacy Policy'}
+            </h2>
+            <p className="text-muted-foreground max-w-md mb-6">
+              {direction === 'rtl'
+                ? 'اطلع على كيفية حماية بياناتك وما نجمعه منها'
+                : 'Learn how we protect your data and what we collect'}
+            </p>
+            <div className="flex gap-3 flex-wrap justify-center">
+              <Link href="/privacy">
+                <button className="bg-primary text-primary-foreground px-6 py-2.5 rounded-full text-sm font-medium hover:bg-primary/90 transition-colors">
+                  {direction === 'rtl' ? 'سياسة الخصوصية' : 'Privacy Policy'}
+                </button>
+              </Link>
+              <Link href="/terms">
+                <button className="border border-border px-6 py-2.5 rounded-full text-sm font-medium hover:bg-accent transition-colors">
+                  {direction === 'rtl' ? 'الشروط والأحكام' : 'Terms of Service'}
+                </button>
+              </Link>
+            </div>
+          </div>
+        );
+      case "about":
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in fade-in zoom-in duration-300 pb-20">
+            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20">
+              <Info className="w-10 h-10 text-primary" />
+            </div>
+            <h2 className="text-2xl font-bold mb-3">
+              {direction === 'rtl' ? 'حول نوفيي' : 'About Novii'}
+            </h2>
+            <p className="text-muted-foreground max-w-md mb-6">
+              {direction === 'rtl'
+                ? 'تعرف على قصتنا ورؤيتنا وكل ما يتعلق بمنصة نوفيي'
+                : 'Learn about our story, vision, and everything about Novii'}
+            </p>
+            <Link href="/about">
+              <button className="bg-primary text-primary-foreground px-6 py-2.5 rounded-full text-sm font-medium hover:bg-primary/90 transition-colors">
+                {direction === 'rtl' ? 'اعرف أكثر' : 'Learn More'}
+              </button>
+            </Link>
           </div>
         );
 

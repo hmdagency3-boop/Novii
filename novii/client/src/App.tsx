@@ -29,6 +29,10 @@ import Admin from "@/pages/admin";
 import FollowersDetail from "@/pages/followers-detail";
 import ResetPassword from "@/pages/reset-password";
 import Features from "@/pages/features";
+import PrivacyPolicy from "@/pages/privacy";
+import TermsOfService from "@/pages/terms";
+import Help from "@/pages/help";
+import About from "@/pages/about";
 import ProtectedLayout from "@/components/protected-layout";
 
 function SplashOverlay() {
@@ -199,6 +203,10 @@ function Router() {
       </Route>
 
       <Route path="/features" component={Features} />
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/terms" component={TermsOfService} />
+      <Route path="/help" component={Help} />
+      <Route path="/about" component={About} />
 
       <Route component={NotFound} />
     </Switch>

@@ -702,12 +702,37 @@ export default function AuthPage() {
           </div>
 
           {/* Footer */}
-          <div className="mt-3 sm:mt-8 text-center pb-4 space-y-1">
+          <div className="mt-3 sm:mt-8 text-center pb-4 space-y-2">
             <Link href="/features">
               <span className="text-xs text-primary/70 hover:text-primary cursor-pointer transition-colors">
                 {isRTL ? "اكتشف مميزات Novii ←" : "Discover Novii Features →"}
               </span>
             </Link>
+            <div className="flex items-center justify-center flex-wrap gap-x-3 gap-y-1">
+              <Link href="/about">
+                <span className="text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+                  {isRTL ? "حول" : "About"}
+                </span>
+              </Link>
+              <span className="text-muted-foreground/40 text-xs">·</span>
+              <Link href="/help">
+                <span className="text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+                  {isRTL ? "المساعدة" : "Help"}
+                </span>
+              </Link>
+              <span className="text-muted-foreground/40 text-xs">·</span>
+              <Link href="/privacy">
+                <span className="text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+                  {isRTL ? "سياسة الخصوصية" : "Privacy"}
+                </span>
+              </Link>
+              <span className="text-muted-foreground/40 text-xs">·</span>
+              <Link href="/terms">
+                <span className="text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+                  {isRTL ? "الشروط" : "Terms"}
+                </span>
+              </Link>
+            </div>
             <p className="text-xs text-muted-foreground">
               {t.auth.copyright}
             </p>
