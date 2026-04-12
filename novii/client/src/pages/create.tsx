@@ -102,7 +102,7 @@ function useLiveCamera(active: boolean) {
     return stopCamera;
   }, [active]);
 
-  return { videoRef, hasCamera, ready, flipCamera, capturePhoto };
+  return { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto };
 }
 
 /* ─────────────────────────────────────────
@@ -134,7 +134,7 @@ export default function CreatePage() {
   const galleryRef = useRef<HTMLInputElement>(null);
 
   // Camera only active on 'camera' step
-  const { videoRef, hasCamera, ready, flipCamera, capturePhoto } = useLiveCamera(step === 'camera');
+  const { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto } = useLiveCamera(step === 'camera');
 
   const accept =
     tab === 'reel'  ? 'video/*' :
@@ -447,6 +447,7 @@ export default function CreatePage() {
             "absolute inset-0 w-full h-full object-cover transition-opacity duration-300",
             ready ? "opacity-100" : "opacity-0"
           )}
+          style={{ transform: facing === 'user' ? 'scaleX(-1)' : 'none' }}
         />
 
         {/* No camera fallback */}
