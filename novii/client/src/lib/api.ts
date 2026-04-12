@@ -1,5 +1,10 @@
 import { supabase } from './supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function assertUUID(value: string, label = 'ID'): void {
+  if (!UUID_RE.test(value)) throw new Error(`Invalid ${label}`);
+}
 import { getFromCache, saveToCache, invalidateCache, getOrFetch, CACHE_DURATIONS } from './cache-utils';
 import {
   PROFILE_COLUMNS,
@@ -300,11 +305,15 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    // الـ trigger في قاعدة البيانات يحدث verified_at تلقائياً
-    // فقط مرر التحديثات كما هي
+    const ALLOWED_FIELDS = ['username', 'full_name', 'bio', 'website', 'location', 'avatar_url', 'cover_url', 'is_private', 'gender'] as const;
+    const safeUpdates: Record<string, any> = {};
+    for (const key of ALLOWED_FIELDS) {
+      if (key in updates) safeUpdates[key] = (updates as any)[key];
+    }
+
     const { data, error } = await supabase
       .from('profiles')
-      .update(updates)
+      .update(safeUpdates)
       .eq('id', user.id)
       .select()
       .single();
@@ -1461,7 +1470,6 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    // Get all messages where current user is involved
     const { data, error } = await supabase
       .from('messages')
       .select(`
@@ -1470,7 +1478,8 @@ export const api = {
         receiver:profiles!messages_receiver_id_fkey(*)
       `)
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (error) throw error;
 
@@ -1520,6 +1529,7 @@ export const api = {
     // This includes:
     // 1. Messages sent by current user TO userId
     // 2. Messages sent by userId TO current user
+    assertUUID(userId, 'userId');
     const { data, error } = await supabase
       .from('messages')
       .select(`
@@ -1872,6 +1882,7 @@ export const api = {
 
   // Followers and Following
   async getFollowers(userId: string): Promise<Profile[]> {
+    assertUUID(userId, 'userId');
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     
     const { data, error } = await supabase
@@ -1880,7 +1891,8 @@ export const api = {
         follower:profiles!follows_follower_id_fkey(*)
       `)
       .eq('following_id', userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (error) throw error;
     
@@ -1916,6 +1928,7 @@ export const api = {
   },
 
   async getFollowing(userId: string): Promise<Profile[]> {
+    assertUUID(userId, 'userId');
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     
     const { data, error } = await supabase
@@ -1924,7 +1937,8 @@ export const api = {
         following:profiles!follows_following_id_fkey(*)
       `)
       .eq('follower_id', userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (error) throw error;
     

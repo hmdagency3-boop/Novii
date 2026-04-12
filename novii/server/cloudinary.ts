@@ -48,7 +48,9 @@ export async function handleUpload(req: Request, res: Response) {
       return res.status(400).json({ error: "No file provided" });
     }
 
-    const folder = (req.body.folder as string) || "misc";
+    const ALLOWED_FOLDERS = ['avatars', 'posts', 'stories', 'reels', 'messages', 'covers', 'audio', 'misc', 'communities'];
+    const rawFolder = (req.body.folder as string) || "misc";
+    const folder = ALLOWED_FOLDERS.includes(rawFolder) ? rawFolder : "misc";
     const isVideo = req.file.mimetype.startsWith("video/");
     const isAudio = req.file.mimetype.startsWith("audio/") || folder === "audio";
     // Use "raw" for audio (bypasses Cloudinary format validation); "video" for video; "image" otherwise

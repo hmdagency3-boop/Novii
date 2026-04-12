@@ -74,9 +74,10 @@ export default function UserProfile() {
   
   // Get userId from URL query params - use window.location.search instead
   const searchParams = new URLSearchParams(window.location.search);
-  const userId = searchParams.get('id');
+  const rawId = searchParams.get('id');
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const userId = rawId && UUID_RE.test(rawId) ? rawId : null;
   
-  // Redirect to own profile only if no userId
   if (!userId) {
     setLocation('/profile');
     return null;

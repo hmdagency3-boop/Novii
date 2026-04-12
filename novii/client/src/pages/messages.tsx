@@ -882,8 +882,9 @@ export default function Messages() {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const targetUserId = searchParams.get('user');
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     
-    if (targetUserId) {
+    if (targetUserId && UUID_RE.test(targetUserId)) {
       setSelectedUserId(targetUserId);
     }
   }, [location]);

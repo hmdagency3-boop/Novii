@@ -99,6 +99,25 @@ function rateLimitUpload(req: Request, res: Response, next: Function) {
   return next();
 }
 
+const searchRateLimit = new Map<string, { count: number; resetAt: number }>();
+function rateLimitSearch(req: Request, res: Response, next: Function) {
+  const ip = req.ip || 'unknown';
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxRequests = 30;
+
+  const entry = searchRateLimit.get(ip);
+  if (!entry || now > entry.resetAt) {
+    searchRateLimit.set(ip, { count: 1, resetAt: now + windowMs });
+    return next();
+  }
+  if (entry.count >= maxRequests) {
+    return res.status(429).json({ error: 'Too many requests. Try again later.' });
+  }
+  entry.count++;
+  return next();
+}
+
 const ALLOWED_MIMETYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm', 'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/webm', 'audio/ogg'];
 
 function validateUploadFile(req: Request, res: Response, next: Function) {
@@ -353,7 +372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (error) throw error;
 
-      const mapped = (data || []).map((d: any) => ({
+      const mapped = ((data || []).slice(0, 50)).map((d: any) => ({
         id: d.id,
         user_id: d.user_id,
         ip_address: d.ip_address,
@@ -464,7 +483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Search GIFs via Tenor API
-  app.get("/api/gifs/search", async (req: Request, res: Response) => {
+  app.get("/api/gifs/search", rateLimitSearch as any, async (req: Request, res: Response) => {
     try {
       const { q } = req.query;
       const query = (q as string || '').trim();
@@ -495,7 +514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Deezer music search proxy (avoid CORS issues)
-  app.get("/api/music/search", async (req: Request, res: Response) => {
+  app.get("/api/music/search", rateLimitSearch as any, async (req: Request, res: Response) => {
     try {
       const { q } = req.query;
       if (!q || !(q as string).trim()) return res.json([]);
@@ -524,7 +543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Advanced recommendation algorithm for suggesting users (Instagram-like)
-  app.get("/api/suggestions/recommended", async (req: Request, res: Response) => {
+  app.get("/api/suggestions/recommended", rateLimitSearch as any, async (req: Request, res: Response) => {
     try {
       const { limit = 50 } = req.query;
       const userId = req.userId || req.headers['x-user-id'] as string;
@@ -1316,10 +1335,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
-      const { targetUserId, durationMinutes, reason } = req.body;
+      const { targetUserId, durationMinutes: rawDuration, reason } = req.body;
+      const durationMinutes = Number(rawDuration);
 
-      if (!userId || !communityId || !targetUserId || !durationMinutes) {
-        return res.status(400).json({ error: 'Missing required fields' });
+      if (!userId || !communityId || !targetUserId || !durationMinutes || isNaN(durationMinutes) || durationMinutes < 1 || durationMinutes > 43200) {
+        return res.status(400).json({ error: 'Missing or invalid required fields' });
       }
 
       // Check if user is admin or owner
