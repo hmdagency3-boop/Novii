@@ -28,7 +28,7 @@ import { AvatarUploader } from "@/components/avatar-uploader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useUserStatistics, useUserDevices, useRemoveDevice } from "@/hooks/use-data";
 import type { UserDevice } from "@/lib/api";
-import { getUserSettings, saveUserSettings, changePassword, blockedUsers, closeFriends, mutedUsers, restrictedUsers, favoriteUsers, type UserSettings, type StoredUser } from "@/lib/settings-storage";
+import { fetchUserSettings, saveUserSettingsToDb, DEFAULT_SETTINGS, changePassword, blockedUsers, closeFriends, mutedUsers, restrictedUsers, favoriteUsers, type UserSettings, type StoredUser } from "@/lib/settings-storage";
 
 // Type definition for menu items
 type MenuItem = {
@@ -342,33 +342,48 @@ export default function SettingsPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isPrivate, setIsPrivate] = useState(false);
 
-  // Settings from localStorage
-  const [settings, setSettings] = useState<UserSettings>(() => 
-    user ? getUserSettings(user.id) : getUserSettings('anon')
-  );
+  const [settings, setSettings] = useState<UserSettings>({ ...DEFAULT_SETTINGS });
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
-  // Password state
   const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
   const [changingPassword, setChangingPassword] = useState(false);
 
-  // Hidden words input
   const [newHiddenWord, setNewHiddenWord] = useState('');
+
+  const [blockedList, setBlockedList] = useState<StoredUser[]>([]);
+  const [friendsList, setFriendsList] = useState<StoredUser[]>([]);
+  const [mutedList, setMutedList] = useState<StoredUser[]>([]);
+  const [restrictedList, setRestrictedList] = useState<StoredUser[]>([]);
+  const [favsList, setFavsList] = useState<StoredUser[]>([]);
+
+  const saveSettingsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const persistSettings = (updated: UserSettings) => {
+    if (!user) return;
+    if (saveSettingsDebounceRef.current) clearTimeout(saveSettingsDebounceRef.current);
+    saveSettingsDebounceRef.current = setTimeout(() => {
+      saveUserSettingsToDb(user.id, updated).catch(err => {
+        console.error('Failed to persist settings:', err);
+        toast.error(direction === 'rtl' ? 'خطأ في حفظ الإعدادات' : 'Failed to save settings');
+      });
+    }, 500);
+  };
 
   const updateSettings = (partial: Partial<UserSettings>) => {
     if (!user) return;
     const updated = { ...settings, ...partial };
     setSettings(updated);
-    saveUserSettings(user.id, updated);
+    persistSettings(updated);
   };
 
   const updateNestedSettings = <K extends keyof UserSettings>(
-    key: K, 
+    key: K,
     partial: Partial<UserSettings[K]>
   ) => {
     if (!user) return;
     const updated = { ...settings, [key]: { ...(settings[key] as any), ...partial } };
     setSettings(updated);
-    saveUserSettings(user.id, updated);
+    persistSettings(updated);
   };
 
   // PWA Installation state
@@ -419,12 +434,45 @@ export default function SettingsPage() {
     }
   }, [profile]);
 
-  // Load settings from localStorage when user changes
   useEffect(() => {
-    if (user?.id) {
-      setSettings(getUserSettings(user.id));
-    }
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [s, b, f, m, r, fv] = await Promise.all([
+          fetchUserSettings(user.id),
+          blockedUsers.get(user.id),
+          closeFriends.get(user.id),
+          mutedUsers.get(user.id),
+          restrictedUsers.get(user.id),
+          favoriteUsers.get(user.id),
+        ]);
+        if (cancelled) return;
+        setSettings(s);
+        setBlockedList(b);
+        setFriendsList(f);
+        setMutedList(m);
+        setRestrictedList(r);
+        setFavsList(fv);
+        setSettingsLoaded(true);
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+        setSettingsLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [user?.id]);
+
+  useEffect(() => {
+    return () => {
+      if (saveSettingsDebounceRef.current) {
+        clearTimeout(saveSettingsDebounceRef.current);
+        if (user?.id) {
+          saveUserSettingsToDb(user.id, settings).catch(() => {});
+        }
+      }
+    };
+  }, []);
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
@@ -487,6 +535,15 @@ export default function SettingsPage() {
   const Chevron = direction === 'rtl' ? ChevronLeft : ChevronRight;
 
   const renderContent = () => {
+    const needsSettings = ["notifications", "messages_replies", "comments", "hide_story", "tags", "sharing", "blocked", "close_friends", "restricted", "hidden_words", "favorites", "muted", "content_pref", "like_counts", "archiving", "accessibility", "account_type"];
+    if (needsSettings.includes(activeTab || '') && !settingsLoaded) {
+      return (
+        <div className="flex items-center justify-center py-20">
+          <Spinner className="w-8 h-8" />
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case "edit_profile":
         if (profileLoading) {
@@ -681,19 +738,18 @@ export default function SettingsPage() {
         );
 
       case "blocked": {
-        const blocked = user ? blockedUsers.get(user.id) : [];
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'المستخدمون المحظورون' : 'Blocked Users'}</h2>
-            {blocked.length > 0 ? (
+            {blockedList.length > 0 ? (
               <div className="space-y-3">
-                {blocked.map(u => (
+                {blockedList.map(u => (
                   <div key={u.id} className="border border-border rounded-xl p-4 bg-card flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <div><p className="font-bold text-sm">{u.username}</p>{u.full_name && <p className="text-xs text-muted-foreground">{u.full_name}</p>}</div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => { blockedUsers.remove(user!.id, u.id); setSettings({...settings}); toast.success(direction === 'rtl' ? 'تم إلغاء الحظر' : 'Unblocked'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { await blockedUsers.remove(user!.id, u.id); setBlockedList(prev => prev.filter(x => x.id !== u.id)); toast.success(direction === 'rtl' ? 'تم إلغاء الحظر' : 'Unblocked'); }}>
                       {direction === 'rtl' ? 'إلغاء الحظر' : 'Unblock'}
                     </Button>
                   </div>
@@ -711,20 +767,19 @@ export default function SettingsPage() {
       }
 
       case "close_friends": {
-        const friends = user ? closeFriends.get(user.id) : [];
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'الأصدقاء المقربون' : 'Close Friends'}</h2>
             <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'الأصدقاء المقربون يمكنهم رؤية قصصك الخاصة ومحتوى حصري' : 'Close friends can see your private stories and exclusive content'}</p>
-            {friends.length > 0 ? (
+            {friendsList.length > 0 ? (
               <div className="space-y-3">
-                {friends.map(u => (
+                {friendsList.map(u => (
                   <div key={u.id} className="border border-border rounded-xl p-4 bg-card flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <div><p className="font-bold text-sm">{u.username}</p>{u.full_name && <p className="text-xs text-muted-foreground">{u.full_name}</p>}</div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => { closeFriends.remove(user!.id, u.id); setSettings({...settings}); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { await closeFriends.remove(user!.id, u.id); setFriendsList(prev => prev.filter(x => x.id !== u.id)); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
                       {direction === 'rtl' ? 'إزالة' : 'Remove'}
                     </Button>
                   </div>
@@ -797,20 +852,19 @@ export default function SettingsPage() {
         );
 
       case "restricted": {
-        const restricted = user ? restrictedUsers.get(user.id) : [];
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'الحسابات المقيّدة' : 'Restricted Accounts'}</h2>
             <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'الحسابات المقيدة لن تعرف أنك قيّدتها. تعليقاتهم تكون مرئية لهم فقط.' : 'Restricted accounts won\'t know they\'re restricted. Their comments are only visible to them.'}</p>
-            {restricted.length > 0 ? (
+            {restrictedList.length > 0 ? (
               <div className="space-y-3">
-                {restricted.map(u => (
+                {restrictedList.map(u => (
                   <div key={u.id} className="border border-border rounded-xl p-4 bg-card flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <p className="font-bold text-sm">{u.username}</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => { restrictedUsers.remove(user!.id, u.id); setSettings({...settings}); toast.success(direction === 'rtl' ? 'تم إلغاء التقييد' : 'Unrestricted'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { await restrictedUsers.remove(user!.id, u.id); setRestrictedList(prev => prev.filter(x => x.id !== u.id)); toast.success(direction === 'rtl' ? 'تم إلغاء التقييد' : 'Unrestricted'); }}>
                       {direction === 'rtl' ? 'إلغاء التقييد' : 'Unrestrict'}
                     </Button>
                   </div>
@@ -857,20 +911,19 @@ export default function SettingsPage() {
         );
 
       case "favorites": {
-        const favs = user ? favoriteUsers.get(user.id) : [];
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'المفضّلون' : 'Favorites'}</h2>
             <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'المفضلون يظهرون أولاً في الفيد الخاص بك' : 'Favorites appear first in your feed'}</p>
-            {favs.length > 0 ? (
+            {favsList.length > 0 ? (
               <div className="space-y-3">
-                {favs.map(u => (
+                {favsList.map(u => (
                   <div key={u.id} className="border border-border rounded-xl p-4 bg-card flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <p className="font-bold text-sm">{u.username}</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => { favoriteUsers.remove(user!.id, u.id); setSettings({...settings}); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { await favoriteUsers.remove(user!.id, u.id); setFavsList(prev => prev.filter(x => x.id !== u.id)); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
                       {direction === 'rtl' ? 'إزالة' : 'Remove'}
                     </Button>
                   </div>
@@ -887,20 +940,19 @@ export default function SettingsPage() {
       }
 
       case "muted": {
-        const muted = user ? mutedUsers.get(user.id) : [];
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'الحسابات المكتومة' : 'Muted Accounts'}</h2>
             <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'لن ترى منشوراتهم في الفيد لكنك تبقى متابعاً لهم' : 'You won\'t see their posts in your feed but you\'ll still follow them'}</p>
-            {muted.length > 0 ? (
+            {mutedList.length > 0 ? (
               <div className="space-y-3">
-                {muted.map(u => (
+                {mutedList.map(u => (
                   <div key={u.id} className="border border-border rounded-xl p-4 bg-card flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <p className="font-bold text-sm">{u.username}</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => { mutedUsers.remove(user!.id, u.id); setSettings({...settings}); toast.success(direction === 'rtl' ? 'تم إلغاء الكتم' : 'Unmuted'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { await mutedUsers.remove(user!.id, u.id); setMutedList(prev => prev.filter(x => x.id !== u.id)); toast.success(direction === 'rtl' ? 'تم إلغاء الكتم' : 'Unmuted'); }}>
                       {direction === 'rtl' ? 'إلغاء الكتم' : 'Unmute'}
                     </Button>
                   </div>

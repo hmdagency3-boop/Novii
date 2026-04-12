@@ -9,11 +9,13 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 Arabic social media platform (React + Vite frontend, Express backend) using Supabase for data/auth and Cloudinary for media.
 
 ### Settings System
-- **Settings storage**: `novii/client/src/lib/settings-storage.ts` — localStorage-based per-user settings with typed UserSettings interface
-- All toggle/preference settings auto-save to localStorage
-- List-based features (blocked, muted, close friends, restricted, favorites) use localStorage with StoredUser entries
+- **Settings storage**: `novii/client/src/lib/settings-storage.ts` — Supabase-backed per-user settings
+- All toggle/preference settings persist to `user_settings` table via debounced upsert (500ms)
+- List-based features (blocked, muted, close friends, restricted, favorites) stored in dedicated Supabase tables with RLS
+- Tables: `user_settings`, `blocked_users`, `close_friends`, `muted_users`, `restricted_users`, `favorite_users`
 - Password change uses `supabase.auth.updateUser()`
 - Privacy toggle (is_private) saves to Supabase profiles table
+- Migration SQL in `novii/supabase-migration.sql` (also includes conversations, highlights tables)
 
 ### Follow System
 - Follow requests stored in `follow_requests` table (requester_id, recipient_id, status)
