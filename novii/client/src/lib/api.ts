@@ -1617,11 +1617,12 @@ export const api = {
       .from('notifications')
       .select(`
         *,
-        actor:profiles!notifications_actor_id_fkey(*)
+        actor:profiles!notifications_actor_id_fkey(*),
+        post:posts!notifications_post_id_fkey(id, image_url, content)
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(80);
 
     if (error) throw error;
     return data || [];
