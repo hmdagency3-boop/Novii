@@ -1555,140 +1555,92 @@ export default function Messages() {
                       key={conv.user?.id}
                       onClick={() => setSelectedUserId(conv.user?.id)}
                       className={cn(
-                        // Base container
-                        "flex items-center gap-4 px-4 py-3.5 cursor-pointer text-left relative group",
-                        "transition-all duration-300 ease-out",
-                        "mx-2 mb-2 rounded-2xl",
-                        "border border-transparent",
-                        
-                        // Verified accounts - blue premium style
-                        isVerified && !isOfficial && cn(
-                          "bg-gradient-to-r from-blue-500/8 via-blue-500/4 to-transparent",
-                          "hover:from-blue-500/15 hover:via-blue-500/8 hover:shadow-lg hover:shadow-blue-500/10",
-                          "hover:border-blue-500/20",
-                          isSelected && "from-blue-500/20 via-blue-500/10 border-blue-500/40 shadow-xl shadow-blue-500/15"
-                        ),
-                        
-                        // Official accounts - gold/amber premium style
-                        isOfficial && cn(
-                          "bg-gradient-to-r from-amber-500/8 via-amber-500/4 to-transparent",
-                          "hover:from-amber-500/15 hover:via-amber-500/8 hover:shadow-lg hover:shadow-amber-500/10",
-                          "hover:border-amber-500/20",
-                          isSelected && "from-amber-500/20 via-amber-500/10 border-amber-500/40 shadow-xl shadow-amber-500/15"
-                        ),
-                        
-                        // Regular accounts
-                        !isVerified && !isOfficial && cn(
-                          "bg-gradient-to-r from-secondary/40 to-transparent",
-                          "hover:from-secondary/60 hover:shadow-md hover:border-border/50",
-                          isSelected && "from-primary/15 border-primary/40 shadow-lg shadow-primary/10"
-                        ),
-                        
-                        // Unread indicator for regular accounts
-                        hasUnread && !isVerified && !isOfficial && "from-primary/10"
+                        "flex items-center gap-3 px-4 py-3 cursor-pointer text-left relative group w-full",
+                        "transition-all duration-200",
+                        "border-b border-border/30 last:border-0",
+                        isSelected
+                          ? "bg-primary/10"
+                          : "hover:bg-accent/50"
                       )}
                     >
                       {/* Avatar Section */}
                       <div className="relative flex-shrink-0">
                         <Avatar className={cn(
-                          "w-14 h-14 transition-all duration-300",
-                          "border-2",
-                          isVerified && !isOfficial && "ring-2 ring-blue-500/20 border-blue-500/30 group-hover:ring-blue-500/40 group-hover:border-blue-500/50",
-                          isOfficial && "ring-2 ring-amber-500/20 border-amber-500/30 group-hover:ring-amber-500/40 group-hover:border-amber-500/50",
-                          !isVerified && !isOfficial && "ring-2 ring-primary/10 border-primary/20 group-hover:ring-primary/30",
-                          isSelected && "scale-105"
+                          "w-12 h-12 border-2",
+                          isVerified && !isOfficial && "border-blue-500/40",
+                          isOfficial && "border-amber-500/40",
+                          !isVerified && !isOfficial && "border-border"
                         )}>
                           <AvatarImage src={conv.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${conv.user?.username}`} />
                           <AvatarFallback className={cn(
                             "text-white font-bold text-sm",
-                            isVerified && !isOfficial && "bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-600",
-                            isOfficial && "bg-gradient-to-br from-amber-500 via-yellow-600 to-orange-600",
+                            isVerified && !isOfficial && "bg-gradient-to-br from-blue-500 to-cyan-600",
+                            isOfficial && "bg-gradient-to-br from-amber-500 to-orange-600",
                             !isVerified && !isOfficial && "bg-gradient-to-br from-primary to-primary/70"
                           )}>
                             {conv.user?.username?.[0]?.toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         
-                        {/* Online Status Indicator — only shown if user is actually online */}
+                        {/* Online Status */}
                         {isOnline && (
-                          <div className={cn(
-                            "absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-background",
-                            isVerified && !isOfficial && "bg-blue-500",
-                            isOfficial && "bg-amber-500",
-                            !isVerified && !isOfficial && "bg-green-500"
-                          )} />
-                        )}
-                        
-                        {/* Unread Badge */}
-                        {hasUnread && (
-                          <div className={cn(
-                            "absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center",
-                            "font-bold text-xs text-white",
-                            "shadow-lg backdrop-blur-sm",
-                            "animate-in scale-in duration-300",
-                            isVerified && !isOfficial && "bg-gradient-to-br from-blue-500 to-blue-600 ring-2 ring-background",
-                            isOfficial && "bg-gradient-to-br from-amber-500 to-amber-600 ring-2 ring-background",
-                            !isVerified && !isOfficial && "bg-gradient-to-br from-primary to-primary/90 ring-2 ring-background"
-                          )}>
-                            {conv.unreadCount > 9 ? '9+' : conv.unreadCount}
-                          </div>
+                          <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-background" />
                         )}
                       </div>
                       
                       {/* Content Section */}
-                      <div className="flex flex-col flex-1 min-w-0 gap-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <VerifiedUsername 
-                              username={conv.user?.full_name || conv.user?.username}
-                              isVerified={isVerified}
-                              className={cn(
-                                "text-sm truncate transition-all duration-200",
-                                hasUnread || isSelected ? "font-bold text-foreground" : "font-semibold text-foreground/80 group-hover:text-foreground"
-                              )}
-                            />
-                            <div className="flex items-center gap-0.5 flex-shrink-0">
-                              {isVerified && (
-                                <VerifiedBadge size="sm" />
-                              )}
-                              {isOfficial && (
-                                <OfficialBadge size="sm" />
-                              )}
-                              {conv.user?.is_creator && (
-                                <CreatorBadge size="sm" />
-                              )}
-                              {conv.user?.is_premium && (
-                                <PremiumBadge size="sm" />
-                              )}
-                              {conv.user?.is_popular && (
-                                <PopularBadge size="sm" />
-                              )}
-                              {conv.user?.is_active && (
-                                <ActiveBadge size="sm" />
-                              )}
-                            </div>
+                      <div className="flex flex-col flex-1 min-w-0 gap-0.5">
+                        {/* Name + Time row */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span className={cn(
+                              "text-sm truncate",
+                              hasUnread || isSelected ? "font-bold text-foreground" : "font-medium text-foreground/90"
+                            )}>
+                              {conv.user?.full_name || conv.user?.username}
+                            </span>
+                            {isVerified && <VerifiedBadge size="sm" />}
+                            {isOfficial && <OfficialBadge size="sm" />}
                           </div>
-                          <span className={cn(
-                            "text-xs flex-shrink-0 whitespace-nowrap transition-all duration-200",
-                            "px-2 py-1 rounded-lg backdrop-blur-sm",
-                            hasUnread ? "font-semibold" : "text-muted-foreground",
-                            isVerified && !isOfficial && "text-blue-600 bg-blue-500/10",
-                            isOfficial && "text-amber-600 bg-amber-500/10",
-                            !isVerified && !isOfficial && "text-muted-foreground bg-secondary/30"
-                          )}>
-                            {new Date(conv.lastMessage?.created_at).toLocaleDateString(isRTL ? 'ar' : 'en', { month: 'short', day: 'numeric' })}
+                          <span className="text-[11px] text-muted-foreground flex-shrink-0">
+                            {conv.lastMessage?.created_at
+                              ? new Date(conv.lastMessage.created_at).toLocaleDateString(isRTL ? 'ar' : 'en', { month: 'short', day: 'numeric' })
+                              : ''}
                           </span>
                         </div>
                         
-                        {/* Message Preview */}
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "text-xs truncate flex-1 leading-relaxed transition-all duration-200",
-                            "line-clamp-1",
-                            hasUnread ? "font-medium text-foreground" : "text-muted-foreground group-hover:text-muted-foreground/90"
-                          )}>
-                            {conv.lastMessage?.content?.substring(0, 45)}
-                          </span>
+                        {/* Message preview + unread badge row */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1 min-w-0 flex-1">
+                            {mutedConvIds.has(conv.user?.id) && (
+                              <span className="text-[11px] text-muted-foreground flex-shrink-0">🔇</span>
+                            )}
+                            {conv.lastMessage?.sender_id === currentUser?.id && (
+                              <span className={cn("text-[11px] flex-shrink-0", conv.lastMessage?.is_read ? "text-primary" : "text-muted-foreground")}>
+                                {conv.lastMessage?.is_read ? "✓✓" : "✓"}
+                              </span>
+                            )}
+                            <span className={cn(
+                              "text-xs truncate leading-snug",
+                              hasUnread ? "font-medium text-foreground" : "text-muted-foreground"
+                            )}>
+                              {conv.lastMessage?.image_url?.startsWith('[voice]')
+                                ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message")
+                                : conv.lastMessage?.image_url
+                                ? (isRTL ? "📷 صورة" : "📷 Image")
+                                : (conv.lastMessage?.content?.substring(0, 40) || (isRTL ? "ابدأ محادثة..." : "Start chatting..."))}
+                            </span>
+                          </div>
+                          {/* Unread count badge */}
+                          {hasUnread && (
+                            <div className={cn(
+                              "flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center",
+                              "text-[11px] font-bold text-white",
+                              isVerified && !isOfficial ? "bg-blue-500" : isOfficial ? "bg-amber-500" : "bg-primary"
+                            )}>
+                              {conv.unreadCount > 99 ? '99+' : conv.unreadCount}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </button>
