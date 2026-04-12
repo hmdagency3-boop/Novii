@@ -680,7 +680,7 @@ export default function SettingsPage() {
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <div><p className="font-bold text-sm">{u.username}</p>{u.full_name && <p className="text-xs text-muted-foreground">{u.full_name}</p>}</div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={async () => { await unblockUser(u.id); toast.success(direction === 'rtl' ? 'تم إلغاء الحظر' : 'Unblocked'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { try { await unblockUser(u.id); toast.success(direction === 'rtl' ? 'تم إلغاء الحظر' : 'Unblocked'); } catch { toast.error(direction === 'rtl' ? 'خطأ في إلغاء الحظر' : 'Failed to unblock'); } }}>
                       {direction === 'rtl' ? 'إلغاء الحظر' : 'Unblock'}
                     </Button>
                   </div>
@@ -710,7 +710,7 @@ export default function SettingsPage() {
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <div><p className="font-bold text-sm">{u.username}</p>{u.full_name && <p className="text-xs text-muted-foreground">{u.full_name}</p>}</div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={async () => { await removeCloseFriend(u.id); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { try { await removeCloseFriend(u.id); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); } catch { toast.error(direction === 'rtl' ? 'خطأ في الإزالة' : 'Failed to remove'); } }}>
                       {direction === 'rtl' ? 'إزالة' : 'Remove'}
                     </Button>
                   </div>
@@ -795,7 +795,7 @@ export default function SettingsPage() {
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <p className="font-bold text-sm">{u.username}</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={async () => { await unrestrictUser(u.id); toast.success(direction === 'rtl' ? 'تم إلغاء التقييد' : 'Unrestricted'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { try { await unrestrictUser(u.id); toast.success(direction === 'rtl' ? 'تم إلغاء التقييد' : 'Unrestricted'); } catch { toast.error(direction === 'rtl' ? 'خطأ في إلغاء التقييد' : 'Failed to unrestrict'); } }}>
                       {direction === 'rtl' ? 'إلغاء التقييد' : 'Unrestrict'}
                     </Button>
                   </div>
@@ -854,7 +854,7 @@ export default function SettingsPage() {
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <p className="font-bold text-sm">{u.username}</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={async () => { await removeFavorite(u.id); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { try { await removeFavorite(u.id); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); } catch { toast.error(direction === 'rtl' ? 'خطأ في الإزالة' : 'Failed to remove'); } }}>
                       {direction === 'rtl' ? 'إزالة' : 'Remove'}
                     </Button>
                   </div>
@@ -883,7 +883,7 @@ export default function SettingsPage() {
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <p className="font-bold text-sm">{u.username}</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={async () => { await unmuteUser(u.id); toast.success(direction === 'rtl' ? 'تم إلغاء الكتم' : 'Unmuted'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { try { await unmuteUser(u.id); toast.success(direction === 'rtl' ? 'تم إلغاء الكتم' : 'Unmuted'); } catch { toast.error(direction === 'rtl' ? 'خطأ في إلغاء الكتم' : 'Failed to unmute'); } }}>
                       {direction === 'rtl' ? 'إلغاء الكتم' : 'Unmute'}
                     </Button>
                   </div>

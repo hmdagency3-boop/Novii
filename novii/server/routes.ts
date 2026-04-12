@@ -353,24 +353,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (error) throw error;
 
-      // Map to camelCase
       const mapped = (data || []).map((d: any) => ({
         id: d.id,
-        userId: d.user_id,
-        ipAddress: d.ip_address,
+        user_id: d.user_id,
+        ip_address: d.ip_address,
         browser: d.browser,
-        browserVersion: d.browser_version,
-        deviceType: d.device_type,
-        deviceName: d.device_name,
-        deviceModel: d.device_model,
-        osName: d.os_name,
-        osVersion: d.os_version,
+        browser_version: d.browser_version,
+        device_type: d.device_type,
+        device_name: d.device_name,
+        device_model: d.device_model,
+        os_name: d.os_name,
+        os_version: d.os_version,
         country: d.country,
-        countryCode: d.country_code,
+        country_code: d.country_code,
         city: d.city,
-        lastActiveAt: d.last_active_at,
-        createdAt: d.created_at,
-        updatedAt: d.updated_at,
+        last_active_at: d.last_active_at,
+        created_at: d.created_at,
+        updated_at: d.updated_at,
       }));
       
       res.json(mapped);

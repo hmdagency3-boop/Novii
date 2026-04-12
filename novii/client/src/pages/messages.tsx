@@ -93,6 +93,7 @@ export default function Messages() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const chatChannelRef = useRef<any>(null);
   const isRTL = direction === "rtl";
   const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
   const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
@@ -996,9 +997,10 @@ export default function Messages() {
     const userIds = [currentUser.id, selectedUserId].sort();
     const channelName = `chat-${userIds[0]}-${userIds[1]}`;
 
-    const channel = supabase
-      .channel(channelName)
-      // Listen for new messages
+    const channel = supabase.channel(channelName);
+    chatChannelRef.current = channel;
+
+    channel
       .on(
         'postgres_changes',
         {
@@ -1086,6 +1088,7 @@ export default function Messages() {
         clearTimeout(typingTimeoutRef.current);
       }
       supabase.removeChannel(channel);
+      chatChannelRef.current = null;
     };
   }, [currentUser, selectedUserId, queryClient]);
 
@@ -1153,14 +1156,10 @@ export default function Messages() {
     }
   };
 
-  // Send typing indicator to other user
   const sendTypingEvent = (typing: boolean) => {
-    if (!currentUser || !selectedUserId) return;
+    if (!currentUser || !selectedUserId || !chatChannelRef.current) return;
     
-    const userIds = [currentUser.id, selectedUserId].sort();
-    const channelName = `chat-${userIds[0]}-${userIds[1]}`;
-    
-    supabase.channel(channelName).send({
+    chatChannelRef.current.send({
       type: 'broadcast',
       event: 'typing',
       payload: { userId: currentUser.id, isTyping: typing }

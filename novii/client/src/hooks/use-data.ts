@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { Profile, Post, Story, Message, Notification, Comment, Reel, UserDevice } from '@/lib/api';
 import { useToast } from './use-toast';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 // Profile hooks
@@ -278,19 +278,19 @@ export function useComments(postId: string) {
 export function useTypingIndicator(postId: string, userId: string) {
   const [typingUsers, setTypingUsers] = useState<Record<string, { username: string; avatar_url?: string; timestamp: number }>>({});
 
+  const channelRef = useRef<any>(null);
+
   useEffect(() => {
     if (!postId || !userId) return;
 
-    console.log('🎹 Setting up typing indicator subscription for post:', postId);
-
     const channel = supabase.channel(`typing:${postId}`);
+    channelRef.current = channel;
 
-    // Subscribe to typing events
     channel.on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState() as Record<string, Array<any>>;
       const typing: Record<string, { username: string; avatar_url?: string; timestamp: number }> = {};
       
-      Object.entries(state).forEach(([key, users]) => {
+      Object.entries(state).forEach(([, users]) => {
         users.forEach((user: any) => {
           if (user.typing && user.user_id !== userId) {
             typing[user.user_id] = {
@@ -303,21 +303,16 @@ export function useTypingIndicator(postId: string, userId: string) {
       });
 
       setTypingUsers(typing);
-    }).subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log('✅ Typing indicator subscribed');
-      }
-    });
+    }).subscribe();
 
     return () => {
-      console.log('🔌 Cleaning up typing indicator for post:', postId);
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
+      channelRef.current = null;
     };
   }, [postId, userId]);
 
-  const channelRef = { current: supabase.channel(`typing:${postId}`) };
-
   const startTyping = async () => {
+    if (!channelRef.current) return;
     const { data: currentProfile } = await supabase
       .from('profiles')
       .select('username, avatar_url')
@@ -334,6 +329,7 @@ export function useTypingIndicator(postId: string, userId: string) {
   };
 
   const stopTyping = () => {
+    if (!channelRef.current) return;
     channelRef.current.track({
       user_id: userId,
       typing: false,
