@@ -4,13 +4,14 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StoryViewerModal } from "@/components/story-viewer-modal";
 import { useQuery } from "@tanstack/react-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -23,7 +24,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MoreVertical, Pencil, Trash2, Check, X, CheckCheck, Download, Smile } from "lucide-react";
+import {
+  MoreVertical, Pencil, Trash2, Check, X, CheckCheck, Download,
+  Smile, Copy, Reply, Forward, Volume2, Mic
+} from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { api, type Message, type Profile } from "@/lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -37,9 +41,21 @@ interface MessageBubbleProps {
   otherUser?: Profile;
   currentUserId?: string;
   onStoryClick?: (storyId: string) => void;
+  onReply?: (message: Message) => void;
+  onForward?: (message: Message) => void;
+  allUsers?: Profile[];
 }
 
-export function MessageBubble({ message, isMe, otherUser, currentUserId, onStoryClick }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  isMe,
+  otherUser,
+  currentUserId,
+  onStoryClick,
+  onReply,
+  onForward,
+  allUsers = [],
+}: MessageBubbleProps) {
   const { direction } = useLanguage();
   const isRTL = direction === "rtl";
   const [isEditing, setIsEditing] = useState(false);
@@ -48,14 +64,14 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
   const [showImageModal, setShowImageModal] = useState(false);
   const [showStoryViewer, setShowStoryViewer] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [showForwardDialog, setShowForwardDialog] = useState(false);
   const [reactions, setReactions] = useState<{ [key: string]: number }>({});
   const [userReaction, setUserReaction] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
-  const reactions_list = ['❤️', '😂', '😮', '😢', '👍'];
+  const reactions_list = ['❤️', '😂', '😮', '😢', '👍', '🔥', '😍', '👏'];
 
-  // Load reactions on mount
   useEffect(() => {
     const loadReactions = async () => {
       try {
@@ -74,14 +90,10 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
     try {
       await api.addMessageReaction(message.id, reaction);
       setUserReaction(reaction);
-      setReactions(prev => ({
-        ...prev,
-        [reaction]: (prev[reaction] || 0) + 1
-      }));
+      setReactions(prev => ({ ...prev, [reaction]: (prev[reaction] || 0) + 1 }));
       setShowReactionPicker(false);
       queryClient.invalidateQueries({ queryKey: ['messages'] });
     } catch (error) {
-      console.error('Error adding reaction:', error);
       toast.error('Failed to add reaction');
     }
   };
@@ -99,11 +111,9 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
       queryClient.invalidateQueries({ queryKey: ['messages'] });
     } catch (error) {
       console.error('Error removing reaction:', error);
-      toast.error('Failed to remove reaction');
     }
   };
 
-  // Fetch story by ID
   const { data: storyData } = useQuery({
     queryKey: ['story', message.story_id],
     queryFn: async () => {
@@ -119,7 +129,6 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
     enabled: !!message.story_id && showStoryViewer,
   });
 
-  // Focus input when entering edit mode
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
@@ -133,15 +142,14 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
     onSuccess: () => {
       toast.success(isRTL ? "تم تعديل الرسالة" : "Message edited");
       setIsEditing(false);
-      // Invalidate queries to refresh messages
       if (otherUser) {
         queryClient.invalidateQueries({ queryKey: ['messages', otherUser.id] });
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
       }
     },
     onError: (error: any) => {
-      toast.error(error.message || (isRTL ? "فشل تعديل الرسالة" : "Failed to edit message"));
-      setEditedContent(message.content); // Reset to original
+      toast.error(error.message || "Failed to edit message");
+      setEditedContent(message.content);
     },
   });
 
@@ -150,23 +158,32 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
     onSuccess: () => {
       toast.success(isRTL ? "تم حذف الرسالة" : "Message deleted");
       setShowDeleteDialog(false);
-      // Invalidate queries to refresh messages
       if (otherUser) {
         queryClient.invalidateQueries({ queryKey: ['messages', otherUser.id] });
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
       }
     },
     onError: (error: any) => {
-      toast.error(error.message || (isRTL ? "فشل حذف الرسالة" : "Failed to delete message"));
+      toast.error(error.message || "Failed to delete message");
+    },
+  });
+
+  const forwardMessageMutation = useMutation({
+    mutationFn: async (targetUserId: string) => {
+      await api.sendMessage(targetUserId, message.content, message.image_url || undefined);
+    },
+    onSuccess: () => {
+      toast.success(isRTL ? "تم إعادة التوجيه" : "Message forwarded");
+      setShowForwardDialog(false);
+    },
+    onError: () => {
+      toast.error(isRTL ? "فشل إعادة التوجيه" : "Failed to forward");
     },
   });
 
   const handleSaveEdit = () => {
     if (editedContent.trim() && editedContent !== message.content) {
-      updateMessageMutation.mutate({
-        messageId: message.id,
-        content: editedContent.trim(),
-      });
+      updateMessageMutation.mutate({ messageId: message.id, content: editedContent.trim() });
     } else {
       setIsEditing(false);
       setEditedContent(message.content);
@@ -182,6 +199,13 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
     deleteMessageMutation.mutate(message.id);
   };
 
+  const handleCopy = () => {
+    if (message.content && message.content !== '🎤') {
+      navigator.clipboard.writeText(message.content);
+      toast.success(isRTL ? "تم نسخ الرسالة" : "Copied to clipboard");
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -193,8 +217,6 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
 
   const handleDownloadImage = () => {
     if (!message.image_url) return;
-
-    // Check if it's a base64 data URL
     if (message.image_url.startsWith('data:')) {
       const link = document.createElement('a');
       link.href = message.image_url;
@@ -204,7 +226,6 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
       document.body.removeChild(link);
       toast.success(isRTL ? "تم حفظ الصورة" : "Image saved");
     } else {
-      // For regular URLs
       fetch(message.image_url)
         .then(res => res.blob())
         .then(blob => {
@@ -218,139 +239,74 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
           window.URL.revokeObjectURL(url);
           toast.success(isRTL ? "تم حفظ الصورة" : "Image saved");
         })
-        .catch(err => {
-          console.error('Error downloading image:', err);
-          toast.error(isRTL ? "فشل تحميل الصورة" : "Failed to download image");
-        });
+        .catch(() => toast.error(isRTL ? "فشل تحميل الصورة" : "Failed to download image"));
     }
   };
 
-  // Show deleted message placeholder
   if (message.is_deleted) {
     return (
-      <div 
-        className={cn(
-          "flex w-full gap-2",
-          isMe ? "justify-end" : "justify-start"
-        )}
-      >
+      <div className={cn("flex w-full gap-2", isMe ? "justify-end" : "justify-start")}>
         {!isMe && otherUser && (
           <Avatar className="w-8 h-8 shrink-0 mt-0.5">
             <AvatarImage src={otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`} />
             <AvatarFallback className="text-xs">{otherUser.username?.[0]?.toUpperCase()}</AvatarFallback>
           </Avatar>
         )}
-        <div className={cn(
-          "max-w-[70%] rounded-2xl px-4 py-2 text-xs italic shadow-sm",
-          "bg-muted text-muted-foreground"
-        )}>
+        <div className="max-w-[70%] rounded-2xl px-4 py-2 text-xs italic shadow-sm bg-muted text-muted-foreground flex items-center gap-1.5">
+          <Trash2 className="w-3 h-3 opacity-50" />
           {isRTL ? "تم حذف هذه الرسالة" : "This message was deleted"}
         </div>
       </div>
     );
   }
 
-  // Check if this is a story reply
   const isStoryReply = !!message.story_id && message.image_url;
 
   if (isStoryReply) {
     return (
-      <div 
-        className={cn(
-          "flex w-full gap-2 group animate-in slide-in-from-bottom-2 duration-300",
-          isMe ? "justify-end" : "justify-start"
-        )}
-      >
+      <div className={cn("flex w-full gap-2 group animate-in slide-in-from-bottom-2 duration-300", isMe ? "justify-end" : "justify-start")}>
         {!isMe && otherUser && (
           <Avatar className="w-8 h-8 shrink-0">
             <AvatarImage src={otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`} />
             <AvatarFallback className="text-xs">{otherUser.username?.[0]?.toUpperCase()}</AvatarFallback>
           </Avatar>
         )}
-        
         <div className={cn("flex flex-col gap-1.5 max-w-xs", isMe && "items-end")}>
-          {/* Story Image - Clickable to view original story */}
           <button
-            onClick={() => {
-              if (message.story_id) {
-                setShowStoryViewer(true);
-              } else {
-                setShowImageModal(true);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                if (message.story_id) {
-                  setShowStoryViewer(true);
-                } else {
-                  setShowImageModal(true);
-                }
-              }
-            }}
-            aria-label={isRTL ? "عرض الاستوري" : "View Story"}
+            onClick={() => { if (message.story_id) { setShowStoryViewer(true); } else { setShowImageModal(true); } }}
             type="button"
             className="relative rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow cursor-pointer group/image bg-transparent border-none p-0"
           >
-            <img 
-              src={message.image_url ?? undefined} 
-              alt="Story reply" 
-              className="w-32 h-48 object-cover hover:opacity-80 transition-opacity"
-            />
-            {/* View Story indicator */}
+            <img src={message.image_url ?? undefined} alt="Story reply" className="w-32 h-48 object-cover hover:opacity-80 transition-opacity" />
             <div className="absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover/image:opacity-100">
               <span className="text-white text-xs font-semibold">📸 {isRTL ? "عرض الاستوري" : "View Story"}</span>
             </div>
-            {/* Time badge */}
-            <div className={cn(
-              "absolute top-1 px-2 py-1 text-xs rounded-full bg-black/60 text-white/70",
-              isRTL ? "left-1" : "right-1"
-            )}>
-              {formatDistanceToNow(new Date(message.created_at), { 
-                addSuffix: false, 
-                locale: isRTL ? ar : undefined 
-              })}
+            <div className={cn("absolute top-1 px-2 py-1 text-xs rounded-full bg-black/60 text-white/70", isRTL ? "left-1" : "right-1")}>
+              {formatDistanceToNow(new Date(message.created_at), { addSuffix: false, locale: isRTL ? ar : undefined })}
             </div>
           </button>
-
-          {/* Reply Text in Bubble */}
-          <div className={cn(
-            "rounded-2xl px-4 py-2 text-sm shadow-sm max-w-xs",
-            isMe 
-              ? "bg-blue-500 text-white" 
-              : "bg-muted text-foreground"
-          )}>
-            <p className={cn("leading-relaxed break-words", isRTL && "text-right")}>
-              {message.content}
-            </p>
+          <div className={cn("rounded-2xl px-4 py-2 text-sm shadow-sm max-w-xs", isMe ? "bg-blue-500 text-white" : "bg-muted text-foreground")}>
+            <p className={cn("leading-relaxed break-words", isRTL && "text-right")}>{message.content}</p>
           </div>
-
-          {/* Message Actions */}
           {currentUserId === message.sender_id && (
             <div className="opacity-0 group-hover:opacity-100 transition-opacity">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    className="h-6 w-6 hover:bg-accent"
-                  >
+                  <Button size="icon" variant="ghost" className="h-6 w-6">
                     <MoreVertical className="w-3.5 h-3.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align={isRTL ? "end" : "start"}>
-                  <DropdownMenuItem 
-                    onClick={() => setIsEditing(true)}
-                    className={isRTL ? "flex-row-reverse" : ""}
-                  >
-                    <Pencil className="w-3.5 h-3.5 mr-1" />
-                    <span className="text-xs">{isRTL ? "تعديل" : "Edit"}</span>
+                  <DropdownMenuItem onClick={handleCopy} className="gap-2">
+                    <Copy className="w-3.5 h-3.5" />
+                    <span className="text-xs">{isRTL ? "نسخ" : "Copy"}</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                  <DropdownMenuItem onClick={() => onReply?.(message)} className="gap-2">
+                    <Reply className="w-3.5 h-3.5" />
+                    <span className="text-xs">{isRTL ? "رد" : "Reply"}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="gap-2 text-destructive">
+                    <Trash2 className="w-3.5 h-3.5" />
                     <span className="text-xs">{isRTL ? "حذف" : "Delete"}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -358,259 +314,261 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
             </div>
           )}
         </div>
-
-        {/* Delete Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{isRTL ? "حذف الرسالة" : "Delete message"}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {isRTL ? "هل أنت متأكد؟ لا يمكن التراجع عن هذا الإجراء" : "Are you sure? This cannot be undone"}
-              </AlertDialogDescription>
+              <AlertDialogDescription>{isRTL ? "هل أنت متأكد؟" : "Are you sure?"}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{isRTL ? "إلغاء" : "Cancel"}</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={handleDelete}
-                disabled={deleteMessageMutation.isPending}
-                className="bg-destructive hover:bg-destructive/90"
-              >
+              <AlertDialogAction onClick={handleDelete} disabled={deleteMessageMutation.isPending} className="bg-destructive hover:bg-destructive/90">
                 {isRTL ? "حذف" : "Delete"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        {/* Story Viewer Modal */}
         {storyData && (
-          <StoryViewerModal
-            stories={[storyData]}
-            initialIndex={0}
-            open={showStoryViewer}
-            onOpenChange={setShowStoryViewer}
-            isRTL={isRTL}
-          />
+          <StoryViewerModal stories={[storyData]} initialIndex={0} open={showStoryViewer} onOpenChange={setShowStoryViewer} isRTL={isRTL} />
         )}
-
-        {/* Image Modal - Navigate to original story */}
-        <Dialog open={showImageModal} onOpenChange={setShowImageModal}>
-          <DialogContent className="max-w-2xl max-h-[80vh] p-0 border-0">
-            <img 
-              src={message.image_url ?? undefined} 
-              alt="Story" 
-              className="w-full h-full object-contain"
-            />
-          </DialogContent>
-        </Dialog>
       </div>
     );
   }
 
   return (
-    <div 
-      className={cn(
-        "flex w-full gap-2 group animate-in slide-in-from-bottom-2 duration-300",
-        isMe ? "justify-end" : "justify-start"
-      )}
-    >
+    <div className={cn("flex w-full gap-2 group animate-in slide-in-from-bottom-2 duration-300", isMe ? "justify-end" : "justify-start")}>
       {!isMe && otherUser && (
         <Avatar className="w-8 h-8 shrink-0 mt-0.5">
           <AvatarImage src={otherUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.username}`} />
           <AvatarFallback className="text-xs">{otherUser.username?.[0]?.toUpperCase()}</AvatarFallback>
         </Avatar>
       )}
-      
+
       <div className={cn("flex items-start gap-1", isMe && "flex-row-reverse")}>
-        {/* Message Content */}
         <div className="flex flex-col gap-1">
           {isEditing ? (
-            <div className={cn(
-              "flex items-center gap-1 bg-secondary rounded-2xl px-3 py-1.5 border-2 border-primary",
-              isRTL && "flex-row-reverse"
-            )}>
+            <div className={cn("flex items-center gap-1 bg-secondary rounded-2xl px-3 py-1.5 border-2 border-primary", isRTL && "flex-row-reverse")}>
               <Input
                 ref={inputRef}
                 value={editedContent}
                 onChange={(e) => setEditedContent(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className={cn(
-                  "border-none bg-transparent text-xs h-7 focus-visible:ring-0 px-2",
-                  isRTL && "text-right"
-                )}
+                className={cn("border-none bg-transparent text-xs h-7 focus-visible:ring-0 px-2", isRTL && "text-right")}
                 disabled={updateMessageMutation.isPending}
               />
               <div className="flex items-center gap-0.5">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6 hover:bg-primary/20"
-                  onClick={handleSaveEdit}
-                  disabled={updateMessageMutation.isPending}
-                >
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleSaveEdit} disabled={updateMessageMutation.isPending}>
                   <Check className="w-3.5 h-3.5 text-green-600" />
                 </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6 hover:bg-destructive/20"
-                  onClick={handleCancelEdit}
-                  disabled={updateMessageMutation.isPending}
-                >
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCancelEdit} disabled={updateMessageMutation.isPending}>
                   <X className="w-3.5 h-3.5 text-destructive" />
                 </Button>
               </div>
             </div>
           ) : (
             <>
-              {/* Image - Without Bubble */}
-              {message.image_url && (
-                <img 
-                  src={message.image_url} 
-                  alt="Message image" 
-                  onClick={() => setShowImageModal(true)}
-                  className="max-w-sm rounded-2xl object-cover max-h-96 cursor-pointer hover:opacity-90 transition-opacity duration-200"
-                />
-              )}
-              
-              {/* Text in Bubble */}
-              {message.content && (
-                <div>
-                  <div className={cn(
-                    "rounded-2xl px-4 py-2.5 text-sm relative max-w-sm",
-                    isMe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
-                  )}>
-                    <p className={cn("leading-relaxed break-words text-sm font-light", isRTL && "text-right")}>{message.content}</p>
-                    
-                    <div className={cn("flex items-center gap-1 mt-0.5 text-xs", isRTL && "flex-row-reverse justify-start", !isRTL && "justify-end")}>
-                      {/* Edited Indicator */}
-                      {message.is_edited && (
-                        <span 
-                          className="opacity-50 text-gray-300"
-                          title={message.edited_at ? 
-                            formatDistanceToNow(new Date(message.edited_at), { 
-                              addSuffix: true,
-                              locale: isRTL ? ar : undefined 
-                            }) : ''
-                          }
-                        >
-                          {isRTL ? "محررة" : "edited"}
-                        </span>
-                      )}
-                      
-                      {/* Read Receipt (only for sent messages) */}
-                      {isMe && (
-                        <span className="opacity-50 flex items-center gap-0.5 text-gray-300">
-                          {message.is_read ? (
-                            <CheckCheck className="w-3 h-3" />
-                          ) : (
-                            <CheckCheck className="w-3 h-3 opacity-50" />
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Reactions Display - Under Message */}
-                  {Object.keys(reactions).length > 0 && (
-                    <div className={cn("flex gap-1 mt-1 flex-wrap", isMe && "justify-end")}>
-                      {Object.entries(reactions).map(([reaction, count]) => (
-                        <button
-                          key={reaction}
-                          onClick={() => {
-                            if (userReaction === reaction) {
-                              handleRemoveReaction(reaction);
-                            } else {
-                              handleRemoveReaction(userReaction || '');
-                              handleAddReaction(reaction);
-                            }
-                          }}
-                          className={cn(
-                            "px-2 py-0.5 rounded-full text-xs transition-all",
-                            userReaction === reaction
-                              ? "bg-blue-500/30 border border-blue-500/50"
-                              : "bg-muted/50 border border-border hover:bg-muted"
-                          )}
-                        >
-                          {reaction} {count > 1 ? count : ''}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Reaction Picker Popover - Under Message */}
-                  {showReactionPicker && (
-                    <div className={cn("flex gap-1 mt-2 p-2 bg-muted rounded-lg border border-border", isMe && "justify-end")}>
-                      {reactions_list.map((reaction) => (
-                        <button
-                          key={reaction}
-                          onClick={() => {
-                            if (userReaction === reaction) {
-                              handleRemoveReaction(reaction);
-                            } else {
-                              if (userReaction) handleRemoveReaction(userReaction);
-                              handleAddReaction(reaction);
-                            }
-                          }}
-                          className="text-xl hover:scale-125 transition-transform"
-                        >
-                          {reaction}
-                        </button>
-                      ))}
-                    </div>
+              {/* Quoted Reply Preview */}
+              {message.reply_to && (
+                <div className={cn(
+                  "rounded-xl px-3 py-1.5 text-xs border-l-4 mb-0.5 max-w-sm opacity-80",
+                  isMe
+                    ? "bg-primary/20 border-primary-foreground/50 text-primary-foreground/80"
+                    : "bg-muted/60 border-muted-foreground/40 text-muted-foreground"
+                )}>
+                  <p className="font-semibold text-[10px] mb-0.5 opacity-70">
+                    {isRTL ? "ردًا على" : "Reply to"} {(message.reply_to as any).sender?.username}
+                  </p>
+                  {message.reply_to.audio_url ? (
+                    <span className="flex items-center gap-1"><Mic className="w-3 h-3" />{isRTL ? "رسالة صوتية" : "Voice message"}</span>
+                  ) : message.reply_to.image_url ? (
+                    <span className="flex items-center gap-1">📷 {isRTL ? "صورة" : "Image"}</span>
+                  ) : (
+                    <p className="truncate">{message.reply_to.content}</p>
                   )}
                 </div>
+              )}
+
+              {/* Audio Message */}
+              {message.audio_url ? (
+                <div className={cn(
+                  "rounded-2xl px-3 py-2 shadow-sm max-w-xs flex items-center gap-2",
+                  isMe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+                )}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 shrink-0 hover:bg-white/20"
+                    onClick={() => {
+                      const audio = new Audio(message.audio_url!);
+                      audio.play();
+                    }}
+                  >
+                    <Volume2 className="w-4 h-4" />
+                  </Button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-0.5">
+                      {[...Array(20)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="w-0.5 rounded-full bg-current opacity-60"
+                          style={{ height: `${Math.random() * 16 + 4}px` }}
+                        />
+                      ))}
+                    </div>
+                    <div className={cn("flex items-center gap-1 mt-1 text-[10px] opacity-60", isRTL ? "flex-row-reverse" : "")}>
+                      <Mic className="w-2.5 h-2.5" />
+                      <span>{isRTL ? "رسالة صوتية" : "Voice message"}</span>
+                    </div>
+                  </div>
+                  <div className={cn("flex items-center gap-1 self-end text-[10px] opacity-60", isMe && "text-primary-foreground/70")}>
+                    {isMe && (
+                      <span>{message.is_read ? <CheckCheck className="w-3 h-3" /> : <CheckCheck className="w-3 h-3 opacity-50" />}</span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Image */}
+                  {message.image_url && (
+                    <img
+                      src={message.image_url}
+                      alt="Message image"
+                      onClick={() => setShowImageModal(true)}
+                      className="max-w-sm rounded-2xl object-cover max-h-96 cursor-pointer hover:opacity-90 transition-opacity duration-200"
+                    />
+                  )}
+
+                  {/* Text Bubble */}
+                  {message.content && message.content !== '🎤' && (
+                    <div>
+                      <div className={cn(
+                        "rounded-2xl px-4 py-2.5 text-sm relative max-w-sm",
+                        isMe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+                      )}>
+                        <p className={cn("leading-relaxed break-words text-sm font-light", isRTL && "text-right")}>{message.content}</p>
+                        <div className={cn("flex items-center gap-1 mt-0.5 text-xs", isRTL && "flex-row-reverse justify-start", !isRTL && "justify-end")}>
+                          {message.is_edited && (
+                            <span className="opacity-50 text-gray-300" title={message.edited_at ? formatDistanceToNow(new Date(message.edited_at), { addSuffix: true, locale: isRTL ? ar : undefined }) : ''}>
+                              {isRTL ? "محررة" : "edited"}
+                            </span>
+                          )}
+                          {isMe && (
+                            <span className="opacity-50 flex items-center gap-0.5 text-gray-300">
+                              {message.is_read ? <CheckCheck className="w-3 h-3" /> : <CheckCheck className="w-3 h-3 opacity-50" />}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Reactions Display */}
+                      {Object.keys(reactions).length > 0 && (
+                        <div className={cn("flex gap-1 mt-1 flex-wrap", isMe && "justify-end")}>
+                          {Object.entries(reactions).map(([reaction, count]) => (
+                            <button
+                              key={reaction}
+                              onClick={() => {
+                                if (userReaction === reaction) { handleRemoveReaction(reaction); }
+                                else { if (userReaction) handleRemoveReaction(userReaction); handleAddReaction(reaction); }
+                              }}
+                              className={cn(
+                                "px-2 py-0.5 rounded-full text-xs transition-all",
+                                userReaction === reaction ? "bg-blue-500/30 border border-blue-500/50" : "bg-muted/50 border border-border hover:bg-muted"
+                              )}
+                            >
+                              {reaction} {count > 1 ? count : ''}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Reaction Picker */}
+                      {showReactionPicker && (
+                        <div className={cn("flex gap-1 mt-2 p-2 bg-muted rounded-lg border border-border flex-wrap", isMe && "justify-end")}>
+                          {reactions_list.map((reaction) => (
+                            <button
+                              key={reaction}
+                              onClick={() => {
+                                if (userReaction === reaction) { handleRemoveReaction(reaction); }
+                                else { if (userReaction) handleRemoveReaction(userReaction); handleAddReaction(reaction); }
+                              }}
+                              className="text-xl hover:scale-125 transition-transform"
+                            >
+                              {reaction}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
         </div>
 
-        {/* Reaction Button on Hover */}
-        <div className="flex gap-1">
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-1">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setShowReactionPicker(!showReactionPicker)}
-            className={cn(
-              "h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1",
-              "hover:bg-accent"
-            )}
+            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1 hover:bg-accent"
           >
             <Smile className="w-3.5 h-3.5" />
           </Button>
 
-          {/* Context Menu (only for own messages) */}
-          {isMe && !isEditing && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1",
-                    "hover:bg-accent"
-                  )}
-                >
-                  <MoreVertical className="w-3.5 h-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hover:bg-accent"
+              >
+                <MoreVertical className="w-3.5 h-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
             <DropdownMenuContent align={isRTL ? "start" : "end"} className="w-48">
-              <DropdownMenuItem
-                onClick={() => setIsEditing(true)}
-                className="gap-2 cursor-pointer"
-              >
-                <Pencil className="w-4 h-4" />
-                {isRTL ? "تعديل" : "Edit"}
+              {/* Reply — both parties */}
+              <DropdownMenuItem onClick={() => onReply?.(message)} className="gap-2 cursor-pointer">
+                <Reply className="w-4 h-4" />
+                {isRTL ? "رد" : "Reply"}
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setShowDeleteDialog(true)}
-                className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-              >
-                <Trash2 className="w-4 h-4" />
-                {isRTL ? "حذف" : "Delete"}
+
+              {/* Copy — only for text messages */}
+              {message.content && message.content !== '🎤' && !message.audio_url && (
+                <DropdownMenuItem onClick={handleCopy} className="gap-2 cursor-pointer">
+                  <Copy className="w-4 h-4" />
+                  {isRTL ? "نسخ النص" : "Copy text"}
+                </DropdownMenuItem>
+              )}
+
+              {/* Forward */}
+              <DropdownMenuItem onClick={() => setShowForwardDialog(true)} className="gap-2 cursor-pointer">
+                <Forward className="w-4 h-4" />
+                {isRTL ? "إعادة توجيه" : "Forward"}
               </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+
+              {/* Sender-only options */}
+              {isMe && (
+                <>
+                  <DropdownMenuSeparator />
+                  {!message.audio_url && (
+                    <DropdownMenuItem onClick={() => setIsEditing(true)} className="gap-2 cursor-pointer">
+                      <Pencil className="w-4 h-4" />
+                      {isRTL ? "تعديل" : "Edit"}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {isRTL ? "حذف للجميع" : "Delete for everyone"}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -619,21 +577,10 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
         <Dialog open={showImageModal} onOpenChange={setShowImageModal}>
           <DialogContent className="max-w-4xl p-0 bg-black border-0">
             <div className="relative w-full flex flex-col items-center justify-center">
-              {/* Download Button */}
-              <Button
-                onClick={handleDownloadImage}
-                className="absolute top-4 right-4 z-10 bg-white/20 hover:bg-white/30 text-white border border-white/30"
-                size="icon"
-              >
+              <Button onClick={handleDownloadImage} className="absolute top-4 right-4 z-10 bg-white/20 hover:bg-white/30 text-white border border-white/30" size="icon">
                 <Download className="w-5 h-5" />
               </Button>
-
-              {/* Image */}
-              <img 
-                src={message.image_url} 
-                alt="Full size message image" 
-                className="w-full h-auto max-h-[80vh] object-contain"
-              />
+              <img src={message.image_url} alt="Full size message image" className="w-full h-auto max-h-[80vh] object-contain" />
             </div>
           </DialogContent>
         </Dialog>
@@ -643,31 +590,51 @@ export function MessageBubble({ message, isMe, otherUser, currentUserId, onStory
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {isRTL ? "حذف الرسالة" : "Delete Message"}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{isRTL ? "حذف الرسالة للجميع" : "Delete for Everyone"}</AlertDialogTitle>
             <AlertDialogDescription>
-              {isRTL 
-                ? "هل أنت متأكد من حذف هذه الرسالة؟ لا يمكن التراجع عن هذا الإجراء."
-                : "Are you sure you want to delete this message? This action cannot be undone."}
+              {isRTL ? "سيتم حذف الرسالة للجميع ولا يمكن التراجع." : "This message will be deleted for everyone. This cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className={cn(isRTL && "flex-row-reverse")}>
-            <AlertDialogCancel>
-              {isRTL ? "إلغاء" : "Cancel"}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive hover:bg-destructive/90"
-              disabled={deleteMessageMutation.isPending}
-            >
-              {deleteMessageMutation.isPending 
-                ? (isRTL ? "جاري الحذف..." : "Deleting...") 
-                : (isRTL ? "حذف" : "Delete")}
+            <AlertDialogCancel>{isRTL ? "إلغاء" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90" disabled={deleteMessageMutation.isPending}>
+              {deleteMessageMutation.isPending ? (isRTL ? "جاري الحذف..." : "Deleting...") : (isRTL ? "حذف للجميع" : "Delete for everyone")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Forward Dialog */}
+      <Dialog open={showForwardDialog} onOpenChange={setShowForwardDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{isRTL ? "إعادة توجيه إلى..." : "Forward to..."}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {allUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">{isRTL ? "لا يوجد محادثات" : "No conversations"}</p>
+            ) : (
+              allUsers.map((user) => (
+                <button
+                  key={user.id}
+                  onClick={() => forwardMessageMutation.mutate(user.id)}
+                  disabled={forwardMessageMutation.isPending}
+                  className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors text-left"
+                >
+                  <Avatar className="w-8 h-8 shrink-0">
+                    <AvatarImage src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
+                    <AvatarFallback>{user.username?.[0]?.toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{user.display_name || user.username}</p>
+                    <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

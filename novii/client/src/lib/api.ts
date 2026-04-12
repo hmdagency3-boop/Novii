@@ -114,8 +114,11 @@ export interface Message {
   receiver_id: string;
   content: string;
   image_url?: string | null;
+  audio_url?: string | null;
   story_id?: string | null;
   story?: Story | null;
+  reply_to_id?: string | null;
+  reply_to?: Message | null;
   is_read: boolean;
   is_deleted: boolean;
   is_edited: boolean;
@@ -1489,7 +1492,8 @@ export const api = {
       .select(`
         *,
         sender:profiles!messages_sender_id_fkey(*),
-        receiver:profiles!messages_receiver_id_fkey(*)
+        receiver:profiles!messages_receiver_id_fkey(*),
+        reply_to:messages!messages_reply_to_id_fkey(id, content, audio_url, image_url, sender_id, sender:profiles!messages_sender_id_fkey(username, avatar_url))
       `)
       .or(`and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`)
       .order('created_at', { ascending: true });
@@ -1506,7 +1510,12 @@ export const api = {
     return this._uploadToCloudinary(file, "messages");
   },
 
-  async sendMessage(receiverId: string, content: string, imageUrl?: string): Promise<Message> {
+  async uploadAudio(blob: Blob): Promise<string> {
+    const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type });
+    return this._uploadToCloudinary(file, 'audio');
+  },
+
+  async sendMessage(receiverId: string, content: string, imageUrl?: string, replyToId?: string, audioUrl?: string): Promise<Message> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
@@ -1522,8 +1531,10 @@ export const api = {
       .insert({
         sender_id: user.id,
         receiver_id: receiverId,
-        content,
-        image_url: imageUrl || null
+        content: content || (audioUrl ? '🎤' : ''),
+        image_url: imageUrl || null,
+        audio_url: audioUrl || null,
+        reply_to_id: replyToId || null,
       })
       .select(`
         *,

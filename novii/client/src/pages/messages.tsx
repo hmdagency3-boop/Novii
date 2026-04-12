@@ -59,6 +59,8 @@ import { StoryViewerModal } from "@/components/story-viewer-modal";
 import { useStories } from "@/hooks/use-data";
 import { toast } from "sonner";
 import Cropper, { type Area } from "react-easy-crop";
+import { formatDistanceToNow } from "date-fns";
+import { ar } from "date-fns/locale";
 
 export default function Messages() {
   const { language, direction } = useLanguage();
@@ -125,6 +127,88 @@ export default function Messages() {
   
   // Community info modal
   const [showCommunityInfoModal, setShowCommunityInfoModal] = useState(false);
+
+  // --- New chat features ---
+  const [replyingTo, setReplyingTo] = useState<import("@/lib/api").Message | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Mute conversation (persisted in localStorage)
+  const mutedConvsKey = `novii_muted_${currentUser?.id}`;
+  const [mutedConvIds, setMutedConvIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(`novii_muted_${currentUser?.id || ''}`);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+  const isMutedConv = selectedUserId ? mutedConvIds.has(selectedUserId) : false;
+
+  const toggleMuteConv = () => {
+    if (!selectedUserId) return;
+    setMutedConvIds(prev => {
+      const next = new Set(prev);
+      if (next.has(selectedUserId)) { next.delete(selectedUserId); }
+      else { next.add(selectedUserId); }
+      localStorage.setItem(mutedConvsKey, JSON.stringify([...next]));
+      toast.success(next.has(selectedUserId)
+        ? (isRTL ? "تم كتم المحادثة" : "Conversation muted")
+        : (isRTL ? "تم إلغاء الكتم" : "Conversation unmuted"));
+      return next;
+    });
+  };
+
+  const EMOJI_LIST = ['😀','😂','🥰','😍','😎','🥳','😢','😡','🤔','😴','👍','👎','❤️','🔥','🎉','🙏','💯','✅','⭐','🎵','😅','🤣','😊','😇','😋','🤩','😏','😒','🙄','😤','🥺','🥹','😱','😨','🤯','😳','🤗','😶','🤐','🫡','💪','🙌','👏','🫶','✌️','🤙','👌','🫰','🤌','💀','🫠','🤡','💩','👻','🤖','💘','💔','💫','⚡','🌟','✨','🎊','🎈','🏆','🥇'];
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+    } catch {
+      toast.error(isRTL ? "لا يمكن الوصول للميكروفون" : "Microphone access denied");
+    }
+  };
+
+  const stopRecording = (): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      if (!mediaRecorderRef.current) { resolve(null); return; }
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        mediaRecorderRef.current?.stream.getTracks().forEach(t => t.stop());
+        resolve(blob);
+      };
+      mediaRecorderRef.current.stop();
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      setIsRecording(false);
+      setRecordingSeconds(0);
+    });
+  };
+
+  const handleSendVoice = async () => {
+    if (!isRecording || !selectedUserId) return;
+    const blob = await stopRecording();
+    if (!blob) return;
+    try {
+      const audioUrl = await api.uploadAudio(blob);
+      sendMessageMutation.mutate({ receiverId: selectedUserId, content: '', audioUrl });
+    } catch {
+      toast.error(isRTL ? "فشل إرسال الرسالة الصوتية" : "Failed to send voice message");
+    }
+  };
+
+  const cancelRecording = async () => {
+    await stopRecording();
+  };
 
   // Keep selectedUserIdRef in sync with state (for use in realtime closures)
   useEffect(() => {
@@ -676,14 +760,16 @@ export default function Messages() {
 
   // Send message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async ({ receiverId, content, imageUrl }: { receiverId: string; content: string; imageUrl?: string }) =>
-      api.sendMessage(receiverId, content, imageUrl),
+    mutationFn: async ({ receiverId, content, imageUrl, replyToId, audioUrl }: { receiverId: string; content: string; imageUrl?: string; replyToId?: string; audioUrl?: string }) =>
+      api.sendMessage(receiverId, content, imageUrl, replyToId, audioUrl),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['messages', selectedUserId] });
       queryClient.invalidateQueries({ queryKey: ['conversations', currentUser?.id] });
       setMessageInput("");
       setSelectedImage(null);
       setPreviewUrl(null);
+      setReplyingTo(null);
+      setShowEmojiPicker(false);
     },
   });
 
@@ -835,13 +921,16 @@ export default function Messages() {
               );
             });
             
-            // Play notification sound
-            if (notificationSoundRef.current) {
+            // Play notification sound (only if conversation not muted)
+            const storedMuted = localStorage.getItem(`novii_muted_${currentUser?.id || ''}`);
+            const mutedSet = storedMuted ? new Set(JSON.parse(storedMuted)) : new Set();
+            const senderIsMuted = mutedSet.has(newMessage.sender_id);
+            if (!senderIsMuted && notificationSoundRef.current) {
               notificationSoundRef.current.play();
             }
             
             // Show browser notification
-            if (hasNotificationPermission) {
+            if (!senderIsMuted && hasNotificationPermission) {
               supabase
                 .from('profiles')
                 .select('username, full_name, avatar_url')
@@ -1035,7 +1124,8 @@ export default function Messages() {
       sendMessageMutation.mutate({
         receiverId: selectedUserId,
         content: messageInput.trim(),
-        imageUrl
+        imageUrl,
+        replyToId: replyingTo?.id,
       });
     }
   };
@@ -2009,13 +2099,30 @@ export default function Messages() {
                                       )}
                                     </div>
                                 </div>
-                                <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block"></span>
-                                  {isRTL ? "نشط الآن" : "Active now"}
-                                </span>
+                                {selectedConversation.user?.is_online ? (
+                                  <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse"></span>
+                                    {isRTL ? "نشط الآن" : "Active now"}
+                                  </span>
+                                ) : selectedConversation.user?.last_seen ? (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    {isRTL ? "آخر ظهور " : "Last seen "}
+                                    {formatDistanceToNow(new Date(selectedConversation.user.last_seen), { addSuffix: true, locale: isRTL ? ar : undefined })}
+                                  </span>
+                                ) : null}
                             </div>
                         </div>
                         <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={cn("hover:bg-accent/50 transition-colors h-9 w-9", isMutedConv ? "text-orange-500" : "text-muted-foreground hover:text-foreground")}
+                              onClick={toggleMuteConv}
+                              title={isMutedConv ? (isRTL ? "إلغاء الكتم" : "Unmute") : (isRTL ? "كتم الإشعارات" : "Mute notifications")}
+                            >
+                              {isMutedConv ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                            </Button>
                             <Button variant="ghost" size="icon" className="hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground h-9 w-9">
                               <Phone className="w-4 h-4" />
                             </Button>
@@ -2087,23 +2194,41 @@ export default function Messages() {
                             {/* Divider */}
                             <div className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent mb-4" />
                             
-                            {messages.map((msg: any) => {
-                              const isMe = msg.sender_id === currentUser?.id;
-                              
-                              return (
-                                <MessageBubble
-                                  key={msg.id}
-                                  message={msg}
-                                  isMe={isMe}
-                                  otherUser={selectedConversation.user}
-                                  currentUserId={currentUser?.id}
-                                  onStoryClick={(storyId) => {
-                                    setSelectedStoryId(storyId);
-                                    setIsStoryViewerOpen(true);
-                                  }}
-                                />
-                              );
-                            })}
+                            {(() => {
+                              let shownUnread = false;
+                              return (messages as any[]).map((msg: any) => {
+                                const isMe = msg.sender_id === currentUser?.id;
+                                const isUnread = !isMe && !msg.is_read;
+                                const showUnreadSep = isUnread && !shownUnread;
+                                if (showUnreadSep) shownUnread = true;
+                                return (
+                                  <div key={msg.id}>
+                                    {showUnreadSep && (
+                                      <div className="flex items-center gap-2 my-3 px-2">
+                                        <div className="flex-1 h-px bg-primary/30" />
+                                        <span className="text-[10px] text-primary font-semibold px-2 py-0.5 rounded-full bg-primary/10">
+                                          {isRTL ? "رسائل جديدة" : "New Messages"}
+                                        </span>
+                                        <div className="flex-1 h-px bg-primary/30" />
+                                      </div>
+                                    )}
+                                    <MessageBubble
+                                      message={msg}
+                                      isMe={isMe}
+                                      otherUser={selectedConversation.user}
+                                      currentUserId={currentUser?.id}
+                                      onStoryClick={(storyId) => {
+                                        setSelectedStoryId(storyId);
+                                        setIsStoryViewerOpen(true);
+                                      }}
+                                      onReply={(m) => { setReplyingTo(m); }}
+                                      onForward={(m) => { setReplyingTo(m); }}
+                                      allUsers={conversations.map((c: any) => c.user).filter(Boolean)}
+                                    />
+                                  </div>
+                                );
+                              });
+                            })()}
                             
                             {/* Typing Indicator */}
                             {isTyping && (
@@ -2180,41 +2305,76 @@ export default function Messages() {
 
                       {/* Direct Message Input */}
                       {selectedUserId && (
-                        <div className="flex items-end gap-1 w-full leading-none pb-1 m-0">
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageSelect}
-                            className="hidden"
-                          />
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="hover:bg-accent/50 flex-shrink-0 transition-colors text-muted-foreground hover:text-foreground h-9 w-9 p-0 m-0"
-                            onClick={() => fileInputRef.current?.click()}
-                          >
-                            <ImageIcon className="w-4 h-4" />
-                          </Button>
-                          <Input 
-                            value={messageInput}
-                            onChange={handleInputChange}
-                            onKeyDown={handleKeyPress}
-                            placeholder={isRTL ? "اكتب رسالة..." : "Type a message..."} 
-                            className="flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-9 text-sm px-3 py-0 m-0"
-                          />
-                          <Button 
-                            onClick={handleSendMessage}
-                            disabled={(!messageInput.trim() && !selectedImage) || sendMessageMutation.isPending}
-                            className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg transition-all h-9 w-9 p-0 m-0"
-                            size="icon" 
-                          >
-                            {sendMessageMutation.isPending ? (
-                              <Spinner className="w-4 h-4" />
+                        <div className="flex flex-col w-full gap-1">
+                          {/* Reply Bar */}
+                          {replyingTo && (
+                            <div className={cn("flex items-center gap-2 px-2 py-1.5 bg-accent/30 rounded-lg border-l-4 border-primary mx-1", isRTL && "border-l-0 border-r-4 flex-row-reverse")}>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] text-primary font-semibold">{isRTL ? "ردًا على" : "Replying to"} {replyingTo.sender?.username || (replyingTo.sender_id === currentUser?.id ? (isRTL ? "أنت" : "You") : "")}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {replyingTo.audio_url ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message") : replyingTo.image_url ? (isRTL ? "📷 صورة" : "📷 Image") : replyingTo.content}
+                                </p>
+                              </div>
+                              <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => setReplyingTo(null)}>
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* Emoji Picker */}
+                          {showEmojiPicker && (
+                            <div className="flex flex-wrap gap-1 p-2 bg-muted rounded-lg border border-border max-h-32 overflow-y-auto mx-1">
+                              {EMOJI_LIST.map(emoji => (
+                                <button key={emoji} onClick={() => setMessageInput(prev => prev + emoji)} className="text-lg hover:scale-125 transition-transform leading-none">
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex items-end gap-1 w-full leading-none pb-1 m-0">
+                            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                            <Button variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-9 w-9 p-0 m-0 text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
+                              <ImageIcon className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-9 w-9 p-0 m-0 text-muted-foreground" onClick={() => setShowEmojiPicker(p => !p)}>
+                              <Smile className="w-4 h-4" />
+                            </Button>
+
+                            {isRecording ? (
+                              <div className="flex-1 flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/30 px-3 h-9">
+                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                <span className="text-xs text-red-500 font-mono">{String(Math.floor(recordingSeconds/60)).padStart(2,'0')}:{String(recordingSeconds%60).padStart(2,'0')}</span>
+                                <span className="text-xs text-muted-foreground flex-1">{isRTL ? "جارٍ التسجيل..." : "Recording..."}</span>
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={cancelRecording} title={isRTL ? "إلغاء" : "Cancel"}>
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
                             ) : (
-                              <Send className="w-4 h-4" />
+                              <Input
+                                value={messageInput}
+                                onChange={handleInputChange}
+                                onKeyDown={handleKeyPress}
+                                placeholder={isRTL ? "اكتب رسالة..." : "Type a message..."}
+                                className="flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 h-9 text-sm px-3 py-0 m-0"
+                              />
                             )}
-                          </Button>
+
+                            {/* Mic or Send */}
+                            {(messageInput.trim() || selectedImage) ? (
+                              <Button onClick={handleSendMessage} disabled={sendMessageMutation.isPending} className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg h-9 w-9 p-0 m-0" size="icon">
+                                {sendMessageMutation.isPending ? <Spinner className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                              </Button>
+                            ) : isRecording ? (
+                              <Button onClick={handleSendVoice} className="rounded-full flex-shrink-0 bg-red-500 hover:bg-red-600 shadow-lg h-9 w-9 p-0 m-0" size="icon">
+                                <Send className="w-4 h-4" />
+                              </Button>
+                            ) : (
+                              <Button onMouseDown={startRecording} variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-9 w-9 p-0 m-0 text-muted-foreground" title={isRTL ? "اضغط مطولاً للتسجيل" : "Hold to record"} onClick={startRecording}>
+                                <Mic className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2314,46 +2474,73 @@ export default function Messages() {
               </div>
             )}
             
-            {/* Direct Message Input */}
+            {/* Direct Message Input - Mobile Enhanced */}
             {selectedUserId && (
-            <div className="flex items-end gap-0 w-full leading-none pb-0 m-0 py-0">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="hidden"
-              />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="hover:bg-accent/50 flex-shrink-0 transition-colors text-muted-foreground hover:text-foreground h-8 w-8 sm:h-9 sm:w-9 p-0 m-0"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <ImageIcon className="w-4 h-4" />
-              </Button>
-              <Input 
-                value={messageInput}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyPress}
-                placeholder={isRTL ? "اكتب رسالة..." : "Type a message..."} 
-                className={cn(
-                  "flex-1 rounded-lg sm:rounded-2xl bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-8 sm:h-9 text-xs sm:text-sm px-3 py-0 m-0",
-                  isRTL && "text-right"
-                )}
-              />
-              <Button 
-                onClick={handleSendMessage}
-                disabled={(!messageInput.trim() && !selectedImage) || sendMessageMutation.isPending}
-                className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg transition-all h-8 w-8 sm:h-9 sm:w-9 p-0 m-0 ml-1"
-                size="icon" 
-              >
-                {sendMessageMutation.isPending ? (
-                  <Spinner className="w-4 h-4" />
+            <div className="flex flex-col w-full gap-1">
+              {/* Reply Bar - Mobile */}
+              {replyingTo && (
+                <div className={cn("flex items-center gap-2 px-2 py-1.5 bg-accent/30 rounded-lg border-l-4 border-primary mx-1", isRTL && "border-l-0 border-r-4 flex-row-reverse")}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-primary font-semibold">{isRTL ? "ردًا على" : "Replying to"} {replyingTo.sender?.username || (replyingTo.sender_id === currentUser?.id ? (isRTL ? "أنت" : "You") : "")}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {replyingTo.audio_url ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message") : replyingTo.image_url ? (isRTL ? "📷 صورة" : "📷 Image") : replyingTo.content}
+                    </p>
+                  </div>
+                  <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => setReplyingTo(null)}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              )}
+              {/* Emoji Picker - Mobile */}
+              {showEmojiPicker && (
+                <div className="flex flex-wrap gap-1 p-2 bg-muted rounded-lg border border-border max-h-28 overflow-y-auto mx-1">
+                  {EMOJI_LIST.map(emoji => (
+                    <button key={emoji} onClick={() => setMessageInput(prev => prev + emoji)} className="text-lg hover:scale-125 transition-transform leading-none">
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-end gap-0 w-full leading-none pb-0 m-0 py-0">
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                <Button variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-8 w-8 p-0 m-0 text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
+                  <ImageIcon className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-8 w-8 p-0 m-0 text-muted-foreground" onClick={() => setShowEmojiPicker(p => !p)}>
+                  <Smile className="w-4 h-4" />
+                </Button>
+
+                {isRecording ? (
+                  <div className="flex-1 flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/30 px-2 h-8">
+                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                    <span className="text-xs text-red-500 font-mono">{String(Math.floor(recordingSeconds/60)).padStart(2,'0')}:{String(recordingSeconds%60).padStart(2,'0')}</span>
+                    <span className="text-xs text-muted-foreground flex-1">{isRTL ? "تسجيل..." : "Rec..."}</span>
+                    <button onClick={cancelRecording} className="text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
+                  </div>
                 ) : (
-                  <Send className="w-4 h-4" />
+                  <Input
+                    value={messageInput}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyPress}
+                    placeholder={isRTL ? "اكتب رسالة..." : "Type a message..."}
+                    className={cn("flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 h-8 text-xs px-3 py-0 m-0", isRTL && "text-right")}
+                  />
                 )}
-              </Button>
+
+                {(messageInput.trim() || selectedImage) ? (
+                  <Button onClick={handleSendMessage} disabled={sendMessageMutation.isPending} className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 shadow-lg h-8 w-8 p-0 m-0 ml-1" size="icon">
+                    {sendMessageMutation.isPending ? <Spinner className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                  </Button>
+                ) : isRecording ? (
+                  <Button onClick={handleSendVoice} className="rounded-full flex-shrink-0 bg-red-500 hover:bg-red-600 shadow-lg h-8 w-8 p-0 m-0 ml-1" size="icon">
+                    <Send className="w-3.5 h-3.5" />
+                  </Button>
+                ) : (
+                  <Button onClick={startRecording} variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-8 w-8 p-0 m-0 ml-0 text-muted-foreground">
+                    <Mic className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
             </div>
             )}
           </div>
