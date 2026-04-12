@@ -22,6 +22,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ar } from "date-fns/locale";
 import { Link } from "wouter";
 import { PostViewerModal } from "./post-viewer-modal";
+import { UserHoverCard } from "./user-hover-card";
 import { useLanguage } from "@/lib/language-context";
 import {
   DropdownMenu,
@@ -155,10 +156,12 @@ export default function PostCard({ post }: PostCardProps) {
       {/* Header */}
       <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border/30">
         <Link href={`/user?id=${post.user_id}`} className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity flex-1 min-w-0">
-          <Avatar className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 border-2 border-primary/30 flex-shrink-0 ring-2 ring-primary/10">
-            <AvatarImage src={post.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + post.user_id} alt={post.profile?.username} />
-            <AvatarFallback>{post.profile?.username?.[0].toUpperCase()}</AvatarFallback>
-          </Avatar>
+          <UserHoverCard userId={post.user_id}>
+            <Avatar className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 border-2 border-primary/30 flex-shrink-0 ring-2 ring-primary/10">
+              <AvatarImage src={post.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + post.user_id} alt={post.profile?.username} />
+              <AvatarFallback>{post.profile?.username?.[0].toUpperCase()}</AvatarFallback>
+            </Avatar>
+          </UserHoverCard>
           <div className="flex flex-col leading-tight min-w-0 flex-1">
             <div className="flex items-center gap-1 flex-wrap">
               <VerifiedUsername
