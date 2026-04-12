@@ -50,7 +50,9 @@ export async function handleUpload(req: Request, res: Response) {
 
     const folder = (req.body.folder as string) || "misc";
     const isVideo = req.file.mimetype.startsWith("video/");
-    const resourceType = isVideo ? "video" : "image";
+    const isAudio = req.file.mimetype.startsWith("audio/");
+    // Cloudinary treats audio under "video" resource_type
+    const resourceType = (isVideo || isAudio) ? "video" : "image";
 
     const url = await uploadToCloudinary(req.file.buffer, folder, resourceType);
     res.json({ url });
