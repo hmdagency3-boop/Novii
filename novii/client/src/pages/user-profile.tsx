@@ -447,7 +447,7 @@ export default function UserProfile() {
                         <Button
                           variant="default"
                           className={cn(
-                            "font-semibold rounded-lg bg-green-600 hover:bg-green-700 text-white",
+                            "font-semibold rounded-lg",
                             "h-8 px-3 text-sm md:h-8 md:px-4 flex-1 md:flex-none"
                           )}
                           onClick={() => approveMutation.mutate()}
