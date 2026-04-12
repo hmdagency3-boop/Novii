@@ -1,6 +1,6 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { X, Heart, Send, Pause, Play, Eye, Trash2, Music2, VolumeX, Volume2, MoreHorizontal, ChevronDown } from "lucide-react";
+import { X, Heart, Send, Pause, Play, Eye, Trash2, Music2, VolumeX, Volume2, MoreHorizontal, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
@@ -233,16 +233,19 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="p-0 border-0 bg-black shadow-2xl overflow-hidden outline-none focus:outline-none"
-        style={{
-          width: '100vw', height: '100dvh',
-          maxWidth: '100vw', maxHeight: '100dvh',
-          borderRadius: 0,
-        }}
+        hideDefaultClose
+        className={cn(
+          "p-0 border-0 bg-black shadow-2xl overflow-hidden outline-none focus:outline-none",
+          // Mobile: full screen
+          "w-screen h-[100dvh] max-w-none rounded-none translate-x-0 translate-y-0 left-0 top-0",
+          // Desktop: centered portrait card like Instagram
+          "md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2",
+          "md:w-[400px] md:max-w-[400px] md:h-[92vh] md:max-h-[820px] md:rounded-2xl",
+        )}
         dir="ltr"
       >
         {/* ── Full-screen story container ── */}
-        <div className="relative w-full h-full bg-black flex items-center justify-center select-none">
+        <div className="group relative w-full h-full bg-black flex items-center justify-center select-none">
 
           {/* ── Media ── */}
           <div className="absolute inset-0 flex items-center justify-center">
@@ -305,6 +308,36 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
               onDoubleClick={handleDoubleTap}
             />
           </div>
+
+          {/* ── Desktop navigation arrows (hidden on mobile) ── */}
+          {currentIndex > 0 && (
+            <button
+              onClick={handlePrevious}
+              className={cn(
+                "hidden md:flex absolute top-1/2 -translate-y-1/2 z-30",
+                "items-center justify-center w-10 h-10 rounded-full",
+                "bg-white/20 backdrop-blur-sm border border-white/30 text-white",
+                "hover:bg-white/35 transition-all",
+                isRTL ? "right-3" : "left-3"
+              )}
+            >
+              {isRTL ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+            </button>
+          )}
+          {currentIndex < stories.length - 1 && (
+            <button
+              onClick={handleNext}
+              className={cn(
+                "hidden md:flex absolute top-1/2 -translate-y-1/2 z-30",
+                "items-center justify-center w-10 h-10 rounded-full",
+                "bg-white/20 backdrop-blur-sm border border-white/30 text-white",
+                "hover:bg-white/35 transition-all",
+                isRTL ? "left-3" : "right-3"
+              )}
+            >
+              {isRTL ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+            </button>
+          )}
 
           {/* ══════════ TOP HUD ══════════ */}
           <div className="absolute top-0 left-0 right-0 z-30 px-2 pt-3 space-y-3">
