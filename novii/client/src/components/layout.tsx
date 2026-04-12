@@ -14,7 +14,7 @@ import { getTranslation } from "@/lib/translations";
 import { useAuth } from "@/lib/auth-context";
 import { useNotifications } from "@/hooks/use-data";
 import { useOnlineStatus } from "@/hooks/use-online-status";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { OfficialBadge } from "@/components/ui/official-badge";
@@ -28,7 +28,8 @@ import {
 export default function Layout({ children }: { children: React.ReactNode }) {
   // Track user online status globally
   useOnlineStatus();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
+  const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
   const { language, direction } = useLanguage();
   const t = getTranslation(language.code).nav;
@@ -104,6 +105,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Logout failed:", error);
     }
+  };
+
+  // Refresh content when clicking any nav tab
+  const handleNavClick = (path: string) => {
+    // Always invalidate stories (ring updates)
+    queryClient.invalidateQueries({ queryKey: ['stories'] });
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+
+    if (path === '/') {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['stories'] });
+    } else if (path === '/explore') {
+      queryClient.invalidateQueries({ queryKey: ['explore'] });
+    } else if (path === '/reels') {
+      queryClient.invalidateQueries({ queryKey: ['reels'] });
+    } else if (path === '/notifications') {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    } else if (path === '/search') {
+      queryClient.invalidateQueries({ queryKey: ['explore'] });
+    } else if (path === '/profile') {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['posts', 'user'] });
+    }
+
+    // Navigate to path
+    navigate(path);
   };
 
   const NavItem = ({ href, icon: Icon, label, isActive, badge, onClick, onDoubleClick }: { href?: string, icon: any, label: string, isActive?: boolean, badge?: number, onClick?: () => void, onDoubleClick?: () => void }) => {
@@ -200,18 +227,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         <nav className="flex-1 space-y-2">
           <NavItem 
-            href="/" 
+            onClick={() => handleNavClick('/')}
             icon={Home} 
             label={t.home} 
             isActive={location === "/"} 
             onDoubleClick={() => window.dispatchEvent(new CustomEvent('doubleClickHome'))}
           />
-          <NavItem href="/search" icon={Search} label={t.search} isActive={location === "/search"} />
-          <NavItem href="/explore" icon={Compass} label={t.explore} isActive={location === "/explore"} />
-          <NavItem href="/reels" icon={Clapperboard} label={t.reels} isActive={location === "/reels"} />
-          <NavItem href="/messages" icon={MessageCircle} label={t.messages} />
-          <NavItem href="/notifications" icon={Heart} label={t.notifications} badge={unreadCount > 0 ? unreadCount : undefined} />
-          <NavItem href="/mentions" icon={AtSign} label={'Mentions'} isActive={location === "/mentions"} />
+          <NavItem onClick={() => handleNavClick('/search')} icon={Search} label={t.search} isActive={location === "/search"} />
+          <NavItem onClick={() => handleNavClick('/explore')} icon={Compass} label={t.explore} isActive={location === "/explore"} />
+          <NavItem onClick={() => handleNavClick('/reels')} icon={Clapperboard} label={t.reels} isActive={location === "/reels"} />
+          <NavItem onClick={() => handleNavClick('/messages')} icon={MessageCircle} label={t.messages} isActive={location === "/messages"} />
+          <NavItem onClick={() => handleNavClick('/notifications')} icon={Heart} label={t.notifications} isActive={location === "/notifications"} badge={unreadCount > 0 ? unreadCount : undefined} />
+          <NavItem onClick={() => handleNavClick('/mentions')} icon={AtSign} label={'Mentions'} isActive={location === "/mentions"} />
           <DropdownMenu open={createMenuOpen} onOpenChange={setCreateMenuOpen}>
             <DropdownMenuTrigger asChild>
               <button ref={createButtonRef} className={cn(
@@ -269,13 +296,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </DropdownMenuContent>
           </DropdownMenu>
           <NavItem 
-            href="/profile" 
+            onClick={() => handleNavClick('/profile')}
             icon={User} 
             label={t.profile} 
             isActive={location === "/profile"} 
             onDoubleClick={() => window.dispatchEvent(new CustomEvent('doubleClickProfile'))}
           />
-          <NavItem href="/settings" icon={Settings} label={t.settings} isActive={location === "/settings"} />
+          <NavItem onClick={() => handleNavClick('/settings')} icon={Settings} label={t.settings} isActive={location === "/settings"} />
         </nav>
 
         <div className="mt-auto space-y-4">
@@ -417,44 +444,36 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         "md:hidden fixed bottom-0 left-0 right-0 h-16 border-t border-border bg-background/90 backdrop-blur-lg z-50 flex items-center justify-around px-2",
         chatActive && "hidden"
       )}>
-        <Link href="/">
-            <button 
-              type="button"
-              onDoubleClick={() => window.dispatchEvent(new CustomEvent('doubleClickHome'))}
-              className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer"
-            >
-                <Home className={cn("w-6 h-6", location === "/" ? "text-primary stroke-[3px]" : "text-muted-foreground")} />
-            </button>
-        </Link>
-        <Link href="/search">
-            <div className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer">
-                <Search className={cn("w-6 h-6", location === "/search" ? "text-primary stroke-[3px]" : "text-muted-foreground")} />
-            </div>
-        </Link>
-        <Link href="/explore">
-            <div className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer">
-                <Compass className={cn("w-6 h-6", location === "/explore" ? "text-primary stroke-[3px]" : "text-muted-foreground")} />
-            </div>
-        </Link>
-        <Link href="/reels">
-            <div className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer">
-                <Clapperboard className={cn("w-6 h-6", location === "/reels" ? "text-primary stroke-[3px]" : "text-muted-foreground")} />
-            </div>
-        </Link>
+        <button
+          type="button"
+          onDoubleClick={() => window.dispatchEvent(new CustomEvent('doubleClickHome'))}
+          onClick={() => handleNavClick('/')}
+          className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer"
+        >
+          <Home className={cn("w-6 h-6", location === "/" ? "text-primary stroke-[3px]" : "text-muted-foreground")} />
+        </button>
+        <button type="button" onClick={() => handleNavClick('/search')} className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer">
+          <Search className={cn("w-6 h-6", location === "/search" ? "text-primary stroke-[3px]" : "text-muted-foreground")} />
+        </button>
+        <button type="button" onClick={() => handleNavClick('/explore')} className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer">
+          <Compass className={cn("w-6 h-6", location === "/explore" ? "text-primary stroke-[3px]" : "text-muted-foreground")} />
+        </button>
+        <button type="button" onClick={() => handleNavClick('/reels')} className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer">
+          <Clapperboard className={cn("w-6 h-6", location === "/reels" ? "text-primary stroke-[3px]" : "text-muted-foreground")} />
+        </button>
         <Link href="/create">
-            <div className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer">
-                <PlusSquare className="w-6 h-6 text-muted-foreground" />
-            </div>
+          <div className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer">
+            <PlusSquare className="w-6 h-6 text-muted-foreground" />
+          </div>
         </Link>
-        <Link href="/profile">
-            <button 
-              type="button"
-              onDoubleClick={() => window.dispatchEvent(new CustomEvent('doubleClickProfile'))}
-              className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer"
-            >
-                <User className={cn("w-6 h-6", location === "/profile" ? "text-primary stroke-[3px]" : "text-muted-foreground")} />
-            </button>
-        </Link>
+        <button
+          type="button"
+          onClick={() => handleNavClick('/profile')}
+          onDoubleClick={() => window.dispatchEvent(new CustomEvent('doubleClickProfile'))}
+          className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer"
+        >
+          <User className={cn("w-6 h-6", location === "/profile" ? "text-primary stroke-[3px]" : "text-muted-foreground")} />
+        </button>
       </nav>
 
       {/* Global Create Modals — available from any page */}
