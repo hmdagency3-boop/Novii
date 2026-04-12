@@ -129,6 +129,7 @@ export default function CreatePage() {
   const [gallery, setGallery] = useState<MediaItem[]>([]);
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const [shutterAnim, setShutterAnim] = useState(false);
+  const lastTapRef = useRef<number>(0);
 
   const galleryRef = useRef<HTMLInputElement>(null);
 
@@ -424,7 +425,18 @@ export default function CreatePage() {
       {shutterAnim && <div className="absolute inset-0 bg-white z-50 pointer-events-none animate-ping" style={{ animationDuration: '150ms', animationIterationCount: 1 }} />}
 
       {/* Live camera feed */}
-      <div className="flex-1 relative overflow-hidden">
+      <div
+        className="flex-1 relative overflow-hidden"
+        onDoubleClick={flipCamera}
+        onTouchEnd={(e) => {
+          const now = Date.now();
+          if (now - lastTapRef.current < 300) {
+            e.preventDefault();
+            flipCamera();
+          }
+          lastTapRef.current = now;
+        }}
+      >
         {/* Video element */}
         <video
           ref={videoRef}
