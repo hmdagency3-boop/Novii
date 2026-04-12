@@ -738,13 +738,14 @@ export default function Messages() {
     }
   }, [currentUser?.id, queryClient]);
 
-  // Fetch conversations — staleTime prevents auto-refetch from overwriting optimistic updates
+  // Fetch conversations — staleTime + gcTime keep optimistic updates stable across navigation
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery({
     queryKey: ['conversations', currentUser?.id],
     queryFn: () => api.getConversations(),
     enabled: !!currentUser,
-    staleTime: 30_000, // 30 seconds — realtime handles live updates
-    refetchOnWindowFocus: false, // prevent focus-triggered refetch overwriting optimistic state
+    staleTime: 60_000,          // 1 min — don't background-refetch too aggressively
+    gcTime: 10 * 60_000,        // keep cache 10 min after unmount (navigation away/back)
+    refetchOnWindowFocus: false, // don't overwrite optimistic state on window focus
   });
 
   // Fetch following list

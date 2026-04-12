@@ -1461,7 +1461,8 @@ export const api = {
       }
       
       // Count unread messages (messages received by current user that are not read)
-      if (message.receiver_id === user.id && !message.is_read) {
+      // Treat null as unread (DB default may be null, not false)
+      if (message.receiver_id === user.id && (message.is_read === false || message.is_read === null)) {
         const conv = conversations.get(otherUserId);
         if (conv) {
           conv.unreadCount++;
@@ -1560,7 +1561,7 @@ export const api = {
       .update({ is_read: true })
       .eq('sender_id', senderId)
       .eq('receiver_id', user.id)
-      .eq('is_read', false);
+      .or('is_read.eq.false,is_read.is.null');
 
     if (error) {
       console.error('❌ Error marking messages as read:', error);
