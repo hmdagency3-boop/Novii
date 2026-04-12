@@ -4,6 +4,24 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
+## Novii Platform
+
+Arabic social media platform (React + Vite frontend, Express backend) using Supabase for data/auth and Cloudinary for media.
+
+### Settings System
+- **Settings storage**: `novii/client/src/lib/settings-storage.ts` — localStorage-based per-user settings with typed UserSettings interface
+- All toggle/preference settings auto-save to localStorage
+- List-based features (blocked, muted, close friends, restricted, favorites) use localStorage with StoredUser entries
+- Password change uses `supabase.auth.updateUser()`
+- Privacy toggle (is_private) saves to Supabase profiles table
+
+### Follow System
+- Follow requests stored in `follow_requests` table (requester_id, recipient_id, status)
+- `useToggleFollow` hook handles 4 states: unfollow, cancel pending, request private, follow public
+- Profile pages use Supabase Realtime subscriptions for live follow state updates (no polling)
+- Incoming request detection via `hasIncomingFollowRequest` query
+- Profile button shows: Accept / Following / Requested / Follow Back / Request / Follow
+
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces

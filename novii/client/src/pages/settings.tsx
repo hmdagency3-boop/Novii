@@ -28,6 +28,7 @@ import { AvatarUploader } from "@/components/avatar-uploader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useUserStatistics, useUserDevices, useRemoveDevice } from "@/hooks/use-data";
 import type { UserDevice } from "@/lib/api";
+import { getUserSettings, saveUserSettings, changePassword, blockedUsers, closeFriends, mutedUsers, restrictedUsers, favoriteUsers, type UserSettings, type StoredUser } from "@/lib/settings-storage";
 
 // Type definition for menu items
 type MenuItem = {
@@ -300,6 +301,7 @@ const settingsMenuStructure: MenuSection[] = [
   {
     sectionKey: "security",
     items: [
+      { id: "password", labelKey: "password", icon: Lock },
       { id: "connected_devices", labelKey: "connected_devices", icon: Smartphone },
     ]
   },
@@ -335,34 +337,39 @@ export default function SettingsPage() {
     location: "",
     avatar_url: "",
   });
-  const [gender, setGender] = useState("male");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isPrivate, setIsPrivate] = useState(false);
-  const [hideOnlineStatus, setHideOnlineStatus] = useState(false);
 
-  // Settings state
-  const [notificationSettings, setNotificationSettings] = useState({
-    email_notifications: true,
-    push_notifications: true,
-    message_notifications: true,
-    like_notifications: true,
-    comment_notifications: true,
-    follow_notifications: true,
-  });
+  // Settings from localStorage
+  const [settings, setSettings] = useState<UserSettings>(() => 
+    user ? getUserSettings(user.id) : getUserSettings('anon')
+  );
 
-  const [messageSettings, setMessageSettings] = useState({
-    everyone_can_message: false,
-    followers_only: false,
-    approved_followers_only: true,
-  });
+  // Password state
+  const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
+  const [changingPassword, setChangingPassword] = useState(false);
 
-  const [commentSettings, setCommentSettings] = useState({
-    everyone_can_comment: true,
-    followers_only: false,
-    no_comments: false,
-  });
+  // Hidden words input
+  const [newHiddenWord, setNewHiddenWord] = useState('');
+
+  const updateSettings = (partial: Partial<UserSettings>) => {
+    if (!user) return;
+    const updated = { ...settings, ...partial };
+    setSettings(updated);
+    saveUserSettings(user.id, updated);
+  };
+
+  const updateNestedSettings = <K extends keyof UserSettings>(
+    key: K, 
+    partial: Partial<UserSettings[K]>
+  ) => {
+    if (!user) return;
+    const updated = { ...settings, [key]: { ...(settings[key] as any), ...partial } };
+    setSettings(updated);
+    saveUserSettings(user.id, updated);
+  };
 
   // PWA Installation state
   const deferredPromptRef = useRef<any>(null);
@@ -411,6 +418,13 @@ export default function SettingsPage() {
       setIsPrivate(profile.is_private || false);
     }
   }, [profile]);
+
+  // Load settings from localStorage when user changes
+  useEffect(() => {
+    if (user?.id) {
+      setSettings(getUserSettings(user.id));
+    }
+  }, [user?.id]);
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
@@ -576,67 +590,31 @@ export default function SettingsPage() {
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <h2 className="text-2xl font-bold mb-8">{t.account_privacy}</h2>
-            
             <div className="space-y-6">
-              <div className="space-y-4 border border-border rounded-2xl p-6 bg-card hover:border-primary/50 transition-colors">
+              <div className="border border-border rounded-2xl p-6 bg-card hover:border-primary/50 transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <h3 className="font-bold text-lg mb-2">{direction === 'rtl' ? 'حساب خاص' : 'Private Account'}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {direction === 'rtl' 
-                        ? 'عند تفعيل هذا الخيار، يمكنك التحكم في من يمكنه رؤية منشوراتك. سيتمكن المتابعون المقبولون فقط من رؤية محتواك والمتابعين الخاصين بك.' 
-                        : 'When enabled, only approved followers can see your posts and followers.'}
+                      {direction === 'rtl' ? 'فقط المتابعون المقبولون يمكنهم رؤية محتواك' : 'Only approved followers can see your posts and followers.'}
                     </p>
                   </div>
-                  <ToggleSwitch 
-                    checked={isPrivate}
-                    onCheckedChange={(checked) => {
-                      setIsPrivate(checked);
-                      if (checked) {
-                        toast.success(direction === 'rtl' ? 'سيتم تفعيل الحساب الخاص' : 'Your account will be private');
-                      } else {
-                        toast.success(direction === 'rtl' ? 'سيتم جعل الحساب عام' : 'Your account will be public');
-                      }
-                    }}
-                  />
+                  <ToggleSwitch checked={isPrivate} onCheckedChange={(checked) => { setIsPrivate(checked); }} />
                 </div>
               </div>
-
-              <div className="space-y-4 border border-border rounded-2xl p-6 bg-card hover:border-primary/50 transition-colors">
+              <div className="border border-border rounded-2xl p-6 bg-card hover:border-primary/50 transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <h3 className="font-bold text-lg mb-2">{direction === 'rtl' ? 'إخفاء حالة الاتصال' : 'Hide Online Status'}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {direction === 'rtl' 
-                        ? 'أخف حالة الاتصال الخاصة بك من المستخدمين الآخرين' 
-                        : 'Hide your online status from other users'}
+                      {direction === 'rtl' ? 'أخف حالة الاتصال من المستخدمين الآخرين' : 'Hide your online status from other users'}
                     </p>
                   </div>
-                  <ToggleSwitch 
-                    checked={hideOnlineStatus}
-                    onCheckedChange={(checked) => {
-                      setHideOnlineStatus(checked);
-                      if (checked) {
-                        toast.success(direction === 'rtl' ? 'سيتم إخفاء حالة الاتصال' : 'Your online status is hidden');
-                      }
-                    }}
-                  />
+                  <ToggleSwitch checked={settings.hide_online_status} onCheckedChange={(checked) => { updateSettings({ hide_online_status: checked }); }} />
                 </div>
               </div>
-
-              <Button 
-                onClick={handleSaveProfile}
-                disabled={updateProfileMutation.isPending}
-                className="w-full bg-primary hover:bg-primary/90 text-white py-6 text-lg font-bold rounded-xl"
-              >
-                {updateProfileMutation.isPending ? (
-                  <>
-                    <Spinner className="w-5 h-5 mr-2" />
-                    {direction === 'rtl' ? 'جاري الحفظ...' : 'Saving...'}
-                  </>
-                ) : (
-                  direction === 'rtl' ? 'حفظ التغييرات' : 'Save Changes'
-                )}
+              <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending} className="w-full bg-primary hover:bg-primary/90 text-white py-6 text-lg font-bold rounded-xl">
+                {updateProfileMutation.isPending ? <><Spinner className="w-5 h-5 mr-2" />{direction === 'rtl' ? 'جاري الحفظ...' : 'Saving...'}</> : (direction === 'rtl' ? 'حفظ التغييرات' : 'Save Changes')}
               </Button>
             </div>
           </div>
@@ -646,40 +624,23 @@ export default function SettingsPage() {
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <h2 className="text-2xl font-bold mb-8">{t.notifications}</h2>
-            
             <div className="space-y-4">
-              {Object.entries(notificationSettings).map(([key, value]) => (
+              {(Object.entries(settings.notifications) as [string, boolean][]).map(([key, value]) => (
                 <div key={key} className="border border-border rounded-xl p-5 bg-card hover:border-primary/50 transition-colors flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-sm">
-                      {direction === 'rtl' 
-                        ? key === 'email_notifications' ? 'إشعارات البريد الإلكتروني' :
-                          key === 'push_notifications' ? 'إشعارات الدفع' :
-                          key === 'message_notifications' ? 'إشعارات الرسائل' :
-                          key === 'like_notifications' ? 'إشعارات الإعجابات' :
-                          key === 'comment_notifications' ? 'إشعارات التعليقات' :
-                          'إشعارات المتابعة'
-                        : key.replace(/_/g, ' ').charAt(0).toUpperCase() + key.replace(/_/g, ' ').slice(1)}
-                    </h3>
-                  </div>
-                  <ToggleSwitch 
-                    checked={value}
-                    onCheckedChange={(checked) => {
-                      setNotificationSettings(prev => ({ ...prev, [key]: checked }));
-                    }}
-                  />
+                  <h3 className="font-bold text-sm flex-1">
+                    {direction === 'rtl'
+                      ? key === 'email_notifications' ? 'إشعارات البريد الإلكتروني' :
+                        key === 'push_notifications' ? 'إشعارات الدفع' :
+                        key === 'message_notifications' ? 'إشعارات الرسائل' :
+                        key === 'like_notifications' ? 'إشعارات الإعجابات' :
+                        key === 'comment_notifications' ? 'إشعارات التعليقات' : 'إشعارات المتابعة'
+                      : key.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase())}
+                  </h3>
+                  <ToggleSwitch checked={value} onCheckedChange={(checked) => updateNestedSettings('notifications', { [key]: checked })} />
                 </div>
               ))}
             </div>
-
-            <Button 
-              onClick={() => {
-                toast.success(direction === 'rtl' ? 'تم حفظ الإعدادات' : 'Settings saved');
-              }}
-              className="w-full bg-primary hover:bg-primary/90 text-white py-6 mt-6 text-lg font-bold rounded-xl"
-            >
-              {direction === 'rtl' ? 'حفظ' : 'Save'}
-            </Button>
+            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -687,45 +648,18 @@ export default function SettingsPage() {
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'إعدادات الرسائل' : 'Message Settings'}</h2>
-            
-            <div className="space-y-4">
-              {Object.entries(messageSettings).map(([key, value]) => (
-                <div key={key} className="border border-border rounded-xl p-5 bg-card hover:border-primary/50 transition-colors flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-sm">
-                      {direction === 'rtl' 
-                        ? key === 'everyone_can_message' ? 'يمكن للجميع إرسال رسائل' :
-                          key === 'followers_only' ? 'المتابعون فقط' :
-                          'المتابعون المعتمدون فقط'
-                        : key === 'everyone_can_message' ? 'Everyone can message' :
-                          key === 'followers_only' ? 'Followers only' :
-                          'Approved followers only'}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {direction === 'rtl' ? 'التحكم في من يمكنه إرسال رسائل' : 'Control who can send you messages'}
-                    </p>
+            <div className="space-y-3">
+              {(['everyone', 'followers', 'approved'] as const).map(opt => (
+                <button key={opt} onClick={() => updateNestedSettings('messages', { who_can_message: opt })}
+                  className={cn("w-full border rounded-xl p-5 bg-card flex items-center justify-between transition-colors", settings.messages.who_can_message === opt ? "border-primary bg-primary/5" : "border-border hover:border-primary/50")}>
+                  <div className="flex-1 text-start">
+                    <h3 className="font-bold text-sm">{direction === 'rtl' ? (opt === 'everyone' ? 'الجميع' : opt === 'followers' ? 'المتابعون فقط' : 'المتابعون المعتمدون فقط') : (opt === 'everyone' ? 'Everyone' : opt === 'followers' ? 'Followers only' : 'Approved followers only')}</h3>
                   </div>
-                  <ToggleSwitch 
-                    checked={value}
-                    onCheckedChange={(checked) => {
-                      setMessageSettings(prev => ({ 
-                        ...prev, 
-                        everyone_can_message: key === 'everyone_can_message' ? checked : false,
-                        followers_only: key === 'followers_only' ? checked : false,
-                        approved_followers_only: key === 'approved_followers_only' ? checked : prev.approved_followers_only
-                      }));
-                    }}
-                  />
-                </div>
+                  {settings.messages.who_can_message === opt && <div className="bg-primary text-primary-foreground rounded-full p-1"><Check className="w-3 h-3" /></div>}
+                </button>
               ))}
             </div>
-
-            <Button 
-              onClick={() => toast.success(direction === 'rtl' ? 'تم حفظ الإعدادات' : 'Settings saved')}
-              className="w-full bg-primary hover:bg-primary/90 text-white py-6 mt-6 text-lg font-bold rounded-xl"
-            >
-              {direction === 'rtl' ? 'حفظ' : 'Save'}
-            </Button>
+            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -733,142 +667,459 @@ export default function SettingsPage() {
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'إعدادات التعليقات' : 'Comments Settings'}</h2>
-            
-            <div className="space-y-4">
-              {Object.entries(commentSettings).map(([key, value]) => (
-                <div key={key} className="border border-border rounded-xl p-5 bg-card hover:border-primary/50 transition-colors flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-sm">
-                      {direction === 'rtl' 
-                        ? key === 'everyone_can_comment' ? 'الجميع يمكنهم التعليق' :
-                          key === 'followers_only' ? 'المتابعون فقط' :
-                          'لا تعليقات'
-                        : key === 'everyone_can_comment' ? 'Everyone can comment' :
-                          key === 'followers_only' ? 'Followers only' :
-                          'Disable comments'}
-                    </h3>
-                  </div>
-                  <ToggleSwitch 
-                    checked={value}
-                    onCheckedChange={(checked) => {
-                      setCommentSettings(prev => ({ 
-                        ...prev, 
-                        everyone_can_comment: key === 'everyone_can_comment' ? checked : false,
-                        followers_only: key === 'followers_only' ? checked : false,
-                        no_comments: key === 'no_comments' ? checked : false
-                      }));
-                    }}
-                  />
-                </div>
+            <div className="space-y-3">
+              {(['everyone', 'followers', 'none'] as const).map(opt => (
+                <button key={opt} onClick={() => updateNestedSettings('comments', { who_can_comment: opt })}
+                  className={cn("w-full border rounded-xl p-5 bg-card flex items-center justify-between transition-colors", settings.comments.who_can_comment === opt ? "border-primary bg-primary/5" : "border-border hover:border-primary/50")}>
+                  <h3 className="font-bold text-sm">{direction === 'rtl' ? (opt === 'everyone' ? 'الجميع' : opt === 'followers' ? 'المتابعون فقط' : 'إيقاف التعليقات') : (opt === 'everyone' ? 'Everyone' : opt === 'followers' ? 'Followers only' : 'Disable comments')}</h3>
+                  {settings.comments.who_can_comment === opt && <div className="bg-primary text-primary-foreground rounded-full p-1"><Check className="w-3 h-3" /></div>}
+                </button>
               ))}
             </div>
-
-            <Button 
-              onClick={() => toast.success(direction === 'rtl' ? 'تم حفظ الإعدادات' : 'Settings saved')}
-              className="w-full bg-primary hover:bg-primary/90 text-white py-6 mt-6 text-lg font-bold rounded-xl"
-            >
-              {direction === 'rtl' ? 'حفظ' : 'Save'}
-            </Button>
+            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
-      case "blocked":
+      case "blocked": {
+        const blocked = user ? blockedUsers.get(user.id) : [];
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'المستخدمون المحظورون' : 'Blocked Users'}</h2>
-            
-            <div className="text-center py-12 border border-border rounded-2xl bg-card/50">
-              <UserX className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <p className="text-muted-foreground">
-                {direction === 'rtl' ? 'لم تقم بحظر أي مستخدمين' : 'You haven\'t blocked any users yet'}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                {direction === 'rtl' ? 'قم بزيارة ملف تعريفي وأضفه إلى قائمة الحظر' : 'Visit a profile and add them to your blocked list'}
-              </p>
-            </div>
+            {blocked.length > 0 ? (
+              <div className="space-y-3">
+                {blocked.map(u => (
+                  <div key={u.id} className="border border-border rounded-xl p-4 bg-card flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
+                      <div><p className="font-bold text-sm">{u.username}</p>{u.full_name && <p className="text-xs text-muted-foreground">{u.full_name}</p>}</div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => { blockedUsers.remove(user!.id, u.id); setSettings({...settings}); toast.success(direction === 'rtl' ? 'تم إلغاء الحظر' : 'Unblocked'); }}>
+                      {direction === 'rtl' ? 'إلغاء الحظر' : 'Unblock'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 border border-border rounded-2xl bg-card/50">
+                <UserX className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground">{direction === 'rtl' ? 'لم تقم بحظر أي مستخدمين' : 'You haven\'t blocked any users yet'}</p>
+                <p className="text-xs text-muted-foreground mt-2">{direction === 'rtl' ? 'قم بزيارة ملف تعريفي واضغط على قائمة الخيارات لحظره' : 'Visit a profile and use the options menu to block'}</p>
+              </div>
+            )}
           </div>
         );
+      }
 
-      case "close_friends":
+      case "close_friends": {
+        const friends = user ? closeFriends.get(user.id) : [];
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-            <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'الأصدقاء المقربون' : 'Close Friends'}</h2>
-            
-            <div className="text-center py-12 border border-border rounded-2xl bg-card/50">
-              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <p className="text-muted-foreground">
-                {direction === 'rtl' ? 'لم تضف أي أصدقاء مقربين بعد' : 'You haven\'t added any close friends yet'}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                {direction === 'rtl' ? 'أضف متابعين إلى قائمة أصدقائك المقربين' : 'Add followers to your close friends list'}
-              </p>
-            </div>
+            <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'الأصدقاء المقربون' : 'Close Friends'}</h2>
+            <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'الأصدقاء المقربون يمكنهم رؤية قصصك الخاصة ومحتوى حصري' : 'Close friends can see your private stories and exclusive content'}</p>
+            {friends.length > 0 ? (
+              <div className="space-y-3">
+                {friends.map(u => (
+                  <div key={u.id} className="border border-border rounded-xl p-4 bg-card flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
+                      <div><p className="font-bold text-sm">{u.username}</p>{u.full_name && <p className="text-xs text-muted-foreground">{u.full_name}</p>}</div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => { closeFriends.remove(user!.id, u.id); setSettings({...settings}); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
+                      {direction === 'rtl' ? 'إزالة' : 'Remove'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 border border-border rounded-2xl bg-card/50">
+                <Star className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground">{direction === 'rtl' ? 'لم تضف أي أصدقاء مقربين بعد' : 'No close friends yet'}</p>
+                <p className="text-xs text-muted-foreground mt-2">{direction === 'rtl' ? 'أضف متابعين من بروفايلهم' : 'Add followers from their profile'}</p>
+              </div>
+            )}
           </div>
         );
+      }
 
       case "hide_story":
         return (
           <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'إخفاء القصة' : 'Hide Story'}</h2>
-            
             <div className="space-y-6">
               <div className="border border-border rounded-2xl p-6 bg-card hover:border-primary/50 transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <h3 className="font-bold text-lg mb-2">{direction === 'rtl' ? 'إخفاء قصتي' : 'Hide My Story'}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {direction === 'rtl' 
-                        ? 'أخف قصتك من جميع المستخدمين' 
-                        : 'Hide your story from all users'}
-                    </p>
+                    <h3 className="font-bold text-lg mb-2">{direction === 'rtl' ? 'إخفاء قصتي من الجميع' : 'Hide My Story From Everyone'}</h3>
+                    <p className="text-sm text-muted-foreground">{direction === 'rtl' ? 'لن يتمكن أي شخص من رؤية قصتك' : 'No one will be able to see your story'}</p>
                   </div>
-                  <ToggleSwitch />
-                </div>
-              </div>
-
-              <div className="border border-border rounded-2xl p-6 bg-card hover:border-primary/50 transition-colors">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg mb-2">{direction === 'rtl' ? 'إخفاء القصة من أشخاص معينين' : 'Hide Story From Specific People'}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {direction === 'rtl' 
-                        ? 'اختر من يمكنه رؤية قصتك' 
-                        : 'Choose who can see your story'}
-                    </p>
-                  </div>
-                  <ToggleSwitch />
+                  <ToggleSwitch checked={settings.story.hide_story_from_all} onCheckedChange={(checked) => updateNestedSettings('story', { hide_story_from_all: checked })} />
                 </div>
               </div>
             </div>
+            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
       case "tags":
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'إعدادات الإشارات' : 'Tags Settings'}</h2>
+            <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'التحكم في من يمكنه الإشارة إليك في المنشورات' : 'Control who can tag you in posts'}</p>
+            <div className="space-y-3">
+              {(['everyone', 'followers', 'none'] as const).map(opt => (
+                <button key={opt} onClick={() => updateNestedSettings('tags', { who_can_tag: opt })}
+                  className={cn("w-full border rounded-xl p-5 bg-card flex items-center justify-between transition-colors", settings.tags.who_can_tag === opt ? "border-primary bg-primary/5" : "border-border hover:border-primary/50")}>
+                  <h3 className="font-bold text-sm">{direction === 'rtl' ? (opt === 'everyone' ? 'الجميع' : opt === 'followers' ? 'المتابعون فقط' : 'لا أحد') : (opt === 'everyone' ? 'Everyone' : opt === 'followers' ? 'Followers only' : 'No one')}</h3>
+                  {settings.tags.who_can_tag === opt && <div className="bg-primary text-primary-foreground rounded-full p-1"><Check className="w-3 h-3" /></div>}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
+          </div>
+        );
+
       case "sharing":
-      case "restricted":
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'إعدادات المشاركة' : 'Sharing Settings'}</h2>
+            <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'التحكم في من يمكنه مشاركة منشوراتك' : 'Control who can share your posts'}</p>
+            <div className="space-y-3">
+              {(['everyone', 'followers', 'none'] as const).map(opt => (
+                <button key={opt} onClick={() => updateNestedSettings('sharing', { who_can_share: opt })}
+                  className={cn("w-full border rounded-xl p-5 bg-card flex items-center justify-between transition-colors", settings.sharing.who_can_share === opt ? "border-primary bg-primary/5" : "border-border hover:border-primary/50")}>
+                  <h3 className="font-bold text-sm">{direction === 'rtl' ? (opt === 'everyone' ? 'الجميع' : opt === 'followers' ? 'المتابعون فقط' : 'لا أحد') : (opt === 'everyone' ? 'Everyone' : opt === 'followers' ? 'Followers only' : 'No one')}</h3>
+                  {settings.sharing.who_can_share === opt && <div className="bg-primary text-primary-foreground rounded-full p-1"><Check className="w-3 h-3" /></div>}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
+          </div>
+        );
+
+      case "restricted": {
+        const restricted = user ? restrictedUsers.get(user.id) : [];
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'الحسابات المقيّدة' : 'Restricted Accounts'}</h2>
+            <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'الحسابات المقيدة لن تعرف أنك قيّدتها. تعليقاتهم تكون مرئية لهم فقط.' : 'Restricted accounts won\'t know they\'re restricted. Their comments are only visible to them.'}</p>
+            {restricted.length > 0 ? (
+              <div className="space-y-3">
+                {restricted.map(u => (
+                  <div key={u.id} className="border border-border rounded-xl p-4 bg-card flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
+                      <p className="font-bold text-sm">{u.username}</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => { restrictedUsers.remove(user!.id, u.id); setSettings({...settings}); toast.success(direction === 'rtl' ? 'تم إلغاء التقييد' : 'Unrestricted'); }}>
+                      {direction === 'rtl' ? 'إلغاء التقييد' : 'Unrestrict'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 border border-border rounded-2xl bg-card/50">
+                <ShieldAlert className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground">{direction === 'rtl' ? 'لا توجد حسابات مقيّدة' : 'No restricted accounts'}</p>
+              </div>
+            )}
+          </div>
+        );
+      }
+
       case "hidden_words":
-      case "favorites":
-      case "muted":
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'الكلمات المخفية' : 'Hidden Words'}</h2>
+            <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'أخفِ التعليقات التي تحتوي على كلمات معينة' : 'Hide comments containing specific words'}</p>
+            <div className="border border-border rounded-2xl p-6 bg-card mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold">{direction === 'rtl' ? 'تفعيل فلتر الكلمات' : 'Enable Word Filter'}</h3>
+                <ToggleSwitch checked={settings.hidden_words.enabled} onCheckedChange={(checked) => updateNestedSettings('hidden_words', { enabled: checked })} />
+              </div>
+              <div className="flex gap-2 mb-4">
+                <Input value={newHiddenWord} onChange={(e) => setNewHiddenWord(e.target.value)} placeholder={direction === 'rtl' ? 'أضف كلمة...' : 'Add a word...'} className="bg-background" onKeyDown={(e) => { if (e.key === 'Enter' && newHiddenWord.trim()) { updateNestedSettings('hidden_words', { custom_words: [...settings.hidden_words.custom_words, newHiddenWord.trim()] }); setNewHiddenWord(''); }}} />
+                <Button onClick={() => { if (newHiddenWord.trim()) { updateNestedSettings('hidden_words', { custom_words: [...settings.hidden_words.custom_words, newHiddenWord.trim()] }); setNewHiddenWord(''); }}} disabled={!newHiddenWord.trim()}>
+                  {direction === 'rtl' ? 'إضافة' : 'Add'}
+                </Button>
+              </div>
+              {settings.hidden_words.custom_words.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {settings.hidden_words.custom_words.map((word, i) => (
+                    <span key={i} className="bg-secondary px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                      {word}
+                      <button onClick={() => updateNestedSettings('hidden_words', { custom_words: settings.hidden_words.custom_words.filter((_, idx) => idx !== i) })} className="hover:text-red-500"><X className="w-3 h-3" /></button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      case "favorites": {
+        const favs = user ? favoriteUsers.get(user.id) : [];
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'المفضّلون' : 'Favorites'}</h2>
+            <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'المفضلون يظهرون أولاً في الفيد الخاص بك' : 'Favorites appear first in your feed'}</p>
+            {favs.length > 0 ? (
+              <div className="space-y-3">
+                {favs.map(u => (
+                  <div key={u.id} className="border border-border rounded-xl p-4 bg-card flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
+                      <p className="font-bold text-sm">{u.username}</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => { favoriteUsers.remove(user!.id, u.id); setSettings({...settings}); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
+                      {direction === 'rtl' ? 'إزالة' : 'Remove'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 border border-border rounded-2xl bg-card/50">
+                <Star className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground">{direction === 'rtl' ? 'لم تضف أي حسابات مفضلة' : 'No favorites yet'}</p>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      case "muted": {
+        const muted = user ? mutedUsers.get(user.id) : [];
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'الحسابات المكتومة' : 'Muted Accounts'}</h2>
+            <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'لن ترى منشوراتهم في الفيد لكنك تبقى متابعاً لهم' : 'You won\'t see their posts in your feed but you\'ll still follow them'}</p>
+            {muted.length > 0 ? (
+              <div className="space-y-3">
+                {muted.map(u => (
+                  <div key={u.id} className="border border-border rounded-xl p-4 bg-card flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
+                      <p className="font-bold text-sm">{u.username}</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => { mutedUsers.remove(user!.id, u.id); setSettings({...settings}); toast.success(direction === 'rtl' ? 'تم إلغاء الكتم' : 'Unmuted'); }}>
+                      {direction === 'rtl' ? 'إلغاء الكتم' : 'Unmute'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 border border-border rounded-2xl bg-card/50">
+                <VolumeX className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground">{direction === 'rtl' ? 'لا توجد حسابات مكتومة' : 'No muted accounts'}</p>
+              </div>
+            )}
+          </div>
+        );
+      }
+
       case "content_pref":
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'تفضيلات المحتوى' : 'Content Preferences'}</h2>
+            <div className="space-y-4">
+              <div className="border border-border rounded-xl p-5 bg-card flex items-center justify-between">
+                <div className="flex-1"><h3 className="font-bold text-sm">{direction === 'rtl' ? 'عرض المحتوى المقترح' : 'Show Suggested Content'}</h3><p className="text-xs text-muted-foreground mt-1">{direction === 'rtl' ? 'اقتراحات بناءً على اهتماماتك' : 'Suggestions based on your interests'}</p></div>
+                <ToggleSwitch checked={settings.content.show_suggested} onCheckedChange={(checked) => updateNestedSettings('content', { show_suggested: checked })} />
+              </div>
+              <div className="border border-border rounded-xl p-5 bg-card flex items-center justify-between">
+                <div className="flex-1"><h3 className="font-bold text-sm">{direction === 'rtl' ? 'عرض المحتوى الرائج' : 'Show Trending Content'}</h3><p className="text-xs text-muted-foreground mt-1">{direction === 'rtl' ? 'المنشورات الأكثر شيوعاً' : 'Most popular posts'}</p></div>
+                <ToggleSwitch checked={settings.content.show_trending} onCheckedChange={(checked) => updateNestedSettings('content', { show_trending: checked })} />
+              </div>
+              <div className="border border-border rounded-xl p-5 bg-card flex items-center justify-between">
+                <div className="flex-1"><h3 className="font-bold text-sm">{direction === 'rtl' ? 'المحتوى الحساس' : 'Sensitive Content'}</h3><p className="text-xs text-muted-foreground mt-1">{direction === 'rtl' ? 'عرض المحتوى الذي قد يكون حساساً' : 'Show content that may be sensitive'}</p></div>
+                <ToggleSwitch checked={settings.content.sensitive_content} onCheckedChange={(checked) => updateNestedSettings('content', { sensitive_content: checked })} />
+              </div>
+            </div>
+            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
+          </div>
+        );
+
       case "like_counts":
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'عدد الإعجابات' : 'Like Counts'}</h2>
+            <div className="space-y-4">
+              <div className="border border-border rounded-xl p-5 bg-card flex items-center justify-between">
+                <div className="flex-1"><h3 className="font-bold text-sm">{direction === 'rtl' ? 'إخفاء عدد الإعجابات على منشوراتك' : 'Hide like counts on your posts'}</h3><p className="text-xs text-muted-foreground mt-1">{direction === 'rtl' ? 'الآخرون لن يرون عدد الإعجابات' : 'Others won\'t see the like count'}</p></div>
+                <ToggleSwitch checked={settings.likes.hide_like_counts_own} onCheckedChange={(checked) => updateNestedSettings('likes', { hide_like_counts_own: checked })} />
+              </div>
+              <div className="border border-border rounded-xl p-5 bg-card flex items-center justify-between">
+                <div className="flex-1"><h3 className="font-bold text-sm">{direction === 'rtl' ? 'إخفاء عدد الإعجابات على منشورات الآخرين' : 'Hide like counts on others\' posts'}</h3><p className="text-xs text-muted-foreground mt-1">{direction === 'rtl' ? 'لن ترى عدد الإعجابات على المنشورات' : 'You won\'t see like counts on posts'}</p></div>
+                <ToggleSwitch checked={settings.likes.hide_like_counts_others} onCheckedChange={(checked) => updateNestedSettings('likes', { hide_like_counts_others: checked })} />
+              </div>
+            </div>
+            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
+          </div>
+        );
+
       case "archiving":
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'الأرشفة' : 'Archiving'}</h2>
+            <div className="space-y-4">
+              <div className="border border-border rounded-xl p-5 bg-card flex items-center justify-between">
+                <div className="flex-1"><h3 className="font-bold text-sm">{direction === 'rtl' ? 'أرشفة القصص تلقائياً' : 'Auto-archive Stories'}</h3><p className="text-xs text-muted-foreground mt-1">{direction === 'rtl' ? 'حفظ القصص المنتهية في الأرشيف تلقائياً' : 'Save expired stories to archive automatically'}</p></div>
+                <ToggleSwitch checked={settings.archiving.auto_archive_stories} onCheckedChange={(checked) => updateNestedSettings('archiving', { auto_archive_stories: checked })} />
+              </div>
+              <div className="border border-border rounded-xl p-5 bg-card flex items-center justify-between">
+                <div className="flex-1"><h3 className="font-bold text-sm">{direction === 'rtl' ? 'أرشفة الريلز تلقائياً' : 'Auto-archive Reels'}</h3><p className="text-xs text-muted-foreground mt-1">{direction === 'rtl' ? 'حفظ الريلز المحذوفة في الأرشيف' : 'Save deleted reels to archive'}</p></div>
+                <ToggleSwitch checked={settings.archiving.auto_archive_reels} onCheckedChange={(checked) => updateNestedSettings('archiving', { auto_archive_reels: checked })} />
+              </div>
+            </div>
+            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
+          </div>
+        );
+
       case "accessibility":
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'إمكانية الوصول' : 'Accessibility'}</h2>
+            <div className="space-y-6">
+              <div className="border border-border rounded-2xl p-6 bg-card">
+                <h3 className="font-bold text-lg mb-4">{direction === 'rtl' ? 'حجم الخط' : 'Font Size'}</h3>
+                <div className="space-y-3">
+                  {(['small', 'medium', 'large', 'xlarge'] as const).map(size => (
+                    <button key={size} onClick={() => updateNestedSettings('accessibility', { font_size: size })}
+                      className={cn("w-full border rounded-xl p-4 bg-card flex items-center justify-between transition-colors", settings.accessibility.font_size === size ? "border-primary bg-primary/5" : "border-border hover:border-primary/50")}>
+                      <span className={cn("font-bold", size === 'small' ? 'text-xs' : size === 'medium' ? 'text-sm' : size === 'large' ? 'text-base' : 'text-lg')}>
+                        {direction === 'rtl' ? (size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : size === 'large' ? 'كبير' : 'كبير جداً') : (size === 'small' ? 'Small' : size === 'medium' ? 'Medium' : size === 'large' ? 'Large' : 'Extra Large')}
+                      </span>
+                      {settings.accessibility.font_size === size && <div className="bg-primary text-primary-foreground rounded-full p-1"><Check className="w-3 h-3" /></div>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="border border-border rounded-xl p-5 bg-card flex items-center justify-between">
+                <div className="flex-1"><h3 className="font-bold text-sm">{direction === 'rtl' ? 'تباين عالي' : 'High Contrast'}</h3><p className="text-xs text-muted-foreground mt-1">{direction === 'rtl' ? 'زيادة تباين الألوان لسهولة القراءة' : 'Increase color contrast for readability'}</p></div>
+                <ToggleSwitch checked={settings.accessibility.high_contrast} onCheckedChange={(checked) => updateNestedSettings('accessibility', { high_contrast: checked })} />
+              </div>
+              <div className="border border-border rounded-xl p-5 bg-card flex items-center justify-between">
+                <div className="flex-1"><h3 className="font-bold text-sm">{direction === 'rtl' ? 'تقليل الحركة' : 'Reduce Motion'}</h3><p className="text-xs text-muted-foreground mt-1">{direction === 'rtl' ? 'تقليل الرسوم المتحركة' : 'Reduce animations throughout the app'}</p></div>
+                <ToggleSwitch checked={settings.accessibility.reduce_motion} onCheckedChange={(checked) => updateNestedSettings('accessibility', { reduce_motion: checked })} />
+              </div>
+            </div>
+            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
+          </div>
+        );
+
       case "website_permissions":
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'أذونات الموقع' : 'Website Permissions'}</h2>
+            <div className="space-y-4">
+              {[
+                { icon: '📷', name: direction === 'rtl' ? 'الكاميرا' : 'Camera', perm: 'camera' as PermissionName },
+                { icon: '🎤', name: direction === 'rtl' ? 'الميكروفون' : 'Microphone', perm: 'microphone' as PermissionName },
+                { icon: '📍', name: direction === 'rtl' ? 'الموقع الجغرافي' : 'Location', perm: 'geolocation' as PermissionName },
+              ].map(item => (
+                <div key={item.perm} className="border border-border rounded-xl p-5 bg-card flex items-center justify-between">
+                  <div className="flex items-center gap-3"><span className="text-2xl">{item.icon}</span><h3 className="font-bold text-sm">{item.name}</h3></div>
+                  <Button variant="outline" size="sm" onClick={async () => {
+                    try {
+                      if (item.perm === 'camera' as any) { await navigator.mediaDevices.getUserMedia({ video: true }); }
+                      else if (item.perm === 'microphone' as any) { await navigator.mediaDevices.getUserMedia({ audio: true }); }
+                      else { navigator.geolocation.getCurrentPosition(() => {}, () => {}); }
+                      toast.success(direction === 'rtl' ? 'تم طلب الإذن' : 'Permission requested');
+                    } catch { toast.error(direction === 'rtl' ? 'تم رفض الإذن' : 'Permission denied'); }
+                  }}>
+                    {direction === 'rtl' ? 'طلب إذن' : 'Request'}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
       case "account_type":
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'نوع الحساب' : 'Account Type'}</h2>
+            <p className="text-sm text-muted-foreground mb-8">{direction === 'rtl' ? 'اختر نوع حسابك للحصول على ميزات مخصصة' : 'Choose your account type for customized features'}</p>
+            <div className="space-y-3">
+              {([
+                { type: 'personal' as const, icon: '👤', label: direction === 'rtl' ? 'شخصي' : 'Personal', desc: direction === 'rtl' ? 'حساب شخصي عادي' : 'Standard personal account' },
+                { type: 'business' as const, icon: '🏢', label: direction === 'rtl' ? 'أعمال' : 'Business', desc: direction === 'rtl' ? 'للشركات والمتاجر' : 'For companies and stores' },
+                { type: 'creator' as const, icon: '🎨', label: direction === 'rtl' ? 'صانع محتوى' : 'Creator', desc: direction === 'rtl' ? 'لصناع المحتوى والمؤثرين' : 'For content creators and influencers' },
+              ]).map(item => (
+                <button key={item.type} onClick={() => updateSettings({ account_type: item.type })}
+                  className={cn("w-full border rounded-xl p-5 bg-card flex items-center gap-4 transition-colors text-start", settings.account_type === item.type ? "border-primary bg-primary/5" : "border-border hover:border-primary/50")}>
+                  <span className="text-3xl">{item.icon}</span>
+                  <div className="flex-1"><h3 className="font-bold">{item.label}</h3><p className="text-xs text-muted-foreground">{item.desc}</p></div>
+                  {settings.account_type === item.type && <div className="bg-primary text-primary-foreground rounded-full p-1"><Check className="w-3 h-3" /></div>}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
+          </div>
+        );
+
       case "verified":
         return (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in fade-in zoom-in duration-300 pb-20">
-            <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-6 border border-blue-500/20">
-              <Settings className="w-10 h-10 text-blue-500" />
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'التوثيق' : 'Verification'}</h2>
+            {profile?.is_verified ? (
+              <div className="text-center py-12 border border-green-500/30 rounded-2xl bg-green-500/5">
+                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <h3 className="text-xl font-bold mb-2">{direction === 'rtl' ? 'حسابك موثّق' : 'Your Account is Verified'}</h3>
+                <p className="text-sm text-muted-foreground">{direction === 'rtl' ? 'تم توثيق حسابك بنجاح' : 'Your account has been verified successfully'}</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="border border-border rounded-2xl p-6 bg-card">
+                  <div className="flex items-center gap-3 mb-4"><BadgeCheck className="w-8 h-8 text-primary" /><h3 className="font-bold text-lg">{direction === 'rtl' ? 'طلب التوثيق' : 'Request Verification'}</h3></div>
+                  <p className="text-sm text-muted-foreground mb-6">{direction === 'rtl' ? 'التوثيق متاح للحسابات التي تستوفي شروط معينة مثل عدد المتابعين والنشاط' : 'Verification is available for accounts that meet specific criteria like follower count and activity'}</p>
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", (profile?.followers_count || 0) >= 100 ? "text-green-500" : "text-muted-foreground")} /><span>{direction === 'rtl' ? '100+ متابع' : '100+ followers'}</span></div>
+                    <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", profile?.bio ? "text-green-500" : "text-muted-foreground")} /><span>{direction === 'rtl' ? 'بايو مكتمل' : 'Complete bio'}</span></div>
+                    <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", profile?.avatar_url ? "text-green-500" : "text-muted-foreground")} /><span>{direction === 'rtl' ? 'صورة شخصية' : 'Profile photo'}</span></div>
+                  </div>
+                  <Button className="w-full" onClick={() => toast.success(direction === 'rtl' ? 'تم إرسال طلب التوثيق! سنراجعه قريباً' : 'Verification request sent! We\'ll review it soon')}>
+                    {direction === 'rtl' ? 'إرسال طلب التوثيق' : 'Submit Verification Request'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case "password":
+        return (
+          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'تغيير كلمة المرور' : 'Change Password'}</h2>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h3 className="font-bold">{direction === 'rtl' ? 'كلمة المرور الجديدة' : 'New Password'}</h3>
+                <Input type="password" value={passwordData.newPassword} onChange={(e) => setPasswordData(p => ({...p, newPassword: e.target.value}))} placeholder={direction === 'rtl' ? 'أدخل كلمة مرور جديدة' : 'Enter new password'} className="bg-card border-border" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-bold">{direction === 'rtl' ? 'تأكيد كلمة المرور' : 'Confirm Password'}</h3>
+                <Input type="password" value={passwordData.confirmPassword} onChange={(e) => setPasswordData(p => ({...p, confirmPassword: e.target.value}))} placeholder={direction === 'rtl' ? 'أعد إدخال كلمة المرور' : 'Re-enter password'} className="bg-card border-border" />
+              </div>
+              {passwordData.newPassword && passwordData.newPassword.length < 6 && (
+                <p className="text-xs text-red-500">{direction === 'rtl' ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : 'Password must be at least 6 characters'}</p>
+              )}
+              {passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
+                <p className="text-xs text-red-500">{direction === 'rtl' ? 'كلمتا المرور غير متطابقتين' : 'Passwords do not match'}</p>
+              )}
+              <Button onClick={async () => {
+                if (passwordData.newPassword.length < 6) { toast.error(direction === 'rtl' ? 'كلمة المرور قصيرة جداً' : 'Password too short'); return; }
+                if (passwordData.newPassword !== passwordData.confirmPassword) { toast.error(direction === 'rtl' ? 'كلمتا المرور غير متطابقتين' : 'Passwords do not match'); return; }
+                setChangingPassword(true);
+                try {
+                  await changePassword(passwordData.newPassword);
+                  toast.success(direction === 'rtl' ? 'تم تغيير كلمة المرور بنجاح!' : 'Password changed successfully!');
+                  setPasswordData({ newPassword: '', confirmPassword: '' });
+                } catch (err: any) { toast.error(err.message || (direction === 'rtl' ? 'فشل تغيير كلمة المرور' : 'Failed to change password')); }
+                setChangingPassword(false);
+              }} disabled={changingPassword || !passwordData.newPassword || !passwordData.confirmPassword || passwordData.newPassword !== passwordData.confirmPassword || passwordData.newPassword.length < 6}
+                className="w-full bg-primary hover:bg-primary/90 text-white py-6 text-lg font-bold rounded-xl">
+                {changingPassword ? <><Spinner className="w-5 h-5 mr-2" />{direction === 'rtl' ? 'جاري التغيير...' : 'Changing...'}</> : (direction === 'rtl' ? 'تغيير كلمة المرور' : 'Change Password')}
+              </Button>
             </div>
-            <h2 className="text-2xl font-bold mb-4">
-              {direction === 'rtl' ? 'قيد التطوير' : 'Coming Soon'}
-            </h2>
-            <p className="text-muted-foreground max-w-md">
-              {direction === 'rtl'
-                ? 'هذا القسم سيتم تطويره قريباً. شكراً لصبرك!'
-                : 'This section will be available soon. Thank you for your patience!'}
-            </p>
           </div>
         );
       case "help":
