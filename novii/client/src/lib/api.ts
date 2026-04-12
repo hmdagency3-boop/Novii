@@ -1135,9 +1135,18 @@ export const api = {
         status: 'pending',
       });
       if (reqError) { console.error('❌ Follow request insert error:', reqError); throw reqError; }
-      try {
-        await this.createNotification({ userId: targetUserId, actorId: user.id, type: 'follow_request' });
-      } catch {}
+
+      // Create notification directly (bypassing createNotification for reliability)
+      const { error: notifError } = await supabase.from('notifications').insert({
+        user_id: targetUserId,
+        actor_id: user.id,
+        type: 'follow_request',
+        is_read: false,
+      });
+      if (notifError) {
+        console.error('❌ Follow request notification error:', notifError);
+      }
+
       return { isFollowing: false, actorProfile: currentProfile, isPending: true };
     }
 
@@ -1632,19 +1641,49 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    const { data, error } = await supabase
-      .from('notifications')
-      .select(`
-        *,
-        actor:profiles!notifications_actor_id_fkey(*),
-        post:posts!notifications_post_id_fkey(id, image_url, content)
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(80);
+    // Fetch notifications + pending follow_requests in parallel
+    const [{ data: notifs }, { data: pendingReqs }] = await Promise.all([
+      supabase.from('notifications')
+        .select(`*, actor:profiles!notifications_actor_id_fkey(*), post:posts!notifications_post_id_fkey(id, image_url, content)`)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(80),
+      supabase.from('follow_requests')
+        .select(`id, requester_id, created_at, requester:profiles!follow_requests_requester_id_fkey(*)`)
+        .eq('recipient_id', user.id)
+        .eq('status', 'pending'),
+    ]);
 
-    if (error) throw error;
-    return data || [];
+    const all = [...(notifs || [])];
+
+    // Inject synthetic follow_request notifications from follow_requests table
+    // (in case the notification insert failed due to RLS)
+    if (pendingReqs && pendingReqs.length > 0) {
+      const existingActors = new Set(
+        all.filter(n => n.type === 'follow_request' && !n.is_read).map(n => n.actor_id)
+      );
+      for (const req of pendingReqs) {
+        if (!existingActors.has(req.requester_id)) {
+          all.push({
+            id: `fr_${req.id}`,
+            user_id: user.id,
+            actor_id: req.requester_id,
+            type: 'follow_request',
+            post_id: null,
+            comment_id: null,
+            content: null,
+            is_read: false,
+            created_at: req.created_at,
+            actor: req.requester,
+            post: null,
+          } as any);
+        }
+      }
+    }
+
+    return all.sort((a: any, b: any) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   },
 
   async markNotificationAsRead(notificationId: string): Promise<void> {

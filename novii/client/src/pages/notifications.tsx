@@ -179,7 +179,7 @@ export default function Notifications() {
                     key={notif.id}
                     notif={notif}
                     isAr={isAr}
-                    onRead={() => { if (!notif.is_read) markAsRead.mutate(notif.id); }}
+                    onRead={() => { if (!notif.is_read && !String(notif.id).startsWith('fr_')) markAsRead.mutate(notif.id); }}
                   />
                 ))}
               </div>
