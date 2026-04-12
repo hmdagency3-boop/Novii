@@ -49,7 +49,7 @@ export function MentionAutocomplete({ inputValue, onSelectUser, isOpen }: Mentio
         >
           <Avatar className="w-8 h-8">
             <AvatarImage src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`} />
-            <AvatarFallback>{user.username?.[0].toUpperCase()}</AvatarFallback>
+            <AvatarFallback>{user.username?.[0]?.toUpperCase()}</AvatarFallback>
           </Avatar>
           <div>
             <p className="font-semibold text-sm">{user.username}</p>

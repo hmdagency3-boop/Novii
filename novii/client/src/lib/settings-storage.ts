@@ -78,11 +78,11 @@ function dbRowToSettings(row: any): UserSettings {
   return {
     notifications: {
       email_notifications: row.notifications_enabled ?? true,
-      push_notifications: true,
-      message_notifications: true,
-      like_notifications: true,
-      comment_notifications: true,
-      follow_notifications: true,
+      push_notifications: row.push_notifications ?? true,
+      message_notifications: row.message_notifications ?? true,
+      like_notifications: row.like_notifications ?? true,
+      comment_notifications: row.comment_notifications ?? true,
+      follow_notifications: row.follow_notifications ?? true,
     },
     messages: { who_can_message: row.messages_privacy ?? 'approved' },
     comments: { who_can_comment: row.comments_privacy === 'approved' ? 'none' : (row.comments_privacy ?? 'everyone') },
@@ -102,6 +102,11 @@ function dbRowToSettings(row: any): UserSettings {
 function settingsToDbRow(s: UserSettings) {
   return {
     notifications_enabled: s.notifications.email_notifications,
+    push_notifications: s.notifications.push_notifications,
+    message_notifications: s.notifications.message_notifications,
+    like_notifications: s.notifications.like_notifications,
+    comment_notifications: s.notifications.comment_notifications,
+    follow_notifications: s.notifications.follow_notifications,
     messages_privacy: s.messages.who_can_message,
     comments_privacy: s.comments.who_can_comment === 'none' ? 'approved' : s.comments.who_can_comment,
     tags_privacy: s.tags.who_can_tag,

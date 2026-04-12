@@ -328,7 +328,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
               <Link href={`/user?id=${post.user_id}`} className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity min-w-0 flex-1">
                 <Avatar className="w-8 h-8 sm:w-10 sm:h-10 border border-border/50 flex-shrink-0">
                   <AvatarImage src={post.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + post.user_id} />
-                  <AvatarFallback>{post.profile?.username?.[0].toUpperCase()}</AvatarFallback>
+                  <AvatarFallback>{post.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col leading-tight min-w-0 flex-1">
                   <div className="flex items-center gap-1 flex-wrap">
@@ -354,7 +354,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                   <Link href={`/user?id=${post.user_id}`}>
                     <Avatar className="w-7 h-7 sm:w-8 sm:h-8 border border-border/50 flex-shrink-0">
                       <AvatarImage src={post.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + post.user_id} />
-                      <AvatarFallback>{post.profile?.username?.[0].toUpperCase()}</AvatarFallback>
+                      <AvatarFallback>{post.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
                     </Avatar>
                   </Link>
                   <div className="flex-1 min-w-0">
@@ -408,7 +408,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                               comment.profile?.is_official ? "w-8 h-8 border-primary/40 ring-2 ring-primary/10" : "w-8 h-8 border-border/50 group-hover:border-primary/40 group-hover:ring-2 group-hover:ring-primary/10"
                             )}>
                               <AvatarImage src={comment.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + comment.user_id} />
-                              <AvatarFallback>{comment.profile?.username?.[0].toUpperCase()}</AvatarFallback>
+                              <AvatarFallback>{comment.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
                             </Avatar>
                           </Link>
                           <div className="flex-1 min-w-0">
@@ -515,7 +515,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                               <Link href={`/user?id=${reply.user_id}`}>
                                 <Avatar className="w-6 h-6 border border-border/50 flex-shrink-0 group-hover:border-primary/40 transition-all duration-200">
                                   <AvatarImage src={reply.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + reply.user_id} />
-                                  <AvatarFallback>{reply.profile?.username?.[0].toUpperCase()}</AvatarFallback>
+                                  <AvatarFallback>{reply.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
                                 </Avatar>
                               </Link>
                               <div className="flex-1 min-w-0">

@@ -163,6 +163,11 @@ function Router() {
           <Reels />
         </ProtectedLayout>
       </Route>
+      <Route path="/reel/:id">
+        <ProtectedLayout>
+          <Reels />
+        </ProtectedLayout>
+      </Route>
       <Route path="/settings">
         <ProtectedLayout>
           <Settings />

@@ -28,7 +28,8 @@ import { AvatarUploader } from "@/components/avatar-uploader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useUserStatistics, useUserDevices, useRemoveDevice } from "@/hooks/use-data";
 import type { UserDevice } from "@/lib/api";
-import { fetchUserSettings, saveUserSettingsToDb, DEFAULT_SETTINGS, changePassword, blockedUsers, closeFriends, mutedUsers, restrictedUsers, favoriteUsers, type UserSettings, type StoredUser } from "@/lib/settings-storage";
+import { changePassword, type UserSettings, type StoredUser } from "@/lib/settings-storage";
+import { useSettings } from "@/lib/settings-context";
 
 // Type definition for menu items
 type MenuItem = {
@@ -342,49 +343,18 @@ export default function SettingsPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isPrivate, setIsPrivate] = useState(false);
 
-  const [settings, setSettings] = useState<UserSettings>({ ...DEFAULT_SETTINGS });
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const {
+    settings, settingsLoaded,
+    blockedList, friendsList, mutedList, restrictedList, favsList,
+    updateSettings, updateNestedSettings,
+    unblockUser, unmuteUser, removeCloseFriend, unrestrictUser, removeFavorite,
+    refetchLists,
+  } = useSettings();
 
   const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
   const [changingPassword, setChangingPassword] = useState(false);
 
   const [newHiddenWord, setNewHiddenWord] = useState('');
-
-  const [blockedList, setBlockedList] = useState<StoredUser[]>([]);
-  const [friendsList, setFriendsList] = useState<StoredUser[]>([]);
-  const [mutedList, setMutedList] = useState<StoredUser[]>([]);
-  const [restrictedList, setRestrictedList] = useState<StoredUser[]>([]);
-  const [favsList, setFavsList] = useState<StoredUser[]>([]);
-
-  const saveSettingsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const persistSettings = (updated: UserSettings) => {
-    if (!user) return;
-    if (saveSettingsDebounceRef.current) clearTimeout(saveSettingsDebounceRef.current);
-    saveSettingsDebounceRef.current = setTimeout(() => {
-      saveUserSettingsToDb(user.id, updated).catch(err => {
-        console.error('Failed to persist settings:', err);
-        toast.error(direction === 'rtl' ? 'خطأ في حفظ الإعدادات' : 'Failed to save settings');
-      });
-    }, 500);
-  };
-
-  const updateSettings = (partial: Partial<UserSettings>) => {
-    if (!user) return;
-    const updated = { ...settings, ...partial };
-    setSettings(updated);
-    persistSettings(updated);
-  };
-
-  const updateNestedSettings = <K extends keyof UserSettings>(
-    key: K,
-    partial: Partial<UserSettings[K]>
-  ) => {
-    if (!user) return;
-    const updated = { ...settings, [key]: { ...(settings[key] as any), ...partial } };
-    setSettings(updated);
-    persistSettings(updated);
-  };
 
   // PWA Installation state
   const deferredPromptRef = useRef<any>(null);
@@ -434,45 +404,6 @@ export default function SettingsPage() {
     }
   }, [profile]);
 
-  useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [s, b, f, m, r, fv] = await Promise.all([
-          fetchUserSettings(user.id),
-          blockedUsers.get(user.id),
-          closeFriends.get(user.id),
-          mutedUsers.get(user.id),
-          restrictedUsers.get(user.id),
-          favoriteUsers.get(user.id),
-        ]);
-        if (cancelled) return;
-        setSettings(s);
-        setBlockedList(b);
-        setFriendsList(f);
-        setMutedList(m);
-        setRestrictedList(r);
-        setFavsList(fv);
-        setSettingsLoaded(true);
-      } catch (err) {
-        console.error('Failed to load settings:', err);
-        setSettingsLoaded(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [user?.id]);
-
-  useEffect(() => {
-    return () => {
-      if (saveSettingsDebounceRef.current) {
-        clearTimeout(saveSettingsDebounceRef.current);
-        if (user?.id) {
-          saveUserSettingsToDb(user.id, settings).catch(() => {});
-        }
-      }
-    };
-  }, []);
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
@@ -749,7 +680,7 @@ export default function SettingsPage() {
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <div><p className="font-bold text-sm">{u.username}</p>{u.full_name && <p className="text-xs text-muted-foreground">{u.full_name}</p>}</div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={async () => { await blockedUsers.remove(user!.id, u.id); setBlockedList(prev => prev.filter(x => x.id !== u.id)); toast.success(direction === 'rtl' ? 'تم إلغاء الحظر' : 'Unblocked'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { await unblockUser(u.id); toast.success(direction === 'rtl' ? 'تم إلغاء الحظر' : 'Unblocked'); }}>
                       {direction === 'rtl' ? 'إلغاء الحظر' : 'Unblock'}
                     </Button>
                   </div>
@@ -779,7 +710,7 @@ export default function SettingsPage() {
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <div><p className="font-bold text-sm">{u.username}</p>{u.full_name && <p className="text-xs text-muted-foreground">{u.full_name}</p>}</div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={async () => { await closeFriends.remove(user!.id, u.id); setFriendsList(prev => prev.filter(x => x.id !== u.id)); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { await removeCloseFriend(u.id); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
                       {direction === 'rtl' ? 'إزالة' : 'Remove'}
                     </Button>
                   </div>
@@ -864,7 +795,7 @@ export default function SettingsPage() {
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <p className="font-bold text-sm">{u.username}</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={async () => { await restrictedUsers.remove(user!.id, u.id); setRestrictedList(prev => prev.filter(x => x.id !== u.id)); toast.success(direction === 'rtl' ? 'تم إلغاء التقييد' : 'Unrestricted'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { await unrestrictUser(u.id); toast.success(direction === 'rtl' ? 'تم إلغاء التقييد' : 'Unrestricted'); }}>
                       {direction === 'rtl' ? 'إلغاء التقييد' : 'Unrestrict'}
                     </Button>
                   </div>
@@ -923,7 +854,7 @@ export default function SettingsPage() {
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <p className="font-bold text-sm">{u.username}</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={async () => { await favoriteUsers.remove(user!.id, u.id); setFavsList(prev => prev.filter(x => x.id !== u.id)); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { await removeFavorite(u.id); toast.success(direction === 'rtl' ? 'تم الإزالة' : 'Removed'); }}>
                       {direction === 'rtl' ? 'إزالة' : 'Remove'}
                     </Button>
                   </div>
@@ -952,7 +883,7 @@ export default function SettingsPage() {
                       <Avatar className="w-10 h-10"><AvatarImage src={u.avatar_url} /><AvatarFallback>{u.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                       <p className="font-bold text-sm">{u.username}</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={async () => { await mutedUsers.remove(user!.id, u.id); setMutedList(prev => prev.filter(x => x.id !== u.id)); toast.success(direction === 'rtl' ? 'تم إلغاء الكتم' : 'Unmuted'); }}>
+                    <Button variant="outline" size="sm" onClick={async () => { await unmuteUser(u.id); toast.success(direction === 'rtl' ? 'تم إلغاء الكتم' : 'Unmuted'); }}>
                       {direction === 'rtl' ? 'إلغاء الكتم' : 'Unmute'}
                     </Button>
                   </div>

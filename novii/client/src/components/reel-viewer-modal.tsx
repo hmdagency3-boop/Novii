@@ -425,7 +425,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
           <Link href={`/user?id=${reply.user_id}`}>
             <Avatar className="w-6 h-6 border border-border/50 flex-shrink-0 group-hover:border-primary/40 transition-all duration-200">
               <AvatarImage src={reply.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + reply.user_id} />
-              <AvatarFallback>{reply.profile?.username?.[0].toUpperCase()}</AvatarFallback>
+              <AvatarFallback>{reply.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
             </Avatar>
           </Link>
           <div className="flex-1 min-w-0">
@@ -808,7 +808,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                               comment.profile?.is_official ? "w-8 h-8 border-primary/40 ring-2 ring-primary/10" : "w-8 h-8 border-border/50 group-hover:border-primary/40 group-hover:ring-2 group-hover:ring-primary/10"
                             )}>
                               <AvatarImage src={comment.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + comment.user_id} />
-                              <AvatarFallback>{comment.profile?.username?.[0].toUpperCase()}</AvatarFallback>
+                              <AvatarFallback>{comment.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
                             </Avatar>
                           </Link>
                           <div className="flex-1 min-w-0">
@@ -1068,7 +1068,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                             comment.profile?.is_official ? "w-9 h-9 border-primary/40 ring-2 ring-primary/10" : "w-9 h-9 border-border/50 group-hover:border-primary/40 group-hover:ring-2 group-hover:ring-primary/10"
                           )}>
                             <AvatarImage src={comment.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + comment.user_id} />
-                            <AvatarFallback>{comment.profile?.username?.[0].toUpperCase()}</AvatarFallback>
+                            <AvatarFallback>{comment.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
                           </Avatar>
                         </Link>
                         <div className="flex-1 min-w-0">
