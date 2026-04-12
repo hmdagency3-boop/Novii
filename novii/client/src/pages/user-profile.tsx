@@ -90,6 +90,7 @@ export default function UserProfile() {
     queryKey: ['profile', userId],
     queryFn: () => api.getProfileById(userId),
     enabled: !!userId,
+    refetchInterval: 10000,
   });
 
   // Fetch user posts
@@ -151,6 +152,7 @@ export default function UserProfile() {
     queryKey: ['isFollowing', userId],
     queryFn: () => api.isFollowing(userId),
     enabled: !!userId && !!currentUser,
+    refetchInterval: 8000,
   });
 
   // Check if mutual follow (to show online indicator)
@@ -158,6 +160,7 @@ export default function UserProfile() {
     queryKey: ['isMutualFollow', userId],
     queryFn: () => api.isMutualFollow(userId),
     enabled: !!userId && !!currentUser && !isOwnProfile,
+    refetchInterval: 10000,
   });
 
   // Check if I sent a follow request to them (outgoing)
@@ -165,6 +168,7 @@ export default function UserProfile() {
     queryKey: ['hasFollowRequest', userId],
     queryFn: () => api.hasFollowRequest(userId),
     enabled: !!userId && !!currentUser && !isOwnProfile,
+    refetchInterval: 8000,
   });
 
   // Check if they sent a follow request to me (incoming)
@@ -172,6 +176,7 @@ export default function UserProfile() {
     queryKey: ['hasIncomingFollowRequest', userId],
     queryFn: () => api.hasIncomingFollowRequest(userId),
     enabled: !!userId && !!currentUser && !isOwnProfile,
+    refetchInterval: 8000,
   });
 
   // Fetch user stories
