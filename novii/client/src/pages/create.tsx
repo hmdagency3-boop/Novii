@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   X, Zap, ZapOff, Settings2, Type, Infinity, LayoutGrid,
-  ChevronDown, ImageIcon, RefreshCw, Check, MapPin
+  ChevronDown, ImageIcon, RefreshCw, Check, MapPin, Camera
 } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 type Tab = 'post' | 'story' | 'reel' | 'live';
+type FacingMode = 'environment' | 'user';
 
 interface MediaItem {
   file: File;
@@ -22,6 +23,90 @@ interface MediaItem {
   isVideo: boolean;
 }
 
+/* ─────────────────────────────────────────
+   Camera hook — live stream via getUserMedia
+───────────────────────────────────────── */
+function useLiveCamera(active: boolean) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [facing, setFacing] = useState<FacingMode>('environment');
+  const [hasCamera, setHasCamera] = useState(true);
+  const [ready, setReady] = useState(false);
+
+  const startCamera = useCallback(async (mode: FacingMode) => {
+    // Stop previous stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setReady(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 1280 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => setReady(true);
+      }
+      setHasCamera(true);
+    } catch {
+      setHasCamera(false);
+    }
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setReady(false);
+  }, []);
+
+  const flipCamera = useCallback(() => {
+    const next: FacingMode = facing === 'environment' ? 'user' : 'environment';
+    setFacing(next);
+    startCamera(next);
+  }, [facing, startCamera]);
+
+  // Capture photo from stream → File
+  const capturePhoto = useCallback((): File | null => {
+    const video = videoRef.current;
+    if (!video || !ready) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    // Mirror if front camera
+    if (facing === 'user') {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    const arr = dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)![1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) u8arr[n] = bstr.charCodeAt(n);
+    return new File([u8arr], `photo_${Date.now()}.jpg`, { type: mime });
+  }, [ready, facing]);
+
+  useEffect(() => {
+    if (active) startCamera(facing);
+    else stopCamera();
+    return stopCamera;
+  }, [active]);
+
+  return { videoRef, hasCamera, ready, flipCamera, capturePhoto };
+}
+
+/* ─────────────────────────────────────────
+   Main component
+───────────────────────────────────────── */
 export default function CreatePage() {
   const { direction } = useLanguage();
   const { user } = useAuth();
@@ -33,53 +118,60 @@ export default function CreatePage() {
   const [tab, setTab] = useState<Tab>('story');
   const [capturedMedia, setCapturedMedia] = useState<MediaItem | null>(null);
   const [caption, setCaption] = useState("");
-  const [location, setLocation] = useState("");
+  const [locationText, setLocationText] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [flashOn, setFlashOn] = useState(false);
   const [step, setStep] = useState<'camera' | 'post-pick' | 'details'>('camera');
-
-  // For post/reel tab — gallery
   const [gallery, setGallery] = useState<MediaItem[]>([]);
   const [selected, setSelected] = useState<MediaItem | null>(null);
+  const [shutterAnim, setShutterAnim] = useState(false);
 
-  const captureRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
+  // Camera only active on 'camera' step
+  const { videoRef, hasCamera, ready, flipCamera, capturePhoto } = useLiveCamera(step === 'camera');
+
   const accept =
-    tab === 'reel' ? 'video/*' :
+    tab === 'reel'  ? 'video/*' :
     tab === 'story' ? 'image/*,video/*' :
     'image/*';
 
-  /* ── Add to gallery ── */
+  /* ── Add file to gallery ── */
   const addMedia = useCallback((file: File): MediaItem => {
     const url = URL.createObjectURL(file);
-    const item: MediaItem = { file, url, isVideo: file.type.startsWith('video/') };
-    return item;
+    return { file, url, isVideo: file.type.startsWith('video/') };
   }, []);
 
-  /* ── Camera capture (story mode) ── */
-  const handleCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  /* ── Shutter: capture from live camera ── */
+  const handleShutter = useCallback(() => {
+    const file = capturePhoto();
     if (!file) return;
-    const item = addMedia(file);
+    const url = URL.createObjectURL(file);
+    const item: MediaItem = { file, url, isVideo: false };
+    setShutterAnim(true);
+    setTimeout(() => setShutterAnim(false), 200);
     setCapturedMedia(item);
     setStep('details');
-    e.target.value = '';
-  }, [addMedia]);
+  }, [capturePhoto]);
 
-  /* ── Gallery pick (post/reel mode) ── */
+  /* ── Gallery pick ── */
   const handleGalleryPick = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const item = addMedia(file);
-    setSelected(item);
-    setGallery(prev => {
-      const exists = prev.find(i => i.file.name === file.name && i.file.size === file.size);
-      if (exists) return prev;
-      return [item, ...prev].slice(0, 14);
-    });
+    if (tab === 'story') {
+      setCapturedMedia(item);
+      setStep('details');
+    } else {
+      setSelected(item);
+      setGallery(prev => {
+        const dup = prev.find(i => i.file.name === file.name && i.file.size === file.size);
+        if (dup) return prev;
+        return [item, ...prev].slice(0, 14);
+      });
+    }
     e.target.value = '';
-  }, [addMedia]);
+  }, [addMedia, tab]);
 
   /* ── Publish ── */
   const handlePublish = async () => {
@@ -89,7 +181,7 @@ export default function CreatePage() {
     try {
       if (tab === 'post') {
         const imageUrl = await api.uploadPostImage(media.file);
-        await createPostMutation.mutateAsync({ caption, imageUrl, location: location || undefined });
+        await createPostMutation.mutateAsync({ caption, imageUrl, location: locationText || undefined });
         toast({ title: isRTL ? "تم النشر!" : "Posted!" });
       } else if (tab === 'story') {
         const mediaUrl = await api.uploadPostImage(media.file);
@@ -119,6 +211,13 @@ export default function CreatePage() {
     return isRTL ? 'مباشر' : 'LIVE';
   };
 
+  const pageTitle = () => {
+    if (tab === 'post')  return isRTL ? 'منشور جديد' : 'New post';
+    if (tab === 'story') return isRTL ? 'قصة جديدة'  : 'New story';
+    if (tab === 'reel')  return isRTL ? 'ريلز جديد'  : 'New reel';
+    return isRTL ? 'بث مباشر' : 'Go live';
+  };
+
   /* ════════════════════════════════
      DETAILS SCREEN
   ════════════════════════════════ */
@@ -126,20 +225,13 @@ export default function CreatePage() {
     const media = tab === 'story' ? capturedMedia : selected;
     if (!media) { setStep('camera'); return null; }
 
-    const pageTitle =
-      tab === 'post'  ? (isRTL ? 'منشور جديد' : 'New post')  :
-      tab === 'story' ? (isRTL ? 'قصة جديدة'  : 'New story') :
-      tab === 'reel'  ? (isRTL ? 'ريلز جديد'  : 'New reel')  :
-                        (isRTL ? 'بث مباشر'   : 'Go live');
-
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-background">
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 h-12 border-b border-border/40 flex-shrink-0">
           <button onClick={() => setStep(tab === 'story' ? 'camera' : 'post-pick')} className="p-1">
             <X className="w-5 h-5" />
           </button>
-          <span className="font-semibold text-sm">{pageTitle}</span>
+          <span className="font-semibold text-sm">{pageTitle()}</span>
           <button
             onClick={handlePublish}
             disabled={isUploading}
@@ -148,16 +240,12 @@ export default function CreatePage() {
             {isUploading ? (isRTL ? 'جاري...' : 'Sharing...') : (isRTL ? 'مشاركة' : 'Share')}
           </button>
         </div>
-
         <div className="flex-1 overflow-y-auto">
-          {/* Preview */}
           <div className="aspect-square w-full bg-black">
             {media.isVideo
               ? <video src={media.url} className="w-full h-full object-cover" controls />
               : <img src={media.url} alt="" className="w-full h-full object-cover" />}
           </div>
-
-          {/* Caption */}
           <div className="flex gap-3 p-4 border-b border-border/30">
             <Avatar className="w-9 h-9 flex-shrink-0">
               <AvatarImage src={user?.user_metadata?.avatar_url} />
@@ -166,9 +254,7 @@ export default function CreatePage() {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <p className="text-sm font-semibold mb-1">
-                {user?.user_metadata?.full_name || user?.email}
-              </p>
+              <p className="text-sm font-semibold mb-1">{user?.user_metadata?.full_name || user?.email}</p>
               <Textarea
                 placeholder={isRTL ? "اكتب تعليقاً..." : "Write a caption..."}
                 value={caption}
@@ -181,76 +267,52 @@ export default function CreatePage() {
               />
             </div>
           </div>
-
-          {/* Location */}
           {(tab === 'post' || tab === 'story') && (
-            <div className={cn(
-              "flex items-center gap-3 px-4 py-3 border-b border-border/30",
-              isRTL && "flex-row-reverse"
-            )}>
+            <div className={cn("flex items-center gap-3 px-4 py-3 border-b border-border/30", isRTL && "flex-row-reverse")}>
               <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               <input
                 type="text"
                 placeholder={isRTL ? "إضافة موقع" : "Add location"}
-                value={location}
-                onChange={e => setLocation(e.target.value)}
+                value={locationText}
+                onChange={e => setLocationText(e.target.value)}
                 dir={isRTL ? "rtl" : "ltr"}
-                className={cn(
-                  "flex-1 text-sm bg-transparent border-0 outline-none placeholder:text-muted-foreground/60",
-                  isRTL && "text-right"
-                )}
+                className={cn("flex-1 text-sm bg-transparent border-0 outline-none placeholder:text-muted-foreground/60", isRTL && "text-right")}
               />
             </div>
           )}
         </div>
-
-        {/* Hidden inputs */}
-        <input ref={captureRef} type="file" accept={accept} capture="environment" onChange={handleCapture} className="hidden" />
         <input ref={galleryRef} type="file" accept={accept} onChange={handleGalleryPick} className="hidden" />
       </div>
     );
   }
 
   /* ════════════════════════════════
-     POST / REEL — Gallery picker
+     POST/REEL — Gallery picker
   ════════════════════════════════ */
   if (step === 'post-pick') {
-    const pageTitle = tab === 'reel' ? (isRTL ? 'ريلز جديد' : 'New reel') : (isRTL ? 'منشور جديد' : 'New post');
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-background">
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 h-12 border-b border-border/40 flex-shrink-0">
-          <button onClick={() => setStep('camera')} className="p-1">
-            <X className="w-5 h-5" />
-          </button>
-          <span className="font-semibold text-sm">{pageTitle}</span>
+          <button onClick={() => setStep('camera')} className="p-1"><X className="w-5 h-5" /></button>
+          <span className="font-semibold text-sm">{pageTitle()}</span>
           <button
             onClick={() => selected && setStep('details')}
             disabled={!selected}
-            className={cn(
-              "font-bold text-sm",
-              selected ? "text-[#3897f0]" : "text-muted-foreground opacity-40"
-            )}
+            className={cn("font-bold text-sm", selected ? "text-[#3897f0]" : "text-muted-foreground opacity-40")}
           >
             {isRTL ? 'التالي' : 'Next'}
           </button>
         </div>
 
-        {/* Top split: camera cell + preview */}
+        {/* Top split */}
         <div className="flex flex-shrink-0" style={{ height: '44vw', maxHeight: 240 }}>
-          {/* Camera cell */}
           <button
-            onClick={() => captureRef.current?.click()}
+            onClick={() => { setStep('camera'); }}
             className="flex-none w-1/3 bg-[#111] flex items-center justify-center"
           >
-            <div className="flex flex-col items-center gap-1.5">
-              <div className="w-10 h-10 rounded-full border-2 border-white/30 flex items-center justify-center">
-                <ImageIcon className="w-5 h-5 text-white/50" />
-              </div>
-            </div>
+            <Camera className="w-9 h-9 text-white/40" />
           </button>
-
-          {/* Preview */}
           <div
             className="flex-1 bg-[#1a1a1a] overflow-hidden cursor-pointer"
             onClick={() => !selected && galleryRef.current?.click()}
@@ -269,19 +331,13 @@ export default function CreatePage() {
         </div>
 
         {/* Recents bar */}
-        <div className={cn(
-          "flex items-center justify-between px-4 py-2.5 border-b border-border/20 flex-shrink-0",
-          isRTL && "flex-row-reverse"
-        )}>
+        <div className={cn("flex items-center justify-between px-4 py-2.5 border-b border-border/20 flex-shrink-0", isRTL && "flex-row-reverse")}>
           <button className={cn("flex items-center gap-1 font-semibold text-sm", isRTL && "flex-row-reverse")}>
             {isRTL ? 'الأخيرة' : 'Recents'} <ChevronDown className="w-4 h-4" />
           </button>
           <button
             onClick={() => galleryRef.current?.click()}
-            className={cn(
-              "flex items-center gap-1.5 border border-border/60 rounded-md px-3 py-1 text-xs font-medium",
-              isRTL && "flex-row-reverse"
-            )}
+            className={cn("flex items-center gap-1.5 border border-border/60 rounded-md px-3 py-1 text-xs font-medium", isRTL && "flex-row-reverse")}
           >
             <span className="w-3 h-3 border border-current rounded-[2px] inline-block" />
             {isRTL ? 'تحديد' : 'Select'}
@@ -291,21 +347,14 @@ export default function CreatePage() {
         {/* Gallery grid */}
         <div className="flex-1 overflow-y-auto">
           <div className="grid grid-cols-3 gap-[1.5px] bg-border/20">
-            {/* Camera tile */}
             <button
-              onClick={() => captureRef.current?.click()}
+              onClick={() => galleryRef.current?.click()}
               className="aspect-square bg-[#1a1a1a] flex items-center justify-center"
             >
               <ImageIcon className="w-7 h-7 text-white/30" />
             </button>
-
-            {/* Gallery items */}
             {gallery.map((item, i) => (
-              <button
-                key={i}
-                onClick={() => setSelected(item)}
-                className="aspect-square relative overflow-hidden bg-[#111]"
-              >
+              <button key={i} onClick={() => setSelected(item)} className="aspect-square relative overflow-hidden bg-[#111]">
                 {item.isVideo
                   ? <video src={item.url} className="w-full h-full object-cover" />
                   : <img src={item.url} alt="" className="w-full h-full object-cover" />}
@@ -317,34 +366,20 @@ export default function CreatePage() {
                     </div>
                   </>
                 )}
-                {item.isVideo && (
-                  <span className="absolute bottom-1 right-1.5 text-white text-[10px] font-semibold drop-shadow">0:15</span>
-                )}
               </button>
             ))}
-
-            {/* Empty tiles */}
             {gallery.length === 0 && Array.from({ length: 11 }).map((_, i) => (
-              <div key={`e-${i}`} className="aspect-square bg-[#111]" />
+              <div key={i} className="aspect-square bg-[#111]" />
             ))}
           </div>
         </div>
 
         {/* Bottom tabs */}
-        <div className="flex-shrink-0 border-t border-border/30 bg-background pb-safe">
+        <div className="flex-shrink-0 border-t border-border/30 bg-background">
           <div className="flex">
             {(['post', 'story', 'reel', 'live'] as Tab[]).map(t => (
-              <button
-                key={t}
-                onClick={() => {
-                  setTab(t);
-                  if (t === 'story') setStep('camera');
-                }}
-                className={cn(
-                  "flex-1 py-3 text-[11px] font-semibold tracking-widest uppercase",
-                  tab === t ? "text-foreground" : "text-muted-foreground/50"
-                )}
-              >
+              <button key={t} onClick={() => { setTab(t); if (t === 'story') setStep('camera'); }}
+                className={cn("flex-1 py-3 text-[11px] font-semibold tracking-widest uppercase", tab === t ? "text-foreground" : "text-muted-foreground/50")}>
                 {tabLabel(t)}
               </button>
             ))}
@@ -356,131 +391,140 @@ export default function CreatePage() {
           </div>
         </div>
 
-        <input ref={captureRef} type="file" accept={accept} capture="environment" onChange={handleCapture} className="hidden" />
         <input ref={galleryRef} type="file" accept={accept} onChange={handleGalleryPick} className="hidden" />
       </div>
     );
   }
 
   /* ════════════════════════════════
-     STORY CAMERA SCREEN (default)
+     CAMERA SCREEN
   ════════════════════════════════ */
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black overflow-hidden">
 
-      {/* Camera "viewfinder" — dark bg simulating camera */}
-      <div className="flex-1 relative bg-[#0a0a0a] flex items-center justify-center overflow-hidden">
+      {/* Shutter flash */}
+      {shutterAnim && <div className="absolute inset-0 bg-white z-50 pointer-events-none animate-ping" style={{ animationDuration: '150ms', animationIterationCount: 1 }} />}
 
-        {/* Camera preview bg */}
-        {capturedMedia ? (
-          capturedMedia.isVideo
-            ? <video src={capturedMedia.url} className="absolute inset-0 w-full h-full object-cover" autoPlay loop muted />
-            : <img src={capturedMedia.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-b from-[#111] via-[#0d0d0d] to-[#1a1a1a]" />
+      {/* Live camera feed */}
+      <div className="flex-1 relative overflow-hidden">
+        {/* Video element */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={cn(
+            "absolute inset-0 w-full h-full object-cover transition-opacity duration-300",
+            ready ? "opacity-100" : "opacity-0"
+          )}
+        />
+
+        {/* No camera fallback */}
+        {!hasCamera && (
+          <div className="absolute inset-0 bg-[#0d0d0d] flex flex-col items-center justify-center gap-3">
+            <Camera className="w-16 h-16 text-white/20" />
+            <p className="text-white/40 text-sm text-center px-8">
+              {isRTL ? 'لم يتم السماح بالوصول للكاميرا' : 'Camera access denied'}
+            </p>
+            <button
+              onClick={() => galleryRef.current?.click()}
+              className="mt-2 px-4 py-2 bg-white/10 rounded-full text-white text-sm"
+            >
+              {isRTL ? 'اختر من المعرض' : 'Choose from gallery'}
+            </button>
+          </div>
+        )}
+
+        {/* Loading */}
+        {hasCamera && !ready && (
+          <div className="absolute inset-0 bg-black flex items-center justify-center">
+            <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          </div>
         )}
 
         {/* ── Top controls ── */}
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-12 pb-4">
-          <button onClick={() => navigate('/')} className="w-9 h-9 flex items-center justify-center">
-            <X className="w-7 h-7 text-white drop-shadow" />
+        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-10 pb-3 bg-gradient-to-b from-black/60 to-transparent">
+          <button onClick={() => navigate('/')} className="w-10 h-10 flex items-center justify-center">
+            <X className="w-7 h-7 text-white drop-shadow-lg" />
           </button>
-          <button onClick={() => setFlashOn(f => !f)} className="w-9 h-9 flex items-center justify-center">
+          <button onClick={() => setFlashOn(f => !f)} className="w-10 h-10 flex items-center justify-center">
             {flashOn
-              ? <Zap className="w-6 h-6 text-yellow-400 fill-yellow-400 drop-shadow" />
-              : <ZapOff className="w-6 h-6 text-white drop-shadow" />}
+              ? <Zap className="w-6 h-6 text-yellow-400 fill-yellow-400 drop-shadow-lg" />
+              : <ZapOff className="w-6 h-6 text-white drop-shadow-lg" />}
           </button>
-          <button className="w-9 h-9 flex items-center justify-center">
-            <Settings2 className="w-6 h-6 text-white drop-shadow" />
+          <button className="w-10 h-10 flex items-center justify-center">
+            <Settings2 className="w-6 h-6 text-white drop-shadow-lg" />
           </button>
         </div>
 
         {/* ── Left tools ── */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-6">
-          {[
-            { icon: <Type className="w-5 h-5 text-white" />,        label: 'Aa' },
-            { icon: <Infinity className="w-5 h-5 text-white" />,    label: '∞' },
-            { icon: <LayoutGrid className="w-5 h-5 text-white" />,  label: '' },
-            { icon: <ChevronDown className="w-5 h-5 text-white" />, label: '' },
-          ].map((item, i) => (
-            <button key={i} className="w-9 h-9 flex items-center justify-center drop-shadow-lg">
-              {i === 0 ? <span className="text-white font-semibold text-sm drop-shadow">Aa</span> : item.icon}
-            </button>
-          ))}
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-5">
+          <button className="w-9 h-9 flex items-center justify-center drop-shadow-lg">
+            <span className="text-white font-semibold text-sm drop-shadow">Aa</span>
+          </button>
+          <button className="w-9 h-9 flex items-center justify-center drop-shadow-lg">
+            <Infinity className="w-5 h-5 text-white" />
+          </button>
+          <button className="w-9 h-9 flex items-center justify-center drop-shadow-lg">
+            <LayoutGrid className="w-5 h-5 text-white" />
+          </button>
+          <button className="w-9 h-9 flex items-center justify-center drop-shadow-lg">
+            <ChevronDown className="w-5 h-5 text-white" />
+          </button>
         </div>
 
-        {/* ── Bottom controls ── */}
-        <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center pb-4">
-          {/* Effect filter row */}
-          <div className="flex items-center gap-3 mb-6 px-4">
+        {/* ── Bottom area (gradient + controls) ── */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pt-10 pb-2">
+
+          {/* Effect row — avatar circles */}
+          <div className="flex items-center justify-center gap-4 mb-5 px-4">
             {/* Gallery thumb */}
             <button
               onClick={() => galleryRef.current?.click()}
-              className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/50 bg-[#222] flex items-center justify-center"
+              className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/50 bg-black/40 flex items-center justify-center flex-shrink-0"
             >
               <ImageIcon className="w-5 h-5 text-white/60" />
             </button>
 
-            {/* Filter dots */}
-            {[
-              { color: 'bg-red-500',    ring: 'ring-white' },
-              { color: 'bg-gray-400',   ring: '' },
-              null,
-              { color: 'bg-purple-500', ring: '' },
-              { color: 'bg-gray-600',   ring: '' },
-            ].map((dot, i) =>
-              dot === null ? (
-                /* Capture button placeholder spacing */
-                <div key={i} className="w-18 h-18" style={{ width: 72, height: 72 }} />
-              ) : (
-                <button
-                  key={i}
-                  className={cn(
-                    "w-9 h-9 rounded-full border-2 border-white/30 overflow-hidden flex items-center justify-center",
-                    dot.color,
-                    dot.ring && `ring-2 ${dot.ring} ring-offset-1 ring-offset-black`
-                  )}
-                >
-                  <Avatar className="w-9 h-9">
-                    <AvatarImage src={user?.user_metadata?.avatar_url} />
-                    <AvatarFallback className={cn("text-xs text-white", dot.color)}>
-                      {user?.user_metadata?.full_name?.[0] || '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-              )
-            )}
+            {/* Dummy effect dots */}
+            {[true, false, false, false].map((active, i) => (
+              <button key={i} className={cn(
+                "w-9 h-9 rounded-full overflow-hidden border-2 flex-shrink-0",
+                active ? "border-white ring-2 ring-white/50 ring-offset-1 ring-offset-black" : "border-white/30"
+              )}>
+                <Avatar className="w-9 h-9">
+                  <AvatarImage src={user?.user_metadata?.avatar_url} />
+                  <AvatarFallback className="text-[10px] bg-gray-700 text-white">
+                    {user?.user_metadata?.full_name?.[0] || '?'}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            ))}
 
             {/* Flip camera */}
-            <button className="w-10 h-10 flex items-center justify-center">
-              <RefreshCw className="w-5 h-5 text-white drop-shadow" />
+            <button onClick={flipCamera} className="w-10 h-10 flex items-center justify-center flex-shrink-0">
+              <RefreshCw className="w-5 h-5 text-white drop-shadow-lg" />
             </button>
           </div>
 
-          {/* Capture button row */}
-          <div className="flex items-center justify-center relative w-full mb-4">
+          {/* Capture button */}
+          <div className="flex items-center justify-center mb-4">
             <button
-              onClick={() => captureRef.current?.click()}
-              className="w-20 h-20 rounded-full bg-white/20 border-4 border-white flex items-center justify-center active:scale-95 transition-transform shadow-2xl"
+              onClick={handleShutter}
+              disabled={!ready && hasCamera}
+              className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-transform disabled:opacity-40"
+              style={{ background: 'rgba(255,255,255,0.15)' }}
             >
               <div className="w-14 h-14 rounded-full bg-white" />
             </button>
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center w-full">
+          <div className="flex w-full">
             {(['post', 'story', 'reel', 'live'] as Tab[]).map(t => (
-              <button
-                key={t}
-                onClick={() => {
-                  setTab(t);
-                  if (t !== 'story') setStep('post-pick');
-                }}
-                className={cn(
-                  "flex-1 py-1 text-[11px] font-semibold tracking-widest uppercase transition-all",
-                  tab === t ? "text-white" : "text-white/40"
-                )}
-              >
+              <button key={t}
+                onClick={() => { setTab(t); if (t !== 'story') setStep('post-pick'); }}
+                className={cn("flex-1 py-1.5 text-[11px] font-semibold tracking-widest uppercase", tab === t ? "text-white" : "text-white/40")}>
                 {tabLabel(t)}
               </button>
             ))}
@@ -493,8 +537,6 @@ export default function CreatePage() {
         </div>
       </div>
 
-      {/* Hidden inputs */}
-      <input ref={captureRef} type="file" accept={accept} capture="environment" onChange={handleCapture} className="hidden" />
       <input ref={galleryRef} type="file" accept={accept} onChange={handleGalleryPick} className="hidden" />
     </div>
   );
