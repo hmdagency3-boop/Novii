@@ -157,16 +157,15 @@ export default function PostCard({ post }: PostCardProps) {
       {/* Header */}
       <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border/30">
         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-          {/* Avatar — story-aware (ring + click to open story if exists) */}
+          {/* Avatar — standalone, story-aware (no HoverCard here to avoid conflict) */}
+          <StoryAwareAvatar
+            userId={post.user_id}
+            avatarUrl={post.profile?.avatar_url}
+            username={post.profile?.username}
+            sizeClass="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16"
+          />
+          {/* Username + time + location — HoverCard triggers on the name */}
           <UserHoverCard userId={post.user_id}>
-            <StoryAwareAvatar
-              userId={post.user_id}
-              avatarUrl={post.profile?.avatar_url}
-              username={post.profile?.username}
-              sizeClass="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16"
-            />
-          </UserHoverCard>
-          {/* Username + time + location */}
           <Link href={`/user?id=${post.user_id}`} className="flex flex-col leading-tight min-w-0 flex-1 hover:opacity-80 transition-opacity">
             <div className="flex items-center gap-1 flex-wrap">
               <VerifiedUsername
@@ -196,6 +195,7 @@ export default function PostCard({ post }: PostCardProps) {
               )}
             </div>
           </Link>
+          </UserHoverCard>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
