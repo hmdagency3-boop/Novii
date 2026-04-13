@@ -187,50 +187,65 @@ export function useToggleLike() {
   return useMutation({
     mutationFn: (postId: string) => api.toggleLike(postId),
     onMutate: async (postId) => {
-      // Update UI immediately with optimistic like state toggle
-      const updatePost = (post: Post) => ({
-        ...post,
-        is_liked: !post.is_liked,
-        likes_count: post.is_liked
-          ? Math.max(0, (post.likes_count ?? 0) - 1)
-          : (post.likes_count ?? 0) + 1,
+      const updatePost = (post: Post) =>
+        post.id === postId
+          ? {
+              ...post,
+              is_liked: !post.is_liked,
+              likes_count: post.is_liked
+                ? Math.max(0, (post.likes_count ?? 0) - 1)
+                : (post.likes_count ?? 0) + 1,
+            }
+          : post;
+
+      // ── Infinite feed (primary feed source) ──
+      queryClient.setQueriesData({ queryKey: ['feed-infinite'] }, (old: any) => {
+        if (!old?.pages) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: Post[]) =>
+            Array.isArray(page) ? page.map(updatePost) : page
+          ),
+        };
       });
 
-      // Update feed queries
+      // ── Flat feed (legacy / profile posts) ──
       queryClient.setQueriesData({ queryKey: ['feed'] }, (old: any) => {
         if (!old) return old;
-        return Array.isArray(old) 
-          ? old.map((post: Post) => post.id === postId ? updatePost(post) : post)
-          : old;
+        return Array.isArray(old) ? old.map(updatePost) : old;
       });
 
-      // Update individual post
+      // ── Individual post ──
       queryClient.setQueriesData({ queryKey: ['post'] }, (old: any) => {
         if (!old) return old;
-        if (old.id === postId) {
-          return updatePost(old);
-        }
-        return old;
+        return old.id === postId ? updatePost(old) : old;
       });
 
-      // Update explore queries
+      // ── Explore posts ──
       queryClient.setQueriesData({ queryKey: ['explore'] }, (old: any) => {
         if (!old) return old;
-        return Array.isArray(old)
-          ? old.map((post: Post) => post.id === postId ? updatePost(post) : post)
-          : old;
+        return Array.isArray(old) ? old.map(updatePost) : old;
+      });
+
+      // ── User posts ──
+      queryClient.setQueriesData({ queryKey: ['posts'] }, (old: any) => {
+        if (!old) return old;
+        return Array.isArray(old) ? old.map(updatePost) : old;
       });
     },
     onSuccess: (_, postId) => {
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-      queryClient.invalidateQueries({ queryKey: ['explore'] });
+      // Only refetch the single post — leave feed-infinite alone to avoid
+      // expensive multi-page refetch after every like.
       queryClient.refetchQueries({ queryKey: ['post', postId] });
     },
     onError: (error: any) => {
       console.error('Like toggle error:', error);
+      // On error, reset everything to server truth
+      queryClient.invalidateQueries({ queryKey: ['feed-infinite'] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['post'] });
       queryClient.invalidateQueries({ queryKey: ['explore'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
     },
   });
 }
