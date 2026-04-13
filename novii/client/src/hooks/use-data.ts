@@ -143,6 +143,23 @@ export function useDeletePost() {
   });
 }
 
+export function useDeleteReel() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (reelId: string) => api.deleteReel(reelId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reels'] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast({ title: 'تم الحذف', description: 'تم حذف الريلز بنجاح' });
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الريلز' });
+    },
+  });
+}
+
 // Like hooks
 export function useToggleLike() {
   const queryClient = useQueryClient();

@@ -78,6 +78,7 @@ export function ReelCommentsSheet({ reelId, open, onClose }: ReelCommentsSheetPr
         .from("comments")
         .select("*, profile:profiles(*)")
         .eq("reel_id", reelId)
+        .eq("is_deleted", false)
         .order("created_at", { ascending: false });
       if (!all) return [];
       const map = new Map<string, any>();

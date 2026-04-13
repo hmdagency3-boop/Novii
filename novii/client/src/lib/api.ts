@@ -206,6 +206,41 @@ async function communityFetch(url: string, options: RequestInit = {}): Promise<R
   });
 }
 
+// -----------------------------------------------------------------------
+// Helper: extract hashtags from caption and save to DB
+// -----------------------------------------------------------------------
+async function saveHashtags(
+  contentId: string,
+  contentType: 'post' | 'reel',
+  caption: string
+): Promise<void> {
+  const tags = Array.from(new Set(
+    (caption.match(/#(\w+)/g) || []).map(t => t.slice(1).toLowerCase())
+  ));
+  if (tags.length === 0) return;
+
+  // Upsert hashtag rows and get their ids
+  const { data: hashtagRows, error: upsertError } = await supabase
+    .from('hashtags')
+    .upsert(
+      tags.map(name => ({ name })),
+      { onConflict: 'name', ignoreDuplicates: false }
+    )
+    .select('id, name');
+
+  if (upsertError || !hashtagRows) return;
+
+  const linkTable = contentType === 'post' ? 'post_hashtags' : 'reel_hashtags';
+  const fkCol    = contentType === 'post' ? 'post_id' : 'reel_id';
+
+  await supabase
+    .from(linkTable)
+    .upsert(
+      hashtagRows.map(h => ({ [fkCol]: contentId, hashtag_id: h.id })),
+      { onConflict: `${fkCol},hashtag_id`, ignoreDuplicates: true }
+    );
+}
+
 export const api = {
   // Profile APIs
   async getCurrentProfile(): Promise<Profile | null> {
@@ -415,6 +450,7 @@ export const api = {
       .from('posts')
       .select(POST_WITH_PROFILE)
       .eq('is_archived', false)
+      .eq('is_deleted', false)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -449,6 +485,7 @@ export const api = {
       .from('posts')
       .select(POST_WITH_PROFILE)
       .eq('is_archived', false)
+      .eq('is_deleted', false)
       .order('likes_count', { ascending: false })
       .limit(limit);
 
@@ -497,6 +534,7 @@ export const api = {
       .select(POST_COLUMNS)
       .eq('user_id', userId)
       .eq('is_archived', false)
+      .eq('is_deleted', false)
       .order('is_pinned', { ascending: false })
       .order('created_at', { ascending: false });
 
@@ -530,6 +568,7 @@ export const api = {
     const { data, error } = await supabase
       .from('reels')
       .select(REEL_WITH_PROFILE)
+      .eq('is_deleted', false)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -623,7 +662,23 @@ export const api = {
 
     await supabase.rpc('increment_posts_count', { profile_id: user.id });
 
+    // Extract and save hashtags in the background (non-blocking)
+    saveHashtags(data.id, 'post', caption).catch(() => {});
+
     return data as unknown as Post;
+  },
+
+  async deleteReel(reelId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { error } = await supabase
+      .from('reels')
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+      .eq('id', reelId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
   },
 
   async deletePost(postId: string): Promise<void> {
@@ -632,7 +687,7 @@ export const api = {
 
     const { error } = await supabase
       .from('posts')
-      .delete()
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
       .eq('id', postId)
       .eq('user_id', user.id);
 
@@ -767,6 +822,7 @@ export const api = {
       .from('comments')
       .select(COMMENT_WITH_PROFILE)
       .eq('post_id', postId)
+      .eq('is_deleted', false)
       .order('created_at', { ascending: true });
 
     if (error) throw error;
@@ -962,18 +1018,20 @@ export const api = {
       }
     }
 
-    // Delete all replies first (cascade delete)
+    const now = new Date().toISOString();
+
+    // Soft-delete all replies first
     const { error: deleteRepliesError } = await supabase
       .from('comments')
-      .delete()
+      .update({ is_deleted: true, deleted_at: now })
       .eq('parent_comment_id', commentId);
 
     if (deleteRepliesError) throw deleteRepliesError;
 
-    // Delete the comment
+    // Soft-delete the comment
     const { error: deleteError } = await supabase
       .from('comments')
-      .delete()
+      .update({ is_deleted: true, deleted_at: now })
       .eq('id', commentId);
 
     if (deleteError) throw deleteError;
@@ -2414,7 +2472,6 @@ export const api = {
         .single();
 
       const typingUser = {
-        id: `${communityId}-${user.id}`,
         community_id: communityId,
         user_id: user.id,
         username: profile?.username || 'Anonymous',
@@ -2424,7 +2481,7 @@ export const api = {
 
       await supabase
         .from('typing_indicators')
-        .upsert(typingUser, { onConflict: 'id' })
+        .upsert(typingUser, { onConflict: 'community_id,user_id' })
         .select();
     } else {
       // Delete typing indicator
@@ -2650,5 +2707,9 @@ export const api = {
     }
 
     return response.json();
-  }
+  },
+
+  saveHashtags(contentId: string, contentType: 'post' | 'reel', caption: string) {
+    return saveHashtags(contentId, contentType, caption);
+  },
 };

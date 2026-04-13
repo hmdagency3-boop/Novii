@@ -18,7 +18,7 @@ import { ActiveBadge } from "@/components/ui/active-badge";
 import { useLanguage } from "@/lib/language-context";
 import { formatDistanceToNow } from "date-fns";
 import { ar } from "date-fns/locale";
-import { useToggleReelLike, useCreateComment, useToggleCommentLike, useDeleteComment, useCurrentUser } from "@/hooks/use-data";
+import { useToggleReelLike, useCreateComment, useToggleCommentLike, useDeleteComment, useCurrentUser, useDeleteReel } from "@/hooks/use-data";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
@@ -153,6 +153,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
         .from('comments')
         .select('*, profile:profiles(*)')
         .eq('reel_id', reel.id)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
       
       if (!allComments) return [];
@@ -190,6 +191,9 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
   const createComment = useCreateComment();
   const toggleCommentLike = useToggleCommentLike();
   const deleteComment = useDeleteComment();
+  const deleteReel = useDeleteReel();
+  const [showReelMenu, setShowReelMenu] = useState(false);
+  const isReelOwner = currentUser?.id === localReel?.user_id;
 
   if (!reel || !localReel) return null;
 
@@ -702,11 +706,33 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
               </div>
             </button>
 
-            <button className="flex flex-col items-center gap-1 group">
-              <div className="bg-black/30 group-hover:bg-purple-500/40 p-3 rounded-full transition-all backdrop-blur-sm border border-white/20">
-                <MoreVertical className="w-6 h-6 text-white" />
+            {isReelOwner && (
+              <div className="relative">
+                <button
+                  className="flex flex-col items-center gap-1 group"
+                  onClick={() => setShowReelMenu(prev => !prev)}
+                >
+                  <div className="bg-black/30 group-hover:bg-red-500/40 p-3 rounded-full transition-all backdrop-blur-sm border border-white/20">
+                    <MoreVertical className="w-6 h-6 text-white" />
+                  </div>
+                </button>
+                {showReelMenu && (
+                  <div className="absolute bottom-14 right-0 bg-background/95 backdrop-blur-sm border border-border rounded-xl shadow-xl overflow-hidden z-50 min-w-[140px]">
+                    <button
+                      className="flex items-center gap-2 w-full px-4 py-3 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+                      onClick={() => {
+                        if (!localReel?.id) return;
+                        deleteReel.mutate(localReel.id, { onSuccess: () => { onClose(); } });
+                        setShowReelMenu(false);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>{isRTL ? 'حذف الريلز' : 'Delete Reel'}</span>
+                    </button>
+                  </div>
+                )}
               </div>
-            </button>
+            )}
           </div>
 
           {/* User Info & Caption - Mobile Bottom Overlay */}

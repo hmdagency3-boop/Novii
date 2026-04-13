@@ -406,7 +406,14 @@ export default function CreatePage() {
         toast({ title: isRTL ? "تمت إضافة القصة!" : "Story added!" });
       } else if (tab === 'reel') {
         const videoUrl = await api.uploadPostImage(media.file);
-        await supabase.from('reels').insert({ user_id: user?.id, video_url: videoUrl, caption });
+        const { data: reelData } = await supabase
+          .from('reels')
+          .insert({ user_id: user?.id, video_url: videoUrl, caption })
+          .select('id')
+          .single();
+        if (reelData?.id && caption) {
+          api.saveHashtags(reelData.id, 'reel', caption).catch(() => {});
+        }
         toast({ title: isRTL ? "تم نشر الريلز!" : "Reel posted!" });
       }
       navigate("/");
