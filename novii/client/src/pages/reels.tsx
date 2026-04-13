@@ -437,6 +437,9 @@ function MobileReelCard({
   currentUserId, videoRefs, cardHeight = "100svh",
   onLike, onFollow, onSave, onShare, onComment,
 }: CardProps) {
+  /* When the card is shorter (nav bar present), reduce bottom offsets so
+     content stays at the same visual position relative to the screen bottom. */
+  const hasNav = cardHeight !== "100svh";
   const longPressTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPress     = useRef(false);
   const lastTapTime     = useRef(0);
@@ -540,15 +543,15 @@ function MobileReelCard({
         {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
       </div>
 
-      {/* Action buttons */}
-      <div className={cn("absolute bottom-24 z-30", isRTL ? "left-3" : "right-3")}>
+      {/* Action buttons — bottom-8 when nav present (32px above nav top = same visual spot) */}
+      <div className={cn("absolute z-30", hasNav ? "bottom-8" : "bottom-24", isRTL ? "left-3" : "right-3")}>
         <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
           currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
           onSave={onSave} onShare={onShare} onComment={onComment} size="sm" />
       </div>
 
-      {/* Bottom info */}
-      <div className={cn("absolute bottom-0 z-20 pb-20 px-4 w-full",
+      {/* Bottom info — pb-4 when nav present (16px above nav top = same visual spot) */}
+      <div className={cn("absolute bottom-0 z-20 px-4 w-full", hasNav ? "pb-4" : "pb-20",
         isRTL ? "text-right pr-4 pl-16" : "pl-4 pr-16")}>
         <Link href={`/user?id=${reel.profile?.id}`}>
           <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity drop-shadow">
