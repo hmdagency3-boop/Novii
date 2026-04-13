@@ -95,7 +95,7 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
     bio: profile.bio || "",
     website: profile.website || "",
     location: profile.location || "",
-    gender: (profile as any).gender || "",
+    gender: profile.gender || "",
     avatar_url: profile.avatar_url || "",
   });
 

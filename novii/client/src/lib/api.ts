@@ -49,6 +49,7 @@ export interface Profile {
   bronze_early_member_at?: string | null;
   is_beta_tester?: boolean;
   beta_tester_at?: string | null;
+  gender?: string | null;
   followers_count: number;
   following_count?: number;
   posts_count?: number;
