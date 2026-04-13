@@ -36,6 +36,8 @@ import TermsOfService from "@/pages/terms";
 import Help from "@/pages/help";
 import About from "@/pages/about";
 import ProtectedLayout from "@/components/protected-layout";
+import PublicRoute from "@/components/public-route";
+import { GuestPromptProvider } from "@/components/guest-login-prompt";
 
 function SplashOverlay() {
   const [visible, setVisible] = useState(true);
@@ -149,9 +151,9 @@ function Router() {
         </ProtectedLayout>
       </Route>
       <Route path="/explore">
-        <ProtectedLayout>
+        <PublicRoute>
           <Explore />
-        </ProtectedLayout>
+        </PublicRoute>
       </Route>
       <Route path="/search">
         <ProtectedLayout>
@@ -159,14 +161,14 @@ function Router() {
         </ProtectedLayout>
       </Route>
       <Route path="/reels">
-        <ProtectedLayout>
+        <PublicRoute>
           <Reels />
-        </ProtectedLayout>
+        </PublicRoute>
       </Route>
       <Route path="/reel/:id">
-        <ProtectedLayout>
+        <PublicRoute>
           <Reels />
-        </ProtectedLayout>
+        </PublicRoute>
       </Route>
       <Route path="/settings">
         <ProtectedLayout>
@@ -230,15 +232,17 @@ function App() {
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
               <SettingsProvider>
-                <TooltipProvider>
-                  <ShadcnToaster />
-                  <Toaster richColors position="top-right" />
-                  <GlobalMessageListener />
-                  <TimeTracker />
-                  <VisitorDetector />
-                  {showSplash && <SplashOverlay />}
-                  <Router />
-                </TooltipProvider>
+                <GuestPromptProvider>
+                  <TooltipProvider>
+                    <ShadcnToaster />
+                    <Toaster richColors position="top-right" />
+                    <GlobalMessageListener />
+                    <TimeTracker />
+                    <VisitorDetector />
+                    {showSplash && <SplashOverlay />}
+                    <Router />
+                  </TooltipProvider>
+                </GuestPromptProvider>
               </SettingsProvider>
             </AuthProvider>
           </QueryClientProvider>

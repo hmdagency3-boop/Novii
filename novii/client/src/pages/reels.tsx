@@ -11,6 +11,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/use-data";
+import { useAuth } from "@/lib/auth-context";
+import { useGuestPrompt } from "@/components/guest-login-prompt";
 import { toast } from "sonner";
 import { Link } from "wouter";
 
@@ -22,6 +24,9 @@ export default function Reels() {
   const isRTL = direction === "rtl";
   const { data: reels, isLoading } = useReels(20);
   const { data: currentUser } = useCurrentUser();
+  const { user } = useAuth();
+  const isGuest = !user;
+  const { showPrompt } = useGuestPrompt();
   const toggleReelLike = useToggleReelLike();
   const toggleFollow   = useToggleFollow();
 
@@ -81,9 +86,9 @@ export default function Reels() {
   }, []);
 
   const handleLike = useCallback(async (reel: any, e?: React.MouseEvent) => {
-    if (!currentUser) { toast.error(isRTL ? "سجّل دخولك أولاً" : "Please login first"); return; }
+    if (!currentUser) { showPrompt(); return; }
     try { await toggleReelLike.mutateAsync(reel.id); if (e) spawnHeart(e); } catch {}
-  }, [currentUser, isRTL, toggleReelLike, spawnHeart]);
+  }, [currentUser, showPrompt, toggleReelLike, spawnHeart]);
 
   const handleDoubleTap = useCallback((reel: any, e: React.MouseEvent) => {
     const now = Date.now();
@@ -106,19 +111,21 @@ export default function Reels() {
   }, [isRTL]);
 
   const handleFollow = useCallback((uid: string) => {
-    if (!currentUser) { toast.error(isRTL ? "سجّل دخولك أولاً" : "Please login first"); return; }
+    if (!currentUser) { showPrompt(); return; }
     toggleFollow.mutate({ targetUserId: uid });
     setFollowedUsers(p => { const n = new Set(p); n.has(uid) ? n.delete(uid) : n.add(uid); return n; });
-  }, [currentUser, isRTL, toggleFollow]);
+  }, [currentUser, showPrompt, toggleFollow]);
 
   const handleSave = useCallback((id: string) => {
+    if (!currentUser) { showPrompt(); return; }
     setSavedReels(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
     toast.success(savedReels.has(id) ? (isRTL ? "تمت الإزالة" : "Removed") : (isRTL ? "تم الحفظ" : "Saved"));
-  }, [isRTL, savedReels]);
+  }, [currentUser, showPrompt, isRTL, savedReels]);
 
   const handleComment = useCallback((id: string) => {
+    if (!currentUser) { showPrompt(); return; }
     setCommentReelId(id);
-  }, []);
+  }, [currentUser, showPrompt]);
 
   /* ── shared card props builder ── */
   const cardProps = (reel: any) => ({
@@ -139,27 +146,31 @@ export default function Reels() {
     onComment: handleComment,
   });
 
+  /* ── helper wrapper ── */
+  const Wrap = ({ children }: { children: React.ReactNode }) =>
+    isGuest ? <>{children}</> : <Layout>{children}</Layout>;
+
   /* ── loading / empty ── */
   if (isLoading) return (
-    <Layout>
+    <Wrap>
       <div className="fixed inset-0 lg:left-20 flex items-center justify-center bg-background">
         <Spinner />
       </div>
-    </Layout>
+    </Wrap>
   );
 
   if (!reels?.length) return (
-    <Layout>
+    <Wrap>
       <div className="fixed inset-0 lg:left-20 flex flex-col items-center justify-center bg-background gap-4">
         <div className="text-6xl">🎬</div>
         <h2 className="text-2xl font-bold text-foreground">{isRTL ? "لا توجد ريلز" : "No Reels Yet"}</h2>
         <p className="text-muted-foreground">{isRTL ? "كن أول من ينشر!" : "Be the first to post!"}</p>
       </div>
-    </Layout>
+    </Wrap>
   );
 
   return (
-    <Layout>
+    <Wrap>
 
       {/* ══════════════════════════════════════════
           MOBILE  — fullscreen snap scroll
@@ -222,7 +233,7 @@ export default function Reels() {
         .animate-marquee   { display:flex; width:max-content; animation: marquee 7s linear infinite; }
         .animate-spin-slow { animation: spinSlow 4s linear infinite; }
       `}</style>
-    </Layout>
+    </Wrap>
   );
 }
 
