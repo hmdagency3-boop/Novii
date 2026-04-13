@@ -2,6 +2,7 @@ import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Grid3X3, Bookmark, UserSquare2, Heart, MessageCircle, ArrowLeft, Lock, QrCode, MoreHorizontal, ShieldBan, VolumeX, ShieldAlert, Star, Users, Pin } from "lucide-react";
 import { ProfilePostCard } from "@/components/profile-post-card";
+import { ProfileReelCard } from "@/components/profile-reel-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
@@ -22,7 +23,7 @@ import { api } from "@/lib/api";
 import { getUserBadges } from "@/lib/badge-utils";
 import { Link, useLocation } from "wouter";
 import { useLanguage } from "@/lib/language-context";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { FollowersDialog } from "@/components/followers-dialog";
 import { PostViewerModal } from "@/components/post-viewer-modal";
 import { ReelViewerModal } from "@/components/reel-viewer-modal";
@@ -247,6 +248,17 @@ export default function UserProfile() {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
+
+  // Merge posts + reels sorted by created_at descending (pinned posts first)
+  const mixedContent = useMemo(() => {
+    const posts = userPosts.map((p: any) => ({ ...p, _type: 'post' as const }));
+    const reels = userReels.map((r: any) => ({ ...r, _type: 'reel' as const }));
+    return [...posts, ...reels].sort((a: any, b: any) => {
+      if (a._type === 'post' && a.is_pinned && !(b._type === 'post' && b.is_pinned)) return -1;
+      if (b._type === 'post' && b.is_pinned && !(a._type === 'post' && a.is_pinned)) return 1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [userPosts, userReels]);
 
   if (profileLoading) {
     return (
@@ -644,7 +656,7 @@ export default function UserProfile() {
                 </div>
 
                 <TabsContent value="posts" className="p-1 md:p-4 pb-20 md:pb-4 max-w-4xl mx-auto mt-0">
-                    {postsLoading ? (
+                    {postsLoading || reelsLoading ? (
                       <div className="flex items-center justify-center py-10">
                         <Spinner className="w-6 h-6" />
                       </div>
@@ -654,7 +666,7 @@ export default function UserProfile() {
                         <h3 className="text-xl font-bold mb-2">{isRTL ? "حساب خاص" : "Private Account"}</h3>
                         <p className="text-muted-foreground max-w-sm">{isRTL ? "هذا الحساب خاص. يمكنك فقط رؤية المنشورات إذا كنت من المتابعين المقبولين." : "This account is private. You can only see posts if you're an approved follower."}</p>
                       </div>
-                    ) : userPosts.length === 0 ? (
+                    ) : mixedContent.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-20 text-center">
                         <Grid3X3 className="w-16 h-16 text-muted-foreground mb-4" />
                         <h3 className="text-xl font-bold mb-2">{isRTL ? "لا توجد منشورات" : "No Posts Yet"}</h3>
@@ -662,13 +674,21 @@ export default function UserProfile() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-3 gap-0.5 md:gap-1">
-                        {userPosts.map((post) => (
-                          <ProfilePostCard
-                            key={post.id}
-                            post={post}
-                            onClick={() => { setSelectedPost(post); setPostViewerOpen(true); }}
-                          />
-                        ))}
+                        {mixedContent.map((item: any) =>
+                          item._type === 'reel' ? (
+                            <ProfileReelCard
+                              key={`reel-${item.id}`}
+                              reel={item}
+                              onClick={() => { setSelectedReel(item); setReelModalOpen(true); }}
+                            />
+                          ) : (
+                            <ProfilePostCard
+                              key={`post-${item.id}`}
+                              post={item}
+                              onClick={() => { setSelectedPost(item); setPostViewerOpen(true); }}
+                            />
+                          )
+                        )}
                       </div>
                     )}
                 </TabsContent>
