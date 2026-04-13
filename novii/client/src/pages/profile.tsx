@@ -32,6 +32,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { REEL_COLUMNS, PROFILE_CARD } from "@/lib/query-columns";
 import { ProfileShareModal } from "@/components/profile-share-modal";
+import { ProfilePostCard } from "@/components/profile-post-card";
 
 export default function Profile() {
   const { user } = useAuth();
@@ -460,38 +461,13 @@ export default function Profile() {
                         <p className="text-muted-foreground">Start sharing your moments!</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-3 gap-1 md:gap-4">
+                      <div className="grid grid-cols-3 gap-0.5 md:gap-1">
                         {userPosts.map((post) => (
-                            <div 
-                              key={post.id} 
-                              onClick={() => {
-                                setSelectedPost(post);
-                                setPostModalOpen(true);
-                              }}
-                              className="relative aspect-square group cursor-pointer overflow-hidden bg-muted rounded-sm md:rounded-lg shadow-sm hover:shadow-xl transition-shadow duration-300">
-                                {post.image_url ? (
-                                  <img src={post.image_url} className="w-full h-full object-cover transition-all duration-300 group-hover:scale-105 group-hover:brightness-90" alt="Post" />
-                                ) : (
-                                  <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                                    <Grid3X3 className="w-12 h-12 text-muted-foreground" />
-                                  </div>
-                                )}
-                                {post.is_pinned && (
-                                  <div className="absolute top-1.5 right-1.5 z-10 bg-black/60 backdrop-blur-sm rounded-full p-1">
-                                    <Pin className="w-3 h-3 text-white fill-white" />
-                                  </div>
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4 text-white font-semibold">
-                                    <div className="flex items-center gap-1.5 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                                      <Heart className="w-5 h-5 fill-white" /> 
-                                      <span>{post.likes_count}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300 delay-75">
-                                      <MessageCircle className="w-5 h-5 fill-white" /> 
-                                      <span>{post.comments_count}</span>
-                                    </div>
-                                </div>
-                            </div>
+                          <ProfilePostCard
+                            key={post.id}
+                            post={post}
+                            onClick={() => { setSelectedPost(post); setPostModalOpen(true); }}
+                          />
                         ))}
                       </div>
                     )}
@@ -549,33 +525,13 @@ export default function Profile() {
                         <p className="text-muted-foreground">Save posts to view them later</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-3 gap-1 md:gap-4">
+                      <div className="grid grid-cols-3 gap-0.5 md:gap-1">
                         {savedPosts.map((post) => (
-                            <div 
-                              key={post.id}
-                              onClick={() => {
-                                setSelectedPost(post);
-                                setPostModalOpen(true);
-                              }}
-                              className="relative aspect-square group cursor-pointer overflow-hidden bg-muted rounded-sm md:rounded-lg shadow-sm hover:shadow-xl transition-shadow duration-300">
-                                {post.image_url ? (
-                                  <img src={post.image_url} className="w-full h-full object-cover transition-all duration-300 group-hover:scale-105 group-hover:brightness-90" alt="Post" />
-                                ) : (
-                                  <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                                    <Grid3X3 className="w-12 h-12 text-muted-foreground" />
-                                  </div>
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4 text-white font-semibold">
-                                    <div className="flex items-center gap-1.5 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                                      <Heart className="w-5 h-5 fill-white" /> 
-                                      <span>{post.likes_count}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300 delay-75">
-                                      <MessageCircle className="w-5 h-5 fill-white" /> 
-                                      <span>{post.comments_count}</span>
-                                    </div>
-                                </div>
-                            </div>
+                          <ProfilePostCard
+                            key={post.id}
+                            post={post}
+                            onClick={() => { setSelectedPost(post); setPostModalOpen(true); }}
+                          />
                         ))}
                       </div>
                     )}
