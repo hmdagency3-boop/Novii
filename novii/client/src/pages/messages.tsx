@@ -750,11 +750,12 @@ export default function Messages() {
   });
 
   // Fetch following list
-  const { data: followingList = [], isLoading: followingLoading } = useQuery({
+  const { data: followingListRaw, isLoading: followingLoading } = useQuery({
     queryKey: ['following', currentUser?.id],
     queryFn: () => currentUser ? api.getFollowing(currentUser.id) : Promise.resolve([]),
     enabled: !!currentUser && showNewMessagePopover,
   });
+  const followingList = Array.isArray(followingListRaw) ? followingListRaw : [];
 
   // Filter following list based on search query
   const filteredFollowing = followingList.filter((user: any) => {
