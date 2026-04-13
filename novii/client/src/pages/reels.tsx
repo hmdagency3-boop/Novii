@@ -466,8 +466,22 @@ function MobileReelCard({
   const isLongPress     = useRef(false);
   const lastTapTime     = useRef(0);
   const singleTapTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerStart    = useRef<{ x: number; y: number } | null>(null);
   const [holdActive, setHoldActive] = useState(false);
   const [localFloatingHearts, setLocalFloatingHearts] = useState<FloatingHeart[]>([]);
+
+  const cancelLongPress = (resume = false) => {
+    clearTimeout(longPressTimer.current ?? undefined);
+    if (isLongPress.current) {
+      isLongPress.current = false;
+      setHoldActive(false);
+      if (resume) {
+        const vid = videoRefs.current[reel.id];
+        if (vid) vid.play().catch(() => {});
+      }
+    }
+    pointerStart.current = null;
+  };
 
   const spawnHeart = (e: React.PointerEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -479,25 +493,32 @@ function MobileReelCard({
   const handlePointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     isLongPress.current = false;
+    pointerStart.current = { x: e.clientX, y: e.clientY };
+    // 600ms threshold — short enough to feel responsive, long enough not to fire during swipes
     longPressTimer.current = setTimeout(() => {
       isLongPress.current = true;
       setHoldActive(true);
       const vid = videoRefs.current[reel.id];
       if (vid) vid.pause();
-    }, 300);
+    }, 600);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!pointerStart.current) return;
+    const dx = Math.abs(e.clientX - pointerStart.current.x);
+    const dy = Math.abs(e.clientY - pointerStart.current.y);
+    // If finger moved more than 8px it's a scroll — kill the long press
+    if (dx > 8 || dy > 8) cancelLongPress(false);
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    clearTimeout(longPressTimer.current ?? undefined);
-    if (isLongPress.current) {
-      isLongPress.current = false;
-      setHoldActive(false);
-      const vid = videoRefs.current[reel.id];
-      if (vid) vid.play().catch(() => {});
-      return;
-    }
+    const wasLong = isLongPress.current;
+    cancelLongPress(true); // resume if was holding
+    if (wasLong) return;   // don't treat release of hold as a tap
+
     const now = Date.now();
     if (now - lastTapTime.current < 350) {
+      // Double tap → like
       clearTimeout(singleTapTimer.current ?? undefined);
       lastTapTime.current = 0;
       onLike(reel, e as any);
@@ -510,15 +531,10 @@ function MobileReelCard({
     }
   };
 
-  const handlePointerLeave = () => {
-    clearTimeout(longPressTimer.current ?? undefined);
-    if (isLongPress.current) {
-      isLongPress.current = false;
-      setHoldActive(false);
-      const vid = videoRefs.current[reel.id];
-      if (vid) vid.play().catch(() => {});
-    }
-  };
+  // pointercancel = browser took over (scroll) — cancel long press without resuming
+  const handlePointerCancel = () => cancelLongPress(false);
+  // pointerleave without cancel means finger left element edge — resume if holding
+  const handlePointerLeave  = () => cancelLongPress(true);
 
   return (
     <div
@@ -533,9 +549,10 @@ function MobileReelCard({
         className="absolute inset-0 w-full h-full object-cover"
         loop playsInline muted={muted}
         onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
-        onPointerCancel={handlePointerLeave}
+        onPointerCancel={handlePointerCancel}
         onContextMenu={e => e.preventDefault()}
         style={{ userSelect: "none", WebkitUserSelect: "none" } as React.CSSProperties}
       />
