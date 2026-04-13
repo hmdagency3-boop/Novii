@@ -14,6 +14,7 @@ import { AvatarUploader } from "@/components/avatar-uploader";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { invalidateCacheByPattern } from "@/lib/cache-utils";
 import { validateUsernameComplete } from "@/lib/username-validation";
+import { supabase } from "@/lib/supabase";
 
 interface EditProfileDialogProps {
   profile: Profile;
@@ -126,6 +127,18 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
       setUsernameIsValid(true);
       setSuggestions([]);
       setShowSuggestions(false);
+
+      // Fetch fresh gender directly from Supabase (bypasses cache)
+      supabase
+        .from("profiles")
+        .select("gender")
+        .eq("id", profile.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.gender) {
+            setFormData((prev) => ({ ...prev, gender: data.gender }));
+          }
+        });
     }
   }, [open]);
 
