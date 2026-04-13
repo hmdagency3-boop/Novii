@@ -352,7 +352,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {/* Left Side */}
                 <div className="flex items-center gap-2 flex-1">
                     {location === "/profile" ? (
-                        // Own profile page: Theme button on left
                         <Button 
                             variant="ghost" 
                             size="icon"
@@ -360,37 +359,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         >
                             {mounted && theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
                         </Button>
-                    ) : location.startsWith("/user") ? (
-                        // User profile page: Empty left side
-                        <div className="w-0" />
                     ) : (
-                        // Other pages: Logo and Novii
-                        <>
-                            <img src={logo} alt="Novii" className="w-6 h-6 mix-blend-multiply dark:mix-blend-screen" />
-                            <span className="font-display font-bold text-lg leading-none">Novii</span>
-                        </>
+                        <div className="w-0" />
                     )}
                 </div>
 
                 {/* Center */}
                 <div className="flex-1 text-center flex items-center justify-center gap-1">
-                    <span className="text-sm font-semibold truncate">
-                        {location === "/profile" ? (profile?.username || 'User') : location.startsWith('/user') ? (visitedUserProfile?.username || 'User') : ''}
-                    </span>
-                    {location.startsWith('/user') && visitedUserProfile && (
-                        <div className="flex items-center gap-0.5">
-                            {visitedUserProfile.is_verified && (
-                                <VerifiedBadge size="sm" />
+                    {location === "/profile" ? (
+                        <span className="text-sm font-semibold truncate">{profile?.username || 'User'}</span>
+                    ) : location.startsWith('/user') ? (
+                        <>
+                            <span className="text-sm font-semibold truncate">{visitedUserProfile?.username || 'User'}</span>
+                            {visitedUserProfile && (
+                                <div className="flex items-center gap-0.5">
+                                    {visitedUserProfile.is_verified && <VerifiedBadge size="sm" />}
+                                    {visitedUserProfile.is_official && <OfficialBadge size="sm" />}
+                                </div>
                             )}
-                            {visitedUserProfile.is_official && (
-                                <OfficialBadge size="sm" />
-                            )}
-                        </div>
+                        </>
+                    ) : (
+                        <span className="font-display font-bold text-xl leading-none">Novii</span>
                     )}
                 </div>
 
                 {/* Right Side */}
-                <div className="flex items-center gap-2 flex-1 justify-end">
+                <div className="flex items-center gap-1 flex-1 justify-end">
                     {location === "/profile" && (
                         <Button 
                             variant="ghost" 
@@ -403,6 +397,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     )}
                     {location !== "/profile" && !location.startsWith("/user") && (
                         <>
+                            <img src={logo} alt="Novii" className="w-6 h-6 mix-blend-multiply dark:mix-blend-screen" />
                             <Link href="/notifications">
                                 <Button variant="ghost" size="icon" className="relative">
                                     <Heart className="w-5 h-5" />
