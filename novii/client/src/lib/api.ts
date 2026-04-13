@@ -252,7 +252,7 @@ export const api = {
 
     if (onProgress) onProgress(10);
 
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const res = await communityFetch("/api/upload", { method: "POST", body: formData });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
