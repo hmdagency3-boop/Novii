@@ -1,6 +1,6 @@
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Settings, Grid3X3, Bookmark, UserSquare2, Heart, MessageCircle, Lock, Shield, QrCode } from "lucide-react";
+import { Settings, Grid3X3, Bookmark, UserSquare2, Heart, MessageCircle, Lock, Shield, QrCode, Pin } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
@@ -474,6 +474,11 @@ export default function Profile() {
                                 ) : (
                                   <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
                                     <Grid3X3 className="w-12 h-12 text-muted-foreground" />
+                                  </div>
+                                )}
+                                {post.is_pinned && (
+                                  <div className="absolute top-1.5 right-1.5 z-10 bg-black/60 backdrop-blur-sm rounded-full p-1">
+                                    <Pin className="w-3 h-3 text-white fill-white" />
                                   </div>
                                 )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4 text-white font-semibold">
