@@ -36,7 +36,9 @@ export default function Reels() {
   const [pausedReels,   setPausedReels]     = useState<Set<string>>(new Set());
   const [floatingHearts, setFloatingHearts] = useState<FloatingHeart[]>([]);
   const [commentReelId, setCommentReelId]   = useState<string | null>(null);
-  const lastTapRef = useRef<number>(0);
+  const lastTapRef       = useRef<number>(0);
+  const guestViewCount   = useRef<number>(0);
+  const guestPromptShown = useRef<boolean>(false);
 
   /* ── SEPARATE ref maps so mobile & desktop don't overwrite each other ── */
   const mobileRefs  = useRef<{ [k: string]: HTMLVideoElement }>({});
@@ -60,6 +62,15 @@ export default function Reels() {
         if (entry.isIntersecting) {
           vid.muted = muted;
           vid.play().catch(() => {});
+
+          /* ── guest view counter: show prompt after 2 reels ── */
+          if (isGuest && !guestPromptShown.current) {
+            guestViewCount.current += 1;
+            if (guestViewCount.current > 2) {
+              guestPromptShown.current = true;
+              setTimeout(() => showPrompt(), 600);
+            }
+          }
         } else {
           vid.pause();
           vid.currentTime = 0;
@@ -69,7 +80,7 @@ export default function Reels() {
 
     document.querySelectorAll(".reel-item").forEach(el => obs.observe(el));
     return () => obs.disconnect();
-  }, [reels, muted]);
+  }, [reels, muted, isGuest, showPrompt]);
 
   /* ── sync mute to whichever refs are active ── */
   useEffect(() => {
