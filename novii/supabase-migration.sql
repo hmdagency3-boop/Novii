@@ -229,6 +229,14 @@ CREATE TRIGGER update_highlights_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================
+-- سياسة تغيير البيانات الشخصية (مثل Instagram)
+-- شغّل هذا الكود في Supabase Dashboard > SQL Editor
+-- =============================================
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS username_changed_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS full_name_changed_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS gender_changed_at TIMESTAMPTZ DEFAULT NULL;
+
+-- =============================================
 -- فهارس لتسريع البحث
 -- =============================================
 

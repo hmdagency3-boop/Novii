@@ -31,6 +31,9 @@ export const PROFILE_COLUMNS = `
   is_bronze_early_member,
   is_beta_tester,
   gender,
+  username_changed_at,
+  full_name_changed_at,
+  gender_changed_at,
   created_at,
   updated_at
 `;

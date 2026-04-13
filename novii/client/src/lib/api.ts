@@ -50,6 +50,9 @@ export interface Profile {
   is_beta_tester?: boolean;
   beta_tester_at?: string | null;
   gender?: string | null;
+  username_changed_at?: string | null;
+  full_name_changed_at?: string | null;
+  gender_changed_at?: string | null;
   followers_count: number;
   following_count?: number;
   posts_count?: number;
@@ -311,6 +314,12 @@ export const api = {
     for (const key of ALLOWED_FIELDS) {
       if (key in updates) safeUpdates[key] = (updates as any)[key];
     }
+
+    // Stamp change timestamps for policy-tracked fields
+    const now = new Date().toISOString();
+    if ('username' in updates) safeUpdates.username_changed_at = now;
+    if ('full_name' in updates) safeUpdates.full_name_changed_at = now;
+    if ('gender' in updates) safeUpdates.gender_changed_at = now;
 
     const { data, error } = await supabase
       .from('profiles')
