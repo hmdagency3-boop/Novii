@@ -53,78 +53,107 @@ export default function Reels() {
   const mobileRefs  = useRef<{ [k: string]: HTMLVideoElement }>({});
   const desktopRefs = useRef<{ [k: string]: HTMLVideoElement }>({});
 
-  /* ── stable refs for muted / guest so the observer closure stays fresh ── */
-  const mutedRef         = useRef(muted);
-  const isGuestRef       = useRef(isGuest);
-  const showPromptRef    = useRef(showPrompt);
-  mutedRef.current       = muted;
-  isGuestRef.current     = isGuest;
-  showPromptRef.current  = showPrompt;
+  /* ── Container refs for scroll-based index tracking ── */
+  const mobileContainerRef  = useRef<HTMLDivElement>(null);
+  const desktopContainerRef = useRef<HTMLDivElement>(null);
 
-  /* ── stable IntersectionObserver — created once, never recreated ── */
-  const observerRef      = useRef<IntersectionObserver | null>(null);
-  const observedEls      = useRef<Set<Element>>(new Set());
+  /* ── Currently visible reel index per container ── */
+  const [activeMobileIdx,  setActiveMobileIdx]  = useState(0);
+  const [activeDesktopIdx, setActiveDesktopIdx] = useState(0);
 
-  /* ── helper: pick the correct ref map based on container class ── */
-  const getRefsForEl = (el: Element): VideoRefMap => {
-    return el.closest(".mobile-reels-container") ? mobileRefs : desktopRefs;
-  };
+  /* ── Stable refs so effects always see latest values ── */
+  const mutedRef        = useRef(muted);
+  const isGuestRef      = useRef(isGuest);
+  const showPromptRef   = useRef(showPrompt);
+  const reelsRef        = useRef(reels);
+  mutedRef.current      = muted;
+  isGuestRef.current    = isGuest;
+  showPromptRef.current = showPrompt;
+  reelsRef.current      = reels;
 
-  /* Create the observer exactly once */
+  /* ── Stable scroll handlers (use reelsRef to avoid stale closure) ── */
+  const handleMobileScroll = useCallback(() => {
+    const c = mobileContainerRef.current;
+    if (!c) return;
+    const idx = Math.round(c.scrollTop / c.clientHeight);
+    setActiveMobileIdx(Math.max(0, Math.min(idx, reelsRef.current.length - 1)));
+  }, []);
+
+  const handleDesktopScroll = useCallback(() => {
+    const c = desktopContainerRef.current;
+    if (!c) return;
+    const idx = Math.round(c.scrollTop / c.clientHeight);
+    setActiveDesktopIdx(Math.max(0, Math.min(idx, reelsRef.current.length - 1)));
+  }, []);
+
+  /* ── Attach scroll listeners once ── */
   useEffect(() => {
-    const obs = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        const id  = entry.target.getAttribute("data-id") || "";
-        const refs = getRefsForEl(entry.target);
-        const vid  = refs.current[id];
-        if (!vid) return;
-        if (entry.isIntersecting) {
-          vid.muted = mutedRef.current;
-          vid.play().catch(() => {});
-          if (isGuestRef.current && !guestPromptShown.current) {
-            guestViewCount.current += 1;
-            if (guestViewCount.current > 2) {
-              guestPromptShown.current = true;
-              setTimeout(() => showPromptRef.current(), 600);
-            }
+    const c = mobileContainerRef.current;
+    if (!c) return;
+    c.addEventListener("scroll", handleMobileScroll, { passive: true });
+    return () => c.removeEventListener("scroll", handleMobileScroll);
+  }, [handleMobileScroll]);
+
+  useEffect(() => {
+    const c = desktopContainerRef.current;
+    if (!c) return;
+    c.addEventListener("scroll", handleDesktopScroll, { passive: true });
+    return () => c.removeEventListener("scroll", handleDesktopScroll);
+  }, [handleDesktopScroll]);
+
+  /* ── Play active reel, pause all others — MOBILE ── */
+  useEffect(() => {
+    if (!reels.length) return;
+    reels.forEach((reel: any, idx: number) => {
+      const vid = mobileRefs.current[reel.id];
+      if (!vid) return;
+      if (idx === activeMobileIdx) {
+        vid.muted = mutedRef.current;
+        vid.play().catch(() => {});
+        if (isGuestRef.current && !guestPromptShown.current) {
+          guestViewCount.current += 1;
+          if (guestViewCount.current > 2) {
+            guestPromptShown.current = true;
+            setTimeout(() => showPromptRef.current(), 600);
           }
-        } else {
-          vid.pause();
-          vid.currentTime = 0;
         }
-      });
-    }, { threshold: 0.6 });
-
-    observerRef.current = obs;
-    return () => {
-      obs.disconnect();
-      observedEls.current.clear();
-    };
-  }, []); // ← intentionally empty: observer lives for the full page lifetime
-
-  /* When reels list grows, observe any NEW elements (never re-observe old ones) */
-  useEffect(() => {
-    if (!observerRef.current || !reels?.length) return;
-    document.querySelectorAll(".reel-item").forEach(el => {
-      if (!observedEls.current.has(el)) {
-        observerRef.current!.observe(el);
-        observedEls.current.add(el);
+      } else {
+        vid.pause();
+        vid.currentTime = 0;
       }
     });
-  }, [reels]);
+  }, [activeMobileIdx, reels]);
 
-  /* ── sync mute to active videos without recreating the observer ── */
+  /* ── Play active reel, pause all others — DESKTOP ── */
   useEffect(() => {
-    [...Object.values(mobileRefs.current), ...Object.values(desktopRefs.current)]
-      .forEach(v => { v.muted = muted; });
-  }, [muted]);
+    if (!reels.length) return;
+    reels.forEach((reel: any, idx: number) => {
+      const vid = desktopRefs.current[reel.id];
+      if (!vid) return;
+      if (idx === activeDesktopIdx) {
+        vid.muted = mutedRef.current;
+        vid.play().catch(() => {});
+      } else {
+        vid.pause();
+        vid.currentTime = 0;
+      }
+    });
+  }, [activeDesktopIdx, reels]);
 
-  /* ── load next page of reels when either sentinel is visible ── */
+  /* ── Sync mute change only to the currently active videos ── */
+  useEffect(() => {
+    const mr = reels[activeMobileIdx];
+    const dr = reels[activeDesktopIdx];
+    if (mr) { const v = mobileRefs.current[mr.id]; if (v) v.muted = muted; }
+    if (dr) { const v = desktopRefs.current[dr.id]; if (v) v.muted = muted; }
+  }, [muted, activeMobileIdx, activeDesktopIdx, reels]);
+
+  /* ── Load next page when sentinel is visible ── */
   useEffect(() => {
     const load = () => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); };
     const obs = new IntersectionObserver((entries) => {
       if (entries.some(e => e.isIntersecting)) load();
-    }, { rootMargin: '400px' });
+    }, { rootMargin: "400px" });
     const els = [mobileSentinelRef.current, desktopSentinelRef.current].filter(Boolean) as Element[];
     els.forEach(el => obs.observe(el));
     return () => obs.disconnect();
@@ -229,6 +258,7 @@ export default function Reels() {
           MOBILE  — fullscreen snap scroll
       ══════════════════════════════════════════ */}
       <div
+        ref={mobileContainerRef}
         className="mobile-reels-container fixed inset-0 top-0 lg:hidden snap-y snap-mandatory bg-background"
         style={{
           overflowY: "scroll",
@@ -259,6 +289,7 @@ export default function Reels() {
           DESKTOP — centered 9:16 + side actions
       ══════════════════════════════════════════ */}
       <div
+        ref={desktopContainerRef}
         className="fixed inset-0 left-20 hidden lg:block overflow-y-scroll snap-y snap-mandatory bg-background"
         style={{ scrollbarWidth: "none" }}
       >
