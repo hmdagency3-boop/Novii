@@ -155,7 +155,7 @@ export default function PostCard({ post }: PostCardProps) {
   };
 
   return (
-    <div className="flex flex-col w-full bg-card lg:border lg:rounded-3xl overflow-hidden mb-0 sm:mb-6 animate-in fade-in-50 slide-in-from-bottom-5 duration-500 lg:shadow-lg lg:hover:shadow-2xl lg:transition-shadow lg:duration-300 lg:border-primary/20 lg:hover:border-primary/40">
+    <div className="flex flex-col w-full bg-card lg:border lg:rounded-3xl overflow-hidden animate-in fade-in-50 slide-in-from-bottom-5 duration-500 lg:shadow-lg lg:hover:shadow-2xl lg:transition-shadow lg:duration-300 lg:border-primary/20 lg:hover:border-primary/40">
       
       {/* Header */}
       <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border/30">
@@ -374,7 +374,7 @@ export default function PostCard({ post }: PostCardProps) {
       </div>
 
       {/* Content */}
-      <div className="px-3 sm:px-4 pb-4 sm:pb-6 space-y-3">
+      <div className="px-3 sm:px-4 pb-0 sm:pb-6 space-y-3">
         {/* Likes Counter - Hidden if hide_likes is true */}
         {!shouldHideLikes && (
           <div className="flex items-center gap-2">
