@@ -53,31 +53,39 @@ export default function Reels() {
   const mobileRefs  = useRef<{ [k: string]: HTMLVideoElement }>({});
   const desktopRefs = useRef<{ [k: string]: HTMLVideoElement }>({});
 
+  /* ── stable refs for muted / guest so the observer closure stays fresh ── */
+  const mutedRef         = useRef(muted);
+  const isGuestRef       = useRef(isGuest);
+  const showPromptRef    = useRef(showPrompt);
+  mutedRef.current       = muted;
+  isGuestRef.current     = isGuest;
+  showPromptRef.current  = showPrompt;
+
+  /* ── stable IntersectionObserver — created once, never recreated ── */
+  const observerRef      = useRef<IntersectionObserver | null>(null);
+  const observedEls      = useRef<Set<Element>>(new Set());
+
   /* ── helper: pick the correct ref map based on container class ── */
   const getRefsForEl = (el: Element): VideoRefMap => {
     return el.closest(".mobile-reels-container") ? mobileRefs : desktopRefs;
   };
 
-  /* ── IntersectionObserver: only the visible container's elements play ── */
+  /* Create the observer exactly once */
   useEffect(() => {
-    if (!reels?.length) return;
-
     const obs = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        const id   = entry.target.getAttribute("data-id") || "";
+        const id  = entry.target.getAttribute("data-id") || "";
         const refs = getRefsForEl(entry.target);
         const vid  = refs.current[id];
         if (!vid) return;
         if (entry.isIntersecting) {
-          vid.muted = muted;
+          vid.muted = mutedRef.current;
           vid.play().catch(() => {});
-
-          /* ── guest view counter: show prompt after 2 reels ── */
-          if (isGuest && !guestPromptShown.current) {
+          if (isGuestRef.current && !guestPromptShown.current) {
             guestViewCount.current += 1;
             if (guestViewCount.current > 2) {
               guestPromptShown.current = true;
-              setTimeout(() => showPrompt(), 600);
+              setTimeout(() => showPromptRef.current(), 600);
             }
           }
         } else {
@@ -87,11 +95,25 @@ export default function Reels() {
       });
     }, { threshold: 0.6 });
 
-    document.querySelectorAll(".reel-item").forEach(el => obs.observe(el));
-    return () => obs.disconnect();
-  }, [reels, muted, isGuest, showPrompt]);
+    observerRef.current = obs;
+    return () => {
+      obs.disconnect();
+      observedEls.current.clear();
+    };
+  }, []); // ← intentionally empty: observer lives for the full page lifetime
 
-  /* ── sync mute to whichever refs are active ── */
+  /* When reels list grows, observe any NEW elements (never re-observe old ones) */
+  useEffect(() => {
+    if (!observerRef.current || !reels?.length) return;
+    document.querySelectorAll(".reel-item").forEach(el => {
+      if (!observedEls.current.has(el)) {
+        observerRef.current!.observe(el);
+        observedEls.current.add(el);
+      }
+    });
+  }, [reels]);
+
+  /* ── sync mute to active videos without recreating the observer ── */
   useEffect(() => {
     [...Object.values(mobileRefs.current), ...Object.values(desktopRefs.current)]
       .forEach(v => { v.muted = muted; });
