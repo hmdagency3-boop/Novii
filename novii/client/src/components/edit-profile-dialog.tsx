@@ -11,8 +11,7 @@ import { api, type Profile } from "@/lib/api";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
 import { AvatarUploader } from "@/components/avatar-uploader";
-import { Camera, X, AlertCircle, CheckCircle2 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { invalidateCacheByPattern } from "@/lib/cache-utils";
 import { validateUsernameComplete } from "@/lib/username-validation";
 
@@ -38,14 +37,13 @@ const GENDER_OPTIONS = {
 
 export function EditProfileDialog({ profile, trigger, children, onProfileUpdate }: EditProfileDialogProps) {
   const [open, setOpen] = useState(false);
-  const { language, direction } = useLanguage();
+  const { direction } = useLanguage();
   const isRTL = direction === "rtl";
-  const lang = language.code === "ar" ? "ar" : "en";
+  const lang = isRTL ? "ar" : "en";
 
   const labels = {
     en: {
       title: "Edit Profile",
-      coverPhoto: "Cover Photo",
       username: "Username",
       name: "Name",
       namePlaceholder: "Full name",
@@ -67,7 +65,6 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
     },
     ar: {
       title: "تعديل الملف الشخصي",
-      coverPhoto: "صورة الغلاف",
       username: "اسم المستخدم",
       name: "الاسم",
       namePlaceholder: "الاسم الكامل",
@@ -100,17 +97,12 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
     location: profile.location || "",
     gender: (profile as any).gender || "",
     avatar_url: profile.avatar_url || "",
-    cover_url: profile.cover_url || "",
   });
 
   const [formData, setFormData] = useState(getDefaultForm);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
-  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string>("");
-  const [coverUploadProgress, setCoverUploadProgress] = useState(0);
-  const [wantToRemoveCover, setWantToRemoveCover] = useState(false);
 
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [usernameIsValid, setUsernameIsValid] = useState(true);
@@ -124,17 +116,12 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  // Reset form state whenever the dialog is opened
   useEffect(() => {
     if (open) {
       setFormData(getDefaultForm());
       setSelectedFile(null);
       setPreviewUrl("");
       setUploadProgress(0);
-      setSelectedCoverFile(null);
-      setCoverPreviewUrl("");
-      setCoverUploadProgress(0);
-      setWantToRemoveCover(false);
       setUsernameError(null);
       setUsernameIsValid(true);
       setSuggestions([]);
@@ -142,27 +129,21 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
     }
   }, [open]);
 
-  // Real-time username validation
   useEffect(() => {
     if (!formData.username || formData.username === profile.username) {
       setUsernameError(null);
       setUsernameIsValid(true);
       return;
     }
-
     setUsernameChecking(true);
     if (usernameCheckTimeoutRef.current) clearTimeout(usernameCheckTimeoutRef.current);
-
     usernameCheckTimeoutRef.current = setTimeout(async () => {
       const result = await validateUsernameComplete(formData.username, profile.id);
       setUsernameError(result.error);
       setUsernameIsValid(result.isValid);
       setUsernameChecking(false);
     }, 500);
-
-    return () => {
-      if (usernameCheckTimeoutRef.current) clearTimeout(usernameCheckTimeoutRef.current);
-    };
+    return () => { if (usernameCheckTimeoutRef.current) clearTimeout(usernameCheckTimeoutRef.current); };
   }, [formData.username, profile.username, profile.id]);
 
   const updateProfileMutation = useMutation({
@@ -178,17 +159,6 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
         }
       }
 
-      // Upload cover if new file selected
-      if (selectedCoverFile) {
-        const coverUrl = await api.uploadCover(selectedCoverFile, (p) => setCoverUploadProgress(p));
-        changedFields.cover_url = coverUrl;
-        hasChanges = true;
-      } else if (wantToRemoveCover) {
-        changedFields.cover_url = "";
-        hasChanges = true;
-      }
-
-      // Upload avatar if new file selected
       if (selectedFile) {
         const avatarUrl = await api.uploadAvatar(selectedFile, (p) => setUploadProgress(p));
         changedFields.avatar_url = avatarUrl;
@@ -196,20 +166,16 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
       }
 
       if (!hasChanges) return profile;
-
       return await api.updateProfile(changedFields as Partial<Profile>);
     },
     onSuccess: (updatedProfile) => {
       invalidateCacheByPattern("profile");
-
       if (user?.id) {
         const currentData = queryClient.getQueryData(["profile", user.id]) as Profile | undefined;
         const mergedData = currentData ? { ...currentData, ...updatedProfile } : updatedProfile;
         queryClient.setQueryData(["profile", user.id], mergedData);
       }
-
       if (onProfileUpdate) onProfileUpdate();
-
       queryClient.refetchQueries({ queryKey: ["profile", user?.id], type: "active" });
       queryClient.invalidateQueries({
         predicate: (query) => {
@@ -221,14 +187,12 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
             "saved", "userPosts"].includes(key[0] as string);
         },
       });
-
       toast.success(t.successMsg);
       setOpen(false);
     },
     onError: (error: any) => {
       toast.error(error.message || t.errorMsg);
       setUploadProgress(0);
-      setCoverUploadProgress(0);
     },
   });
 
@@ -255,22 +219,6 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
   };
 
   const handleRemovePhoto = () => { setSelectedFile(null); setPreviewUrl(""); };
-
-  const handleCoverFileSelect = (file: File) => {
-    if (!file.type.startsWith("image/")) { toast.error(lang === "ar" ? "يرجى اختيار ملف صورة" : "Please select an image file"); return; }
-    if (file.size > 10 * 1024 * 1024) { toast.error(lang === "ar" ? "حجم الصورة يجب أن يكون أقل من 10 ميجابايت" : "Image size should be less than 10MB"); return; }
-    setSelectedCoverFile(file);
-    setWantToRemoveCover(false);
-    const reader = new FileReader();
-    reader.onloadend = () => setCoverPreviewUrl(reader.result as string);
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveCover = () => {
-    setSelectedCoverFile(null);
-    setCoverPreviewUrl("");
-    setWantToRemoveCover(true);
-  };
 
   const fetchSuggestions = async (partial: string) => {
     if (!partial || partial.length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
@@ -302,8 +250,6 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
     setSuggestions([]);
   };
 
-  const currentCoverSrc = coverPreviewUrl || (!wantToRemoveCover ? formData.cover_url : "");
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger || children}</DialogTrigger>
@@ -313,46 +259,7 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Cover Photo */}
-          <div className="space-y-2">
-            <label className="text-sm font-semibold">{t.coverPhoto}</label>
-            <div className="relative w-full h-32 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 rounded-lg overflow-hidden group">
-              {currentCoverSrc && (
-                <img src={currentCoverSrc} alt="Cover" className="w-full h-full object-cover" />
-              )}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => e.target.files?.[0] && handleCoverFileSelect(e.target.files[0])}
-                    disabled={updateProfileMutation.isPending}
-                  />
-                  <div className="bg-white/90 hover:bg-white text-black rounded-full p-2 transition-colors">
-                    <Camera className="w-5 h-5" />
-                  </div>
-                </label>
-                {currentCoverSrc && (
-                  <button
-                    type="button"
-                    onClick={handleRemoveCover}
-                    className="bg-white/90 hover:bg-white text-black rounded-full p-2 transition-colors"
-                    disabled={updateProfileMutation.isPending}
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-              {coverUploadProgress > 0 && coverUploadProgress < 100 && (
-                <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/50">
-                  <Progress value={coverUploadProgress} className="h-1" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Avatar Uploader */}
+          {/* Avatar */}
           <AvatarUploader
             currentAvatar={formData.avatar_url}
             username={profile.username}
@@ -366,7 +273,6 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
             lang={lang}
           />
 
-          {/* Form Fields */}
           <div className="space-y-4">
             {/* Username */}
             <div className="space-y-2">
@@ -379,9 +285,7 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
                   placeholder={t.username}
                   className={`bg-background ${isRTL ? "pr-3 pl-10" : "pl-3 pr-10"} ${
                     formData.username !== profile.username
-                      ? usernameIsValid && !usernameError
-                        ? "border-green-500"
-                        : "border-destructive"
+                      ? usernameIsValid && !usernameError ? "border-green-500" : "border-destructive"
                       : ""
                   }`}
                 />
@@ -400,12 +304,8 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
                   <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-md z-50">
                     <div className="max-h-40 overflow-y-auto">
                       {suggestions.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => selectSuggestion(s)}
-                          className={`w-full ${isRTL ? "text-right" : "text-left"} px-3 py-2 hover:bg-accent transition-colors text-sm`}
-                        >
+                        <button key={s} type="button" onClick={() => selectSuggestion(s)}
+                          className={`w-full ${isRTL ? "text-right" : "text-left"} px-3 py-2 hover:bg-accent transition-colors text-sm`}>
                           {s}
                         </button>
                       ))}
@@ -415,14 +315,12 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
               </div>
               {formData.username !== profile.username && usernameError && (
                 <p className="text-xs text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="w-3 h-3" />
-                  {usernameError}
+                  <AlertCircle className="w-3 h-3" />{usernameError}
                 </p>
               )}
               {formData.username !== profile.username && usernameIsValid && !usernameError && !usernameChecking && (
                 <p className="text-xs text-green-500 flex items-center gap-1 mt-1">
-                  <CheckCircle2 className="w-3 h-3" />
-                  {t.usernameAvailable}
+                  <CheckCircle2 className="w-3 h-3" />{t.usernameAvailable}
                 </p>
               )}
             </div>
@@ -430,12 +328,8 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
             {/* Full Name */}
             <div className="space-y-2">
               <label className="text-sm font-semibold">{t.name}</label>
-              <Input
-                value={formData.full_name}
-                onChange={(e) => handleChange("full_name", e.target.value)}
-                placeholder={t.namePlaceholder}
-                className="bg-background"
-              />
+              <Input value={formData.full_name} onChange={(e) => handleChange("full_name", e.target.value)}
+                placeholder={t.namePlaceholder} className="bg-background" />
             </div>
 
             {/* Bio */}
@@ -444,54 +338,35 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
                 <label className="text-sm font-semibold">{t.bio}</label>
                 <span className="text-xs text-muted-foreground">{formData.bio.length} / 150</span>
               </div>
-              <Textarea
-                value={formData.bio}
-                onChange={(e) => handleChange("bio", e.target.value)}
-                placeholder={t.bioPlaceholder}
-                className="bg-background resize-none"
-                maxLength={150}
-                rows={3}
-              />
+              <Textarea value={formData.bio} onChange={(e) => handleChange("bio", e.target.value)}
+                placeholder={t.bioPlaceholder} className="bg-background resize-none" maxLength={150} rows={3} />
             </div>
 
             {/* Website */}
             <div className="space-y-2">
               <label className="text-sm font-semibold">{t.website}</label>
-              <Input
-                value={formData.website}
-                onChange={(e) => handleChange("website", e.target.value)}
-                placeholder={t.websitePlaceholder}
-                className="bg-background"
-              />
+              <Input value={formData.website} onChange={(e) => handleChange("website", e.target.value)}
+                placeholder={t.websitePlaceholder} className="bg-background" />
             </div>
 
             {/* Location */}
             <div className="space-y-2">
               <label className="text-sm font-semibold">{t.location}</label>
-              <Input
-                value={formData.location}
-                onChange={(e) => handleChange("location", e.target.value)}
-                placeholder={t.locationPlaceholder}
-                className="bg-background"
-              />
+              <Input value={formData.location} onChange={(e) => handleChange("location", e.target.value)}
+                placeholder={t.locationPlaceholder} className="bg-background" />
             </div>
 
             {/* Gender */}
             <div className="space-y-2">
               <label className="text-sm font-semibold">{t.gender}</label>
-              <Select
-                value={formData.gender || ""}
-                onValueChange={(val) => handleChange("gender", val)}
-                disabled={updateProfileMutation.isPending}
-              >
+              <Select value={formData.gender || ""} onValueChange={(val) => handleChange("gender", val)}
+                disabled={updateProfileMutation.isPending}>
                 <SelectTrigger className="bg-background w-full">
                   <SelectValue placeholder={t.genderPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
                   {genderOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -500,32 +375,19 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              className="flex-1"
-              disabled={updateProfileMutation.isPending}
-            >
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}
+              className="flex-1" disabled={updateProfileMutation.isPending}>
               {t.cancel}
             </Button>
-            <Button
-              type="submit"
-              className="flex-1 bg-primary hover:bg-primary/90"
+            <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90"
               disabled={
                 updateProfileMutation.isPending ||
                 (formData.username !== profile.username && (!usernameIsValid || !!usernameError)) ||
                 usernameChecking
-              }
-            >
+              }>
               {updateProfileMutation.isPending ? (
-                <span className="flex items-center gap-2">
-                  <Spinner className="w-4 h-4" />
-                  {t.saving}
-                </span>
-              ) : (
-                t.save
-              )}
+                <span className="flex items-center gap-2"><Spinner className="w-4 h-4" />{t.saving}</span>
+              ) : t.save}
             </Button>
           </div>
         </form>
