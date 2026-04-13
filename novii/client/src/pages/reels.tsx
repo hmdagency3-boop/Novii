@@ -1,8 +1,8 @@
 import Layout from "@/components/layout";
 import { ReelCommentsSheet } from "@/components/reel-comments-sheet";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useLanguage } from "@/lib/language-context";
-import { useReels, useToggleReelLike, useToggleFollow } from "@/hooks/use-data";
+import { useInfiniteReels, useToggleReelLike, useToggleFollow } from "@/hooks/use-data";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Heart, MessageCircle, Share2, Bookmark,
@@ -22,7 +22,16 @@ type VideoRefMap = React.MutableRefObject<{ [k: string]: HTMLVideoElement }>;
 export default function Reels() {
   const { direction } = useLanguage();
   const isRTL = direction === "rtl";
-  const { data: reels, isLoading } = useReels(20);
+  const {
+    data: infiniteReelsData,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteReels();
+  const reels = useMemo(() => infiniteReelsData?.pages.flat() ?? [], [infiniteReelsData]);
+  const mobileSentinelRef  = useRef<HTMLDivElement>(null);
+  const desktopSentinelRef = useRef<HTMLDivElement>(null);
   const { data: currentUser } = useCurrentUser();
   const { user } = useAuth();
   const isGuest = !user;
@@ -87,6 +96,17 @@ export default function Reels() {
     [...Object.values(mobileRefs.current), ...Object.values(desktopRefs.current)]
       .forEach(v => { v.muted = muted; });
   }, [muted]);
+
+  /* ── load next page of reels when either sentinel is visible ── */
+  useEffect(() => {
+    const load = () => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); };
+    const obs = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) load();
+    }, { rootMargin: '400px' });
+    const els = [mobileSentinelRef.current, desktopSentinelRef.current].filter(Boolean) as Element[];
+    els.forEach(el => obs.observe(el));
+    return () => obs.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   /* ── spawn floating heart at tap position ── */
   const spawnHeart = useCallback((e: React.MouseEvent) => {
@@ -204,6 +224,13 @@ export default function Reels() {
             {...cardProps(reel)}
           />
         ))}
+        {/* Mobile sentinel */}
+        <div ref={mobileSentinelRef} className="w-full h-2 shrink-0 snap-start" />
+        {isFetchingNextPage && (
+          <div className="flex items-center justify-center w-full h-16 shrink-0">
+            <div className="w-6 h-6 rounded-full border-2 border-white border-t-transparent animate-spin" />
+          </div>
+        )}
       </div>
 
       {/* ══════════════════════════════════════════
@@ -222,6 +249,13 @@ export default function Reels() {
             {...cardProps(reel)}
           />
         ))}
+        {/* Desktop sentinel */}
+        <div ref={desktopSentinelRef} className="w-full h-2 shrink-0 snap-start" />
+        {isFetchingNextPage && (
+          <div className="flex items-center justify-center w-full h-16 shrink-0">
+            <div className="w-6 h-6 rounded-full border-2 border-white border-t-transparent animate-spin" />
+          </div>
+        )}
       </div>
 
       {/* Comments Sheet */}

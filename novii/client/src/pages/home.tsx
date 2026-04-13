@@ -3,9 +3,9 @@ import StoryBar from "@/components/story-bar";
 import PostCard from "@/components/post-card";
 import { CreateStoryModal } from "@/components/create-story-modal";
 import { StoryViewerModal } from "@/components/story-viewer-modal";
-import { useFeed, useStories, useCurrentProfile, useFollowing } from "@/hooks/use-data";
+import { useInfiniteFeed, useStories, useCurrentProfile, useFollowing } from "@/hooks/use-data";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useLanguage } from "@/lib/language-context";
 import { toast } from "sonner";
@@ -14,7 +14,14 @@ import { Link } from "wouter";
 import { useSettings } from "@/lib/settings-context";
 
 export default function Home() {
-  const { data: posts, isLoading: postsLoading, refetch: refetchFeed } = useFeed();
+  const {
+    data: infiniteData,
+    isLoading: postsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch: refetchFeed,
+  } = useInfiniteFeed();
   const { data: stories, isLoading: storiesLoading } = useStories();
   const { data: currentUser } = useCurrentProfile();
   const { data: followingUsers = [] } = useFollowing(currentUser?.id || '');
@@ -26,6 +33,31 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { direction } = useLanguage();
   const isRTL = direction === "rtl";
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Flatten all pages into one array
+  const posts = useMemo(
+    () => infiniteData?.pages.flat() ?? [],
+    [infiniteData]
+  );
+
+  // IntersectionObserver — load next page when sentinel enters view
+  const handleIntersect = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    },
+    [fetchNextPage, hasNextPage, isFetchingNextPage]
+  );
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(handleIntersect, { rootMargin: '300px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [handleIntersect]);
   
   // Filter stories for selected user
   const userStories = useMemo(() => {
@@ -149,18 +181,32 @@ export default function Home() {
                 <Skeleton className="h-4 w-2/3" />
               </div>
             ))
-          ) : posts && posts.length > 0 ? (
-            [...posts]
-              .filter(post => !blockedIds.has(post.user_id) && !mutedIds.has(post.user_id))
-              .sort((a, b) => {
-                const aFav = favoriteIds.has(a.user_id) ? 1 : 0;
-                const bFav = favoriteIds.has(b.user_id) ? 1 : 0;
-                if (aFav !== bFav) return bFav - aFav;
-                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-              })
-              .map(post => (
-              <PostCard key={post.id} post={post} />
-            ))
+          ) : posts.length > 0 ? (
+            <>
+              {[...posts]
+                .filter(post => !blockedIds.has(post.user_id) && !mutedIds.has(post.user_id))
+                .sort((a, b) => {
+                  const aFav = favoriteIds.has(a.user_id) ? 1 : 0;
+                  const bFav = favoriteIds.has(b.user_id) ? 1 : 0;
+                  if (aFav !== bFav) return bFav - aFav;
+                  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                })
+                .map(post => (
+                  <PostCard key={post.id} post={post} />
+                ))}
+              {/* Sentinel for infinite scroll */}
+              <div ref={sentinelRef} className="w-full h-1" />
+              {isFetchingNextPage && (
+                <div className="flex justify-center py-6 w-full">
+                  <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                </div>
+              )}
+              {!hasNextPage && posts.length > 0 && (
+                <p className="text-muted-foreground text-sm py-6">
+                  {isRTL ? 'وصلت لآخر المنشورات' : 'You\'re all caught up!'}
+                </p>
+              )}
+            </>
           ) : (
             <EmptyFeedState />
           )}

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { Profile, Post, Story, Message, Notification, Comment, Reel, UserDevice } from '@/lib/api';
 import { useToast } from './use-toast';
@@ -59,6 +59,22 @@ export function useFeed(limit = 20, offset = 0) {
   return useQuery({
     queryKey: ['feed', limit, offset],
     queryFn: () => api.getFeed(limit, offset),
+  });
+}
+
+const FEED_PAGE_SIZE = 10;
+
+export function useInfiniteFeed() {
+  return useInfiniteQuery({
+    queryKey: ['feed-infinite'],
+    queryFn: ({ pageParam }: { pageParam: number }) =>
+      api.getFeed(FEED_PAGE_SIZE, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: any[], allPages: any[][]) => {
+      if (lastPage.length < FEED_PAGE_SIZE) return undefined;
+      return allPages.length * FEED_PAGE_SIZE;
+    },
+    staleTime: 1000 * 60 * 2,
   });
 }
 
@@ -763,6 +779,22 @@ export function useReels(limit = 20, offset = 0) {
   return useQuery({
     queryKey: ['reels', limit, offset],
     queryFn: () => api.getReels(limit, offset),
+  });
+}
+
+const REELS_PAGE_SIZE = 5;
+
+export function useInfiniteReels() {
+  return useInfiniteQuery({
+    queryKey: ['reels-infinite'],
+    queryFn: ({ pageParam }: { pageParam: number }) =>
+      api.getReels(REELS_PAGE_SIZE, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: any[], allPages: any[][]) => {
+      if (lastPage.length < REELS_PAGE_SIZE) return undefined;
+      return allPages.length * REELS_PAGE_SIZE;
+    },
+    staleTime: 1000 * 60 * 2,
   });
 }
 
