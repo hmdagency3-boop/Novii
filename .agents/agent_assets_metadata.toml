@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "pOaEfqPX-mZ9FcR3Fwoqi"
@@ -42,3 +41,27 @@ id = "LlzE3Ik0YsbW3OayYIHHA"
 uri = "file://artifacts/novii-promo/public/images/abstract_bg.png"
 type = "image"
 title = "Abstract purple pink cyan background"
+
+[[generated]]
+id = "kyST8MVjkBNNAjdm1jewY"
+uri = "file://attached_assets/generated_images/novii_beta_invite_9x16.png"
+type = "image"
+title = "novii beta invite story"
+
+[[generated]]
+id = "5oKzzo6vGgnAJ5_Wm8avN"
+uri = "file://attached_assets/generated_images/novii_beta_invite_16x9.png"
+type = "image"
+title = "novii beta invite banner"
+
+[[outputs]]
+id = "Sxt43qrZdflnEo09LgUX4"
+uri = "file://attached_assets/generated_images/novii_beta_invite_9x16.png"
+type = "image"
+title = "Novii Beta Invite — Story (9:16)"
+
+[[outputs]]
+id = "uSvaJtjL68eccNBvqDTdO"
+uri = "file://attached_assets/generated_images/novii_beta_invite_16x9.png"
+type = "image"
+title = "Novii Beta Invite — Banner (16:9)"
