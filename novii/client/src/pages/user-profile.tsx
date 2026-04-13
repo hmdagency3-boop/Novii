@@ -655,7 +655,7 @@ export default function UserProfile() {
                     </TabsList>
                 </div>
 
-                <TabsContent value="posts" className="p-1 md:p-4 pb-20 md:pb-4 max-w-4xl mx-auto mt-0">
+                <TabsContent value="posts" className="p-0 md:p-4 pb-20 md:pb-4 max-w-4xl mx-auto mt-0">
                     {postsLoading || reelsLoading ? (
                       <div className="flex items-center justify-center py-10">
                         <Spinner className="w-6 h-6" />
@@ -673,7 +673,7 @@ export default function UserProfile() {
                         <p className="text-muted-foreground">{isRTL ? "لم يشارك أي منشورات بعد" : "No posts shared yet"}</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-3 gap-0.5 md:gap-1">
+                      <div className="grid grid-cols-3 gap-0 md:gap-1">
                         {mixedContent.map((item: any) =>
                           item._type === 'reel' ? (
                             <ProfileReelCard

@@ -462,7 +462,7 @@ export default function Profile() {
                     </TabsList>
                 </div>
 
-                <TabsContent value="posts" className="p-1 md:p-4 max-w-4xl mx-auto mt-0 overflow-y-auto flex-1">
+                <TabsContent value="posts" className="p-0 md:p-4 max-w-4xl mx-auto mt-0 overflow-y-auto flex-1">
                     {postsLoading || reelsLoading ? (
                       <div className="flex items-center justify-center py-10">
                         <Spinner className="w-6 h-6" />
@@ -474,7 +474,7 @@ export default function Profile() {
                         <p className="text-muted-foreground">Start sharing your moments!</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-3 gap-0.5 md:gap-1">
+                      <div className="grid grid-cols-3 gap-0 md:gap-1">
                         {mixedContent.map((item: any) =>
                           item._type === 'reel' ? (
                             <ProfileReelCard
@@ -546,7 +546,7 @@ export default function Profile() {
                         <p className="text-muted-foreground">Save posts to view them later</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-3 gap-0.5 md:gap-1">
+                      <div className="grid grid-cols-3 gap-0 md:gap-1">
                         {savedPosts.map((post) => (
                           <ProfilePostCard
                             key={post.id}

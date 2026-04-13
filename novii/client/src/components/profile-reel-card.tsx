@@ -15,7 +15,7 @@ export function ProfileReelCard({ reel, onClick }: ProfileReelCardProps) {
   return (
     <div
       onClick={onClick}
-      className="relative aspect-square group cursor-pointer overflow-hidden bg-black rounded-md md:rounded-xl"
+      className="relative aspect-square group cursor-pointer overflow-hidden bg-black rounded-none md:rounded-xl"
       style={{ transition: "transform .2s, box-shadow .2s" }}
       onMouseEnter={e => {
         (e.currentTarget as HTMLElement).style.transform = "scale(1.02)";
