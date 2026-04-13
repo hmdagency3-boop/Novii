@@ -528,10 +528,9 @@ export const api = {
       }
     }
 
-    // Optimized: use specific columns, no joins for performance
     const { data, error } = await supabase
       .from('posts')
-      .select(POST_COLUMNS)
+      .select(POST_WITH_PROFILE)
       .eq('user_id', userId)
       .eq('is_archived', false)
       .eq('is_deleted', false)

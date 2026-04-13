@@ -56,7 +56,17 @@ export const PROFILE_CARD = `
   avatar_url,
   bio,
   is_verified,
+  verified_at,
   is_private,
+  is_official,
+  is_creator,
+  is_premium,
+  is_popular,
+  is_active,
+  is_gold_member,
+  is_silver_member,
+  is_bronze_member,
+  is_beta_tester,
   followers_count,
   following_count
 `;
