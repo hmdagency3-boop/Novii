@@ -385,7 +385,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             )}
                         </>
                     ) : (
-                        <span className="font-display font-bold text-xl leading-none">Novii</span>
+                        <>
+                            <img src={logo} alt="Novii" className="w-6 h-6 mix-blend-multiply dark:mix-blend-screen" />
+                            <span className="font-display font-bold text-xl leading-none">Novii</span>
+                        </>
                     )}
                 </div>
 
@@ -409,7 +412,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                     {unreadCount > 0 && <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-destructive"></span>}
                                 </Button>
                             </Link>
-                            <img src={logo} alt="Novii" className="w-6 h-6 mix-blend-multiply dark:mix-blend-screen" />
                         </>
                     )}
                 </div>
