@@ -71,51 +71,58 @@ export default function Reels() {
   showPromptRef.current = showPrompt;
   reelsRef.current      = reels;
 
-  /* ── Stable scroll handlers (debounced to avoid mid-snap flickering) ── */
-  const mobileScrollTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const desktopScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleMobileScroll = useCallback(() => {
-    if (mobileScrollTimer.current) clearTimeout(mobileScrollTimer.current);
-    mobileScrollTimer.current = setTimeout(() => {
-      const c = mobileContainerRef.current;
-      if (!c || c.clientHeight === 0) return;
-      const idx = Math.round(c.scrollTop / c.clientHeight);
-      const clamped = Math.max(0, Math.min(idx, reelsRef.current.length - 1));
-      if (Number.isFinite(clamped)) setActiveMobileIdx(clamped);
-    }, 80);
+  /* ── Index computers (run AFTER snap settles, not during) ── */
+  const computeMobileIdx = useCallback(() => {
+    const c = mobileContainerRef.current;
+    if (!c || c.clientHeight === 0) return;
+    const idx = Math.round(c.scrollTop / c.clientHeight);
+    const clamped = Math.max(0, Math.min(idx, reelsRef.current.length - 1));
+    if (Number.isFinite(clamped)) setActiveMobileIdx(clamped);
   }, []);
 
-  const handleDesktopScroll = useCallback(() => {
-    if (desktopScrollTimer.current) clearTimeout(desktopScrollTimer.current);
-    desktopScrollTimer.current = setTimeout(() => {
-      const c = desktopContainerRef.current;
-      if (!c || c.clientHeight === 0) return;
-      const idx = Math.round(c.scrollTop / c.clientHeight);
-      const clamped = Math.max(0, Math.min(idx, reelsRef.current.length - 1));
-      if (Number.isFinite(clamped)) setActiveDesktopIdx(clamped);
-    }, 80);
+  const computeDesktopIdx = useCallback(() => {
+    const c = desktopContainerRef.current;
+    if (!c || c.clientHeight === 0) return;
+    const idx = Math.round(c.scrollTop / c.clientHeight);
+    const clamped = Math.max(0, Math.min(idx, reelsRef.current.length - 1));
+    if (Number.isFinite(clamped)) setActiveDesktopIdx(clamped);
   }, []);
 
-  /* ── Attach scroll listeners once ── */
+  /* ── Attach listeners: prefer scrollend (fires after snap), fallback debounced scroll ── */
   useEffect(() => {
     const c = mobileContainerRef.current;
     if (!c) return;
-    c.addEventListener("scroll", handleMobileScroll, { passive: true });
-    return () => c.removeEventListener("scroll", handleMobileScroll);
-  }, [handleMobileScroll]);
+    const supportsScrollEnd = "onscrollend" in window;
+    if (supportsScrollEnd) {
+      c.addEventListener("scrollend", computeMobileIdx, { passive: true });
+      return () => c.removeEventListener("scrollend", computeMobileIdx);
+    }
+    let t: ReturnType<typeof setTimeout>;
+    const onScroll = () => { clearTimeout(t); t = setTimeout(computeMobileIdx, 150); };
+    c.addEventListener("scroll", onScroll, { passive: true });
+    return () => { c.removeEventListener("scroll", onScroll); clearTimeout(t); };
+  }, [computeMobileIdx]);
 
   useEffect(() => {
     const c = desktopContainerRef.current;
     if (!c) return;
-    c.addEventListener("scroll", handleDesktopScroll, { passive: true });
-    return () => c.removeEventListener("scroll", handleDesktopScroll);
-  }, [handleDesktopScroll]);
+    const supportsScrollEnd = "onscrollend" in window;
+    if (supportsScrollEnd) {
+      c.addEventListener("scrollend", computeDesktopIdx, { passive: true });
+      return () => c.removeEventListener("scrollend", computeDesktopIdx);
+    }
+    let t: ReturnType<typeof setTimeout>;
+    const onScroll = () => { clearTimeout(t); t = setTimeout(computeDesktopIdx, 150); };
+    c.addEventListener("scroll", onScroll, { passive: true });
+    return () => { c.removeEventListener("scroll", onScroll); clearTimeout(t); };
+  }, [computeDesktopIdx]);
 
-  /* ── Play active reel, pause all others — MOBILE ── */
+  /* ── Play active reel, pause all others — MOBILE ──
+     Uses reelsRef (not reels) in body so new page loads don't re-trigger this. ── */
   useEffect(() => {
-    if (!reels.length) return;
-    reels.forEach((reel: any, idx: number) => {
+    const list = reelsRef.current;
+    if (!list.length) return;
+    list.forEach((reel: any, idx: number) => {
       const vid = mobileRefs.current[reel.id];
       if (!vid) return;
       if (idx === activeMobileIdx) {
@@ -133,12 +140,14 @@ export default function Reels() {
         vid.currentTime = 0;
       }
     });
-  }, [activeMobileIdx, reels]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMobileIdx]);
 
   /* ── Play active reel, pause all others — DESKTOP ── */
   useEffect(() => {
-    if (!reels.length) return;
-    reels.forEach((reel: any, idx: number) => {
+    const list = reelsRef.current;
+    if (!list.length) return;
+    list.forEach((reel: any, idx: number) => {
       const vid = desktopRefs.current[reel.id];
       if (!vid) return;
       if (idx === activeDesktopIdx) {
@@ -149,7 +158,8 @@ export default function Reels() {
         vid.currentTime = 0;
       }
     });
-  }, [activeDesktopIdx, reels]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDesktopIdx]);
 
   /* ── Sync mute change only to the currently active videos ── */
   useEffect(() => {
