@@ -499,6 +499,8 @@ export default function SettingsPage() {
                 previewUrl={previewUrl}
                 isUploading={updateProfileMutation.isPending}
                 uploadProgress={uploadProgress}
+                isRTL={direction === "rtl"}
+                lang={direction === "rtl" ? "ar" : "en"}
               />
             </div>
 

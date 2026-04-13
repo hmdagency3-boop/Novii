@@ -3,7 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth-context";
+import { useLanguage } from "@/lib/language-context";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Profile } from "@/lib/api";
 import { toast } from "sonner";
@@ -12,7 +14,7 @@ import { AvatarUploader } from "@/components/avatar-uploader";
 import { Camera, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { invalidateCacheByPattern } from "@/lib/cache-utils";
-import { validateUsernameComplete, validateUsernameFormat } from "@/lib/username-validation";
+import { validateUsernameComplete } from "@/lib/username-validation";
 
 interface EditProfileDialogProps {
   profile: Profile;
@@ -21,31 +23,100 @@ interface EditProfileDialogProps {
   onProfileUpdate?: () => void;
 }
 
+const GENDER_OPTIONS = {
+  en: [
+    { value: "male", label: "Male" },
+    { value: "female", label: "Female" },
+    { value: "prefer_not_to_say", label: "Prefer not to say" },
+  ],
+  ar: [
+    { value: "male", label: "ذكر" },
+    { value: "female", label: "أنثى" },
+    { value: "prefer_not_to_say", label: "أفضل عدم الإفصاح" },
+  ],
+};
+
 export function EditProfileDialog({ profile, trigger, children, onProfileUpdate }: EditProfileDialogProps) {
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
+  const { language, direction } = useLanguage();
+  const isRTL = direction === "rtl";
+  const lang = language.code === "ar" ? "ar" : "en";
+
+  const labels = {
+    en: {
+      title: "Edit Profile",
+      coverPhoto: "Cover Photo",
+      username: "Username",
+      name: "Name",
+      namePlaceholder: "Full name",
+      bio: "Bio",
+      bioPlaceholder: "Write a bio...",
+      website: "Website",
+      websitePlaceholder: "https://example.com",
+      location: "Location",
+      locationPlaceholder: "City, Country",
+      gender: "Gender",
+      genderPlaceholder: "Select gender",
+      cancel: "Cancel",
+      save: "Save Changes",
+      saving: "Saving...",
+      usernameAvailable: "Username is available!",
+      successMsg: "Profile updated successfully!",
+      errorMsg: "Failed to update profile",
+      usernameError: "Please fix username errors before saving",
+    },
+    ar: {
+      title: "تعديل الملف الشخصي",
+      coverPhoto: "صورة الغلاف",
+      username: "اسم المستخدم",
+      name: "الاسم",
+      namePlaceholder: "الاسم الكامل",
+      bio: "السيرة الذاتية",
+      bioPlaceholder: "اكتب نبذة عنك...",
+      website: "الموقع الإلكتروني",
+      websitePlaceholder: "https://example.com",
+      location: "الموقع الجغرافي",
+      locationPlaceholder: "المدينة، الدولة",
+      gender: "الجنس",
+      genderPlaceholder: "اختر الجنس",
+      cancel: "إلغاء",
+      save: "حفظ التغييرات",
+      saving: "جاري الحفظ...",
+      usernameAvailable: "اسم المستخدم متاح!",
+      successMsg: "تم تحديث الملف الشخصي بنجاح!",
+      errorMsg: "فشل تحديث الملف الشخصي",
+      usernameError: "يرجى إصلاح أخطاء اسم المستخدم أولاً",
+    },
+  };
+
+  const t = labels[lang];
+  const genderOptions = GENDER_OPTIONS[lang];
+
+  const getDefaultForm = () => ({
     username: profile.username || "",
     full_name: profile.full_name || "",
     bio: profile.bio || "",
     website: profile.website || "",
     location: profile.location || "",
+    gender: (profile as any).gender || "",
     avatar_url: profile.avatar_url || "",
     cover_url: profile.cover_url || "",
   });
+
+  const [formData, setFormData] = useState(getDefaultForm);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string>("");
   const [coverUploadProgress, setCoverUploadProgress] = useState(0);
-  
-  // Username validation state
+  const [wantToRemoveCover, setWantToRemoveCover] = useState(false);
+
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [usernameIsValid, setUsernameIsValid] = useState(true);
   const [usernameChecking, setUsernameChecking] = useState(false);
   const usernameCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Username suggestions state
+
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -53,7 +124,25 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  // Validate username in real-time
+  // Reset form state whenever the dialog is opened
+  useEffect(() => {
+    if (open) {
+      setFormData(getDefaultForm());
+      setSelectedFile(null);
+      setPreviewUrl("");
+      setUploadProgress(0);
+      setSelectedCoverFile(null);
+      setCoverPreviewUrl("");
+      setCoverUploadProgress(0);
+      setWantToRemoveCover(false);
+      setUsernameError(null);
+      setUsernameIsValid(true);
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [open]);
+
+  // Real-time username validation
   useEffect(() => {
     if (!formData.username || formData.username === profile.username) {
       setUsernameError(null);
@@ -62,10 +151,7 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
     }
 
     setUsernameChecking(true);
-
-    if (usernameCheckTimeoutRef.current) {
-      clearTimeout(usernameCheckTimeoutRef.current);
-    }
+    if (usernameCheckTimeoutRef.current) clearTimeout(usernameCheckTimeoutRef.current);
 
     usernameCheckTimeoutRef.current = setTimeout(async () => {
       const result = await validateUsernameComplete(formData.username, profile.id);
@@ -75,132 +161,72 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
     }, 500);
 
     return () => {
-      if (usernameCheckTimeoutRef.current) {
-        clearTimeout(usernameCheckTimeoutRef.current);
-      }
+      if (usernameCheckTimeoutRef.current) clearTimeout(usernameCheckTimeoutRef.current);
     };
   }, [formData.username, profile.username, profile.id]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: Partial<Profile>) => {
-      // Only send fields that have actually changed
-      const changedFields: Partial<Profile> = {};
+    mutationFn: async (data: typeof formData) => {
+      const changedFields: Record<string, any> = {};
       let hasChanges = false;
 
-      // Check each field for changes
-      if (data.username !== profile.username) {
-        changedFields.username = data.username;
-        hasChanges = true;
+      const textFields = ["username", "full_name", "bio", "website", "location", "gender"] as const;
+      for (const field of textFields) {
+        if (data[field] !== ((profile as any)[field] || "")) {
+          changedFields[field] = data[field];
+          hasChanges = true;
+        }
       }
-      if (data.full_name !== profile.full_name) {
-        changedFields.full_name = data.full_name;
+
+      // Upload cover if new file selected
+      if (selectedCoverFile) {
+        const coverUrl = await api.uploadCover(selectedCoverFile, (p) => setCoverUploadProgress(p));
+        changedFields.cover_url = coverUrl;
         hasChanges = true;
-      }
-      if (data.bio !== profile.bio) {
-        changedFields.bio = data.bio;
-        hasChanges = true;
-      }
-      if (data.website !== profile.website) {
-        changedFields.website = data.website;
-        hasChanges = true;
-      }
-      if (data.location !== profile.location) {
-        changedFields.location = data.location;
+      } else if (wantToRemoveCover) {
+        changedFields.cover_url = "";
         hasChanges = true;
       }
 
-      // Upload cover first if a file is selected
-      if (selectedCoverFile) {
-        const coverUrl = await api.uploadCover(selectedCoverFile, (progress) => {
-          setCoverUploadProgress(progress);
-        });
-        changedFields.cover_url = coverUrl;
-        hasChanges = true;
-      }
-      
-      // Upload avatar if a file is selected
+      // Upload avatar if new file selected
       if (selectedFile) {
-        const avatarUrl = await api.uploadAvatar(selectedFile, (progress) => {
-          setUploadProgress(progress);
-        });
+        const avatarUrl = await api.uploadAvatar(selectedFile, (p) => setUploadProgress(p));
         changedFields.avatar_url = avatarUrl;
         hasChanges = true;
       }
 
-      // Only call updateProfile if there are actual changes
-      if (!hasChanges) {
-        return profile;
-      }
+      if (!hasChanges) return profile;
 
-      const result = await api.updateProfile(changedFields);
-      return result;
+      return await api.updateProfile(changedFields as Partial<Profile>);
     },
     onSuccess: (updatedProfile) => {
-      // 1. Clear local cache first (localStorage + memory cache)
-      invalidateCacheByPattern('profile');
-      
-      // 2. Update React Query data with merged data
+      invalidateCacheByPattern("profile");
+
       if (user?.id) {
-        const currentData = queryClient.getQueryData(['profile', user.id]) as Profile | undefined;
+        const currentData = queryClient.getQueryData(["profile", user.id]) as Profile | undefined;
         const mergedData = currentData ? { ...currentData, ...updatedProfile } : updatedProfile;
-        queryClient.setQueryData(['profile', user.id], mergedData);
+        queryClient.setQueryData(["profile", user.id], mergedData);
       }
-      
-      // 3. Trigger profile refetch immediately to ensure fresh data
-      if (onProfileUpdate) {
-        onProfileUpdate();
-      }
-      
-      // 4. Force refetch profile queries to ensure sidebar and all places update immediately
-      queryClient.refetchQueries({
-        queryKey: ['profile', user?.id],
-        type: 'active'
-      });
-      
-      // 5. Invalidate all profile-related queries
+
+      if (onProfileUpdate) onProfileUpdate();
+
+      queryClient.refetchQueries({ queryKey: ["profile", user?.id], type: "active" });
       queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey;
           if (!Array.isArray(key)) return false;
-          
-          // List of all query keys that might contain profile data with avatar
-          const profileRelatedKeys = [
-            'profile',          // All profile queries
-            'feed',             // Feed posts with profile data
-            'posts',            // Posts with profile data
-            'post',             // Individual post with profile data
-            'explore',          // Explore posts with profile data
-            'comments',         // Comments with profile data
-            'stories',          // Stories with profile data
-            'userStories',      // User stories with profile data
-            'followers',        // Followers with profile data
-            'following',        // Following with profile data
-            'messages',         // Messages with profile data
-            'conversations',    // Conversations with profile data
-            'notifications',    // Notifications with profile data
-            'suggestions',      // Suggestions with profile data
-            'reels',            // Reels with profile data
-            'userReels',        // User reels with profile data
-            'mentions',         // Mentions with profile data
-            'saved',            // Saved posts with profile data
-            'userPosts',        // User posts with profile data
-          ];
-          
-          return profileRelatedKeys.includes(key[0] as string);
-        }
+          return ["profile", "feed", "posts", "post", "explore", "comments", "stories",
+            "userStories", "followers", "following", "messages", "conversations",
+            "notifications", "suggestions", "reels", "userReels", "mentions",
+            "saved", "userPosts"].includes(key[0] as string);
+        },
       });
-      
-      toast.success("Profile updated successfully!");
+
+      toast.success(t.successMsg);
       setOpen(false);
-      setSelectedFile(null);
-      setPreviewUrl("");
-      setUploadProgress(0);
-      setSelectedCoverFile(null);
-      setCoverPreviewUrl("");
-      setCoverUploadProgress(0);
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to update profile");
+      toast.error(error.message || t.errorMsg);
       setUploadProgress(0);
       setCoverUploadProgress(0);
     },
@@ -208,117 +234,65 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Check if username has changed and validate it
-    if (formData.username !== profile.username) {
-      if (!usernameIsValid || usernameError) {
-        toast.error(usernameError || "Please fix username validation errors");
-        return;
-      }
+    if (formData.username !== profile.username && (!usernameIsValid || !!usernameError)) {
+      toast.error(usernameError || t.usernameError);
+      return;
     }
-
     updateProfileMutation.mutate(formData);
   };
 
   const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleFileSelect = (file: File) => {
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-    
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size should be less than 5MB');
-      return;
-    }
-
+    if (!file.type.startsWith("image/")) { toast.error(lang === "ar" ? "يرجى اختيار ملف صورة" : "Please select an image file"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error(lang === "ar" ? "حجم الصورة يجب أن يكون أقل من 5 ميجابايت" : "Image size should be less than 5MB"); return; }
     setSelectedFile(file);
-    
-    // Create preview URL
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreviewUrl(reader.result as string);
-    };
+    reader.onloadend = () => setPreviewUrl(reader.result as string);
     reader.readAsDataURL(file);
   };
 
-  const handleRemovePhoto = () => {
-    setSelectedFile(null);
-    setPreviewUrl("");
-  };
+  const handleRemovePhoto = () => { setSelectedFile(null); setPreviewUrl(""); };
 
   const handleCoverFileSelect = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-    
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Image size should be less than 10MB');
-      return;
-    }
-
+    if (!file.type.startsWith("image/")) { toast.error(lang === "ar" ? "يرجى اختيار ملف صورة" : "Please select an image file"); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error(lang === "ar" ? "حجم الصورة يجب أن يكون أقل من 10 ميجابايت" : "Image size should be less than 10MB"); return; }
     setSelectedCoverFile(file);
-    
+    setWantToRemoveCover(false);
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setCoverPreviewUrl(reader.result as string);
-    };
+    reader.onloadend = () => setCoverPreviewUrl(reader.result as string);
     reader.readAsDataURL(file);
   };
 
   const handleRemoveCover = () => {
     setSelectedCoverFile(null);
     setCoverPreviewUrl("");
-    handleChange("cover_url", "");
+    setWantToRemoveCover(true);
   };
 
-  // Fetch username suggestions
   const fetchSuggestions = async (partial: string) => {
-    if (!partial || partial.length < 2) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
+    if (!partial || partial.length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
     try {
-      const response = await fetch('/api/auth/suggest-username', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/auth/suggest-username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ partial }),
       });
-
       if (!response.ok) return;
-
       const data = await response.json();
       setSuggestions(data.suggestions || []);
       setShowSuggestions(data.suggestions && data.suggestions.length > 0);
-    } catch (error) {
-      console.error('Error fetching suggestions:', error);
-    }
+    } catch {}
   };
 
   const handleUsernameChange = (value: string) => {
     handleChange("username", value);
-    
-    // Clear existing timeout
-    if (suggestionTimeoutRef.current) {
-      clearTimeout(suggestionTimeoutRef.current);
-    }
-
-    // Fetch suggestions after user stops typing
+    if (suggestionTimeoutRef.current) clearTimeout(suggestionTimeoutRef.current);
     suggestionTimeoutRef.current = setTimeout(() => {
-      if (value && value !== profile.username) {
-        fetchSuggestions(value);
-      } else {
-        setSuggestions([]);
-        setShowSuggestions(false);
-      }
+      if (value && value !== profile.username) fetchSuggestions(value);
+      else { setSuggestions([]); setShowSuggestions(false); }
     }, 300);
   };
 
@@ -328,27 +302,23 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
     setSuggestions([]);
   };
 
+  const currentCoverSrc = coverPreviewUrl || (!wantToRemoveCover ? formData.cover_url : "");
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || children}
-      </DialogTrigger>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogTrigger asChild>{trigger || children}</DialogTrigger>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" dir={isRTL ? "rtl" : "ltr"}>
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Edit Profile</DialogTitle>
+          <DialogTitle className="text-xl font-bold">{t.title}</DialogTitle>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Cover Photo Uploader */}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Cover Photo */}
           <div className="space-y-2">
-            <label className="text-sm font-semibold">Cover Photo</label>
+            <label className="text-sm font-semibold">{t.coverPhoto}</label>
             <div className="relative w-full h-32 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 rounded-lg overflow-hidden group">
-              {(coverPreviewUrl || formData.cover_url) && (
-                <img 
-                  src={coverPreviewUrl || formData.cover_url} 
-                  alt="Cover preview" 
-                  className="w-full h-full object-cover"
-                />
+              {currentCoverSrc && (
+                <img src={currentCoverSrc} alt="Cover" className="w-full h-full object-cover" />
               )}
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <label className="cursor-pointer">
@@ -363,7 +333,7 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
                     <Camera className="w-5 h-5" />
                   </div>
                 </label>
-                {(coverPreviewUrl || formData.cover_url) && (
+                {currentCoverSrc && (
                   <button
                     type="button"
                     onClick={handleRemoveCover}
@@ -392,29 +362,31 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
             previewUrl={previewUrl}
             isUploading={updateProfileMutation.isPending}
             uploadProgress={uploadProgress}
+            isRTL={isRTL}
+            lang={lang}
           />
 
           {/* Form Fields */}
           <div className="space-y-4">
+            {/* Username */}
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Username</label>
+              <label className="text-sm font-semibold">{t.username}</label>
               <div className="relative">
                 <Input
                   value={formData.username}
                   onChange={(e) => handleUsernameChange(e.target.value)}
-                  onFocus={() => formData.username && formData.username !== profile.username && showSuggestions && setSuggestions(suggestions)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  placeholder="Username"
-                  className={`bg-background pr-10 ${
+                  placeholder={t.username}
+                  className={`bg-background ${isRTL ? "pr-3 pl-10" : "pl-3 pr-10"} ${
                     formData.username !== profile.username
                       ? usernameIsValid && !usernameError
-                        ? 'border-green-500'
-                        : 'border-destructive'
-                      : ''
+                        ? "border-green-500"
+                        : "border-destructive"
+                      : ""
                   }`}
                 />
                 {formData.username !== profile.username && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? "left-3" : "right-3"}`}>
                     {usernameChecking ? (
                       <Spinner className="w-4 h-4 text-muted-foreground" />
                     ) : usernameIsValid && !usernameError ? (
@@ -424,19 +396,17 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
                     )}
                   </div>
                 )}
-                
-                {/* Suggestions Dropdown */}
                 {showSuggestions && suggestions.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-md z-50">
                     <div className="max-h-40 overflow-y-auto">
-                      {suggestions.map((suggestion) => (
+                      {suggestions.map((s) => (
                         <button
-                          key={suggestion}
+                          key={s}
                           type="button"
-                          onClick={() => selectSuggestion(suggestion)}
-                          className="w-full text-left px-3 py-2 hover:bg-accent transition-colors text-sm"
+                          onClick={() => selectSuggestion(s)}
+                          className={`w-full ${isRTL ? "text-right" : "text-left"} px-3 py-2 hover:bg-accent transition-colors text-sm`}
                         >
-                          {suggestion}
+                          {s}
                         </button>
                       ))}
                     </div>
@@ -449,63 +419,87 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
                   {usernameError}
                 </p>
               )}
-              {formData.username !== profile.username && usernameIsValid && !usernameError && (
+              {formData.username !== profile.username && usernameIsValid && !usernameError && !usernameChecking && (
                 <p className="text-xs text-green-500 flex items-center gap-1 mt-1">
                   <CheckCircle2 className="w-3 h-3" />
-                  Username is available!
+                  {t.usernameAvailable}
                 </p>
               )}
             </div>
 
+            {/* Full Name */}
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Name</label>
+              <label className="text-sm font-semibold">{t.name}</label>
               <Input
                 value={formData.full_name}
                 onChange={(e) => handleChange("full_name", e.target.value)}
-                placeholder="Full name"
+                placeholder={t.namePlaceholder}
                 className="bg-background"
               />
             </div>
 
+            {/* Bio */}
             <div className="space-y-2">
               <div className="flex justify-between">
-                <label className="text-sm font-semibold">Bio</label>
+                <label className="text-sm font-semibold">{t.bio}</label>
                 <span className="text-xs text-muted-foreground">{formData.bio.length} / 150</span>
               </div>
               <Textarea
                 value={formData.bio}
                 onChange={(e) => handleChange("bio", e.target.value)}
-                placeholder="Write a bio..."
+                placeholder={t.bioPlaceholder}
                 className="bg-background resize-none"
                 maxLength={150}
                 rows={3}
               />
             </div>
 
+            {/* Website */}
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Website</label>
+              <label className="text-sm font-semibold">{t.website}</label>
               <Input
                 value={formData.website}
                 onChange={(e) => handleChange("website", e.target.value)}
-                placeholder="https://example.com"
+                placeholder={t.websitePlaceholder}
                 className="bg-background"
-                type="url"
               />
             </div>
 
+            {/* Location */}
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Location</label>
+              <label className="text-sm font-semibold">{t.location}</label>
               <Input
                 value={formData.location}
                 onChange={(e) => handleChange("location", e.target.value)}
-                placeholder="City, Country"
+                placeholder={t.locationPlaceholder}
                 className="bg-background"
               />
+            </div>
+
+            {/* Gender */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">{t.gender}</label>
+              <Select
+                value={formData.gender || ""}
+                onValueChange={(val) => handleChange("gender", val)}
+                disabled={updateProfileMutation.isPending}
+              >
+                <SelectTrigger className="bg-background w-full">
+                  <SelectValue placeholder={t.genderPlaceholder} />
+                </SelectTrigger>
+                <SelectContent>
+                  {genderOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-2">
             <Button
               type="button"
               variant="outline"
@@ -513,7 +507,7 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
               className="flex-1"
               disabled={updateProfileMutation.isPending}
             >
-              Cancel
+              {t.cancel}
             </Button>
             <Button
               type="submit"
@@ -525,12 +519,12 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
               }
             >
               {updateProfileMutation.isPending ? (
-                <>
-                  <Spinner className="w-4 h-4 mr-2" />
-                  Saving...
-                </>
+                <span className="flex items-center gap-2">
+                  <Spinner className="w-4 h-4" />
+                  {t.saving}
+                </span>
               ) : (
-                "Save Changes"
+                t.save
               )}
             </Button>
           </div>
