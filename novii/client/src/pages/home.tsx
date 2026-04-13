@@ -12,16 +12,20 @@ import { toast } from "sonner";
 import { Heart, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { useSettings } from "@/lib/settings-context";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Home() {
+  const queryClient = useQueryClient();
+  const [feedSeed, setFeedSeed] = useState<number>(() => Date.now());
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+
   const {
     data: infiniteData,
     isLoading: postsLoading,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-    refetch: refetchFeed,
-  } = useInfiniteFeed();
+  } = useInfiniteFeed(feedSeed);
   const { data: stories, isLoading: storiesLoading } = useStories();
   const { data: currentUser } = useCurrentProfile();
   const { data: followingUsers = [] } = useFollowing(currentUser?.id || '');
@@ -30,10 +34,10 @@ export default function Home() {
   const [isCreateStoryModalOpen, setIsCreateStoryModalOpen] = useState(false);
   const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const { direction } = useLanguage();
   const isRTL = direction === "rtl";
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const feedRef = useRef<HTMLDivElement>(null);
 
   // Flatten all pages into one array
   const posts = useMemo(
@@ -71,25 +75,40 @@ export default function Home() {
 
 
 
-  // Listen for double-click on Home icon to refresh feed
+  // Listen for double-click on Home icon → pull-down animation + algorithmic refresh
   useEffect(() => {
     const handleDoubleClickHome = async () => {
-      // Scroll to top
+      if (isPullRefreshing) return;
+
+      // Scroll to top first
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      
-      setIsRefreshing(true);
-      try {
-        await refetchFeed();
-      } catch (error) {
-        toast.error(isRTL ? "حدث خطأ" : "Error refreshing");
-      } finally {
-        setIsRefreshing(false);
+
+      // Trigger pull-down animation
+      setIsPullRefreshing(true);
+      if (feedRef.current) {
+        feedRef.current.style.transition = 'transform 0.35s cubic-bezier(0.34,1.56,0.64,1)';
+        feedRef.current.style.transform  = 'translateY(64px)';
       }
+
+      // Wait for animation, then swap seed (triggers new algorithmic fetch)
+      await new Promise(r => setTimeout(r, 420));
+      const newSeed = Date.now();
+      // Remove old query cache so fresh data is fetched
+      queryClient.removeQueries({ queryKey: ['feed-infinite'] });
+      setFeedSeed(newSeed);
+
+      // Animate back up
+      await new Promise(r => setTimeout(r, 600));
+      if (feedRef.current) {
+        feedRef.current.style.transition = 'transform 0.4s ease';
+        feedRef.current.style.transform  = 'translateY(0)';
+      }
+      setIsPullRefreshing(false);
     };
 
     window.addEventListener('doubleClickHome', handleDoubleClickHome);
     return () => window.removeEventListener('doubleClickHome', handleDoubleClickHome);
-  }, [refetchFeed, isRTL]);
+  }, [isPullRefreshing, queryClient, feedSeed]);
 
   // Empty Feed State Component
   const EmptyFeedState = () => (
@@ -124,22 +143,23 @@ export default function Home() {
 
   return (
     <Layout>
-      {/* Refresh Loading Bar at Top */}
-      {isRefreshing && (
-        <div className="fixed top-0 left-0 right-0 h-1 z-50 overflow-hidden bg-background/10">
-          <div 
-            className="h-full bg-gradient-to-r from-primary via-purple-400 to-primary"
-            style={{
-              animation: 'loadingBar 1.5s ease-in-out infinite',
-              width: '30%',
-              backgroundSize: '200% 100%'
-            }}
-          />
+      {/* Pull-down refresh spinner */}
+      <div
+        className="fixed left-0 right-0 z-50 flex justify-center pointer-events-none"
+        style={{
+          top: '56px',
+          transform: isPullRefreshing ? 'translateY(0)' : 'translateY(-80px)',
+          opacity: isPullRefreshing ? 1 : 0,
+          transition: 'transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease',
+        }}
+      >
+        <div className="w-10 h-10 rounded-full bg-background shadow-lg border border-border flex items-center justify-center">
+          <div className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
         </div>
-      )}
+      </div>
 
       {/* Restrict width for Home Feed to standard size */}
-      <div className="flex flex-col gap-0 sm:gap-4 lg:gap-6 lg:pt-6 w-full px-0 sm:px-2 max-w-full lg:max-w-[630px] mx-auto">
+      <div ref={feedRef} className="flex flex-col gap-0 sm:gap-4 lg:gap-6 lg:pt-6 w-full px-0 sm:px-2 max-w-full lg:max-w-[630px] mx-auto">
         {storiesLoading ? (
           <div className="flex gap-4 p-4">
             {[...Array(5)].map((_, i) => (

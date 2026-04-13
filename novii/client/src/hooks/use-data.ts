@@ -64,15 +64,19 @@ export function useFeed(limit = 20, offset = 0) {
 
 const FEED_PAGE_SIZE = 10;
 
-export function useInfiniteFeed() {
+export function useInfiniteFeed(seed: number = 0) {
   return useInfiniteQuery({
-    queryKey: ['feed-infinite'],
-    queryFn: ({ pageParam }: { pageParam: number }) =>
-      api.getFeed(FEED_PAGE_SIZE, pageParam),
+    queryKey: ['feed-infinite', seed],
+    queryFn: ({ pageParam }: { pageParam: number }) => {
+      // First page: algorithmic scoring from a big batch
+      if (pageParam === 0) return api.getFeedAlgorithmic(seed, FEED_PAGE_SIZE);
+      // Subsequent pages: regular chronological (offset beyond the algo batch)
+      return api.getFeed(FEED_PAGE_SIZE, 60 + (pageParam - 1) * FEED_PAGE_SIZE);
+    },
     initialPageParam: 0,
     getNextPageParam: (lastPage: any[], allPages: any[][]) => {
       if (lastPage.length < FEED_PAGE_SIZE) return undefined;
-      return allPages.length * FEED_PAGE_SIZE;
+      return allPages.length; // page index
     },
     staleTime: 1000 * 60 * 2,
   });

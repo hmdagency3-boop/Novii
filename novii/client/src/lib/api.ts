@@ -479,6 +479,52 @@ export const api = {
     return posts as unknown as Post[];
   },
 
+  // Algorithmic feed: fetch a large batch, score by engagement + recency + seeded randomness
+  async getFeedAlgorithmic(seed: number, limit = 10): Promise<Post[]> {
+    const BATCH = 60;
+    const { data, error } = await supabase
+      .from('posts')
+      .select(POST_WITH_PROFILE)
+      .eq('is_archived', false)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false })
+      .range(0, BATCH - 1);
+
+    if (error) throw error;
+    const { data: { user } } = await supabase.auth.getUser();
+    let posts: any[] = data || [];
+
+    if (user && posts.length > 0) {
+      const postIds = posts.map(p => p.id);
+      const [likesData, savedData] = await Promise.all([
+        supabase.from('likes').select('post_id').eq('user_id', user.id).in('post_id', postIds),
+        supabase.from('saved_posts').select('post_id').eq('user_id', user.id).in('post_id', postIds)
+      ]);
+      const likedIds = new Set(likesData.data?.map(l => l.post_id) || []);
+      const savedIds = new Set(savedData.data?.map(s => s.post_id) || []);
+      posts = posts.map(post => ({
+        ...post,
+        is_liked: likedIds.has(post.id),
+        is_saved: savedIds.has(post.id),
+      }));
+    }
+
+    // Scoring: recency + engagement + seeded randomness
+    const now = Date.now();
+    const scored = posts.map((post: any) => {
+      const hoursAgo = (now - new Date(post.created_at).getTime()) / 3600000;
+      const recencyScore  = 120 / (hoursAgo + 2);
+      const engagementScore = (post.likes_count || 0) * 2.5 + (post.comments_count || 0) * 4;
+      // Deterministic per-post randomness that changes with seed
+      const idSum = post.id.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0);
+      const seededRandom = ((seed * 31 + idSum * 17) % 100) / 100 * 30;
+      return { ...post, _score: recencyScore + engagementScore + seededRandom };
+    });
+
+    scored.sort((a: any, b: any) => b._score - a._score);
+    return scored.slice(0, limit) as Post[];
+  },
+
   async getExplorePosts(limit = 30): Promise<Post[]> {
     // Optimized: use specific columns and pagination
     const { data, error } = await supabase
