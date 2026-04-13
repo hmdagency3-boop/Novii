@@ -46,22 +46,22 @@ title = "Abstract purple pink cyan background"
 id = "kyST8MVjkBNNAjdm1jewY"
 uri = "file://attached_assets/generated_images/novii_beta_invite_9x16.png"
 type = "image"
-title = "novii beta invite story"
+title = "novii beta story clean"
 
 [[generated]]
 id = "5oKzzo6vGgnAJ5_Wm8avN"
 uri = "file://attached_assets/generated_images/novii_beta_invite_16x9.png"
 type = "image"
-title = "novii beta invite banner"
+title = "novii beta banner clean"
 
 [[outputs]]
 id = "Sxt43qrZdflnEo09LgUX4"
 uri = "file://attached_assets/generated_images/novii_beta_invite_9x16.png"
 type = "image"
-title = "Novii Beta Invite — Story (9:16)"
+title = "Story (9:16)"
 
 [[outputs]]
 id = "uSvaJtjL68eccNBvqDTdO"
 uri = "file://attached_assets/generated_images/novii_beta_invite_16x9.png"
 type = "image"
-title = "Novii Beta Invite — Banner (16:9)"
+title = "Banner (16:9)"
