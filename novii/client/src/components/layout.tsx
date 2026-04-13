@@ -112,7 +112,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     queryClient.invalidateQueries({ queryKey: ['stories'] });
 
     if (path === '/') {
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      window.dispatchEvent(new CustomEvent('doubleClickHome'));
     } else if (path === '/explore' || path === '/search') {
       queryClient.invalidateQueries({ queryKey: ['explore'] });
     } else if (path === '/reels') {
