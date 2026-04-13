@@ -259,7 +259,10 @@ export default function Reels() {
       ══════════════════════════════════════════ */}
       <div
         ref={mobileContainerRef}
-        className="mobile-reels-container fixed inset-0 top-0 lg:hidden snap-y snap-mandatory bg-background"
+        className={cn(
+          "mobile-reels-container fixed inset-x-0 top-0 lg:hidden snap-y snap-mandatory bg-background",
+          isGuest ? "bottom-0" : "bottom-16"
+        )}
         style={{
           overflowY: "scroll",
           overflowX: "hidden",
@@ -272,6 +275,7 @@ export default function Reels() {
             key={reel.id}
             idx={idx}
             videoRefs={mobileRefs}
+            cardHeight={isGuest ? "100svh" : "calc(100svh - 4rem)"}
             onTap={(id) => handleTap(id, mobileRefs)}
             {...cardProps(reel)}
           />
@@ -344,6 +348,7 @@ interface CardProps {
   paused: boolean; followed: boolean; saved: boolean;
   floatingHearts: FloatingHeart[]; currentUserId?: string;
   videoRefs: VideoRefMap;
+  cardHeight?: string;
   onTap: (id: string) => void;
   onDoubleTap: (reel: any, e: React.MouseEvent) => void;
   onLike:   (reel: any, e?: React.MouseEvent) => void;
@@ -429,7 +434,7 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
 ════════════════════════════════════════════════════ */
 function MobileReelCard({
   reel, idx, isRTL, muted, setMuted, followed, saved,
-  currentUserId, videoRefs,
+  currentUserId, videoRefs, cardHeight = "100svh",
   onLike, onFollow, onSave, onShare, onComment,
 }: CardProps) {
   const longPressTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -494,7 +499,7 @@ function MobileReelCard({
     <div
       data-id={reel.id} data-index={idx}
       className="reel-item relative w-full overflow-hidden bg-black flex-shrink-0"
-      style={{ height: "100svh", scrollSnapAlign: "start", scrollSnapStop: "always" }}
+      style={{ height: cardHeight, scrollSnapAlign: "start", scrollSnapStop: "always" }}
     >
       {/* Video */}
       <video
