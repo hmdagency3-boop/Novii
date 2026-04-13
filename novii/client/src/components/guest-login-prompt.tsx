@@ -1,6 +1,9 @@
 import { useState, createContext, useContext, useCallback } from "react";
 import { Link } from "wouter";
+import { Heart, MessageCircle, Image, Video, Users, Bookmark } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
+
+const logo = "/assets/novii_logo_transparent.png";
 
 interface GuestPromptContextType {
   showPrompt: () => void;
@@ -12,88 +15,14 @@ export function useGuestPrompt() {
   return useContext(GuestPromptContext);
 }
 
-function NoviiIllustration() {
-  return (
-    <svg width="150" height="130" viewBox="0 0 150 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Glow behind phone */}
-      <ellipse cx="55" cy="110" rx="38" ry="8" fill="url(#glowGrad)" opacity="0.3"/>
-
-      {/* Phone body */}
-      <rect x="18" y="8" width="74" height="112" rx="14" fill="url(#phoneGrad)" />
-      <rect x="18" y="8" width="74" height="112" rx="14" stroke="url(#borderGrad)" strokeWidth="1.5"/>
-      <rect x="26" y="20" width="58" height="88" rx="8" fill="hsl(var(--background))"/>
-
-      {/* Photo grid on screen */}
-      <rect x="28" y="22" width="25" height="25" rx="4" fill="url(#p1)"/>
-      <rect x="55" y="22" width="27" height="25" rx="4" fill="url(#p2)"/>
-      <rect x="28" y="49" width="27" height="25" rx="4" fill="url(#p3)"/>
-      <rect x="57" y="49" width="25" height="25" rx="4" fill="url(#p4)"/>
-      <rect x="28" y="76" width="54" height="28" rx="4" fill="url(#p5)"/>
-
-      {/* Bottom bar */}
-      <rect x="44" y="106" width="22" height="5" rx="2.5" fill="url(#borderGrad)" opacity="0.5"/>
-
-      {/* Floating heart */}
-      <circle cx="112" cy="34" r="20" fill="url(#heartBg)" opacity="0.15"/>
-      <path d="M112 43C112 43 99 33.5 99 26.5C99 22.1 102.4 18.5 106.5 18.5C109 18.5 111.2 19.8 112 21.7C112.8 19.8 115 18.5 117.5 18.5C121.6 18.5 125 22.1 125 26.5C125 33.5 112 43 112 43Z" fill="url(#heartGrad)"/>
-
-      {/* Sparkle top right */}
-      <path d="M131 10L132.8 16L139 17.5L132.8 19L131 25L129.2 19L123 17.5L129.2 16Z" fill="url(#starGrad)"/>
-
-      {/* Small sparkles */}
-      <circle cx="14" cy="52" r="3.5" fill="url(#dotGrad1)" opacity="0.8"/>
-      <circle cx="8"  cy="80" r="2"   fill="url(#dotGrad2)" opacity="0.6"/>
-      <circle cx="140" cy="60" r="2.5" fill="url(#dotGrad3)" opacity="0.7"/>
-      <circle cx="136" cy="80" r="1.5" fill="url(#dotGrad1)" opacity="0.5"/>
-
-      {/* Comment bubble */}
-      <rect x="96" y="60" width="44" height="30" rx="10" fill="url(#bubbleGrad)" opacity="0.9"/>
-      <path d="M108 90L104 98L116 92" fill="url(#bubbleGrad)"/>
-      <circle cx="111" cy="75" r="3" fill="white" opacity="0.8"/>
-      <circle cx="120" cy="75" r="3" fill="white" opacity="0.8"/>
-      <circle cx="129" cy="75" r="3" fill="white" opacity="0.8"/>
-
-      <defs>
-        <linearGradient id="phoneGrad" x1="18" y1="8" x2="92" y2="120" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#a855f7"/>
-          <stop offset="100%" stopColor="#ec4899"/>
-        </linearGradient>
-        <linearGradient id="borderGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#c084fc"/>
-          <stop offset="100%" stopColor="#f472b6"/>
-        </linearGradient>
-        <linearGradient id="heartBg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#ec4899"/>
-          <stop offset="100%" stopColor="#f43f5e"/>
-        </linearGradient>
-        <linearGradient id="heartGrad" x1="99" y1="18" x2="125" y2="43" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#f472b6"/>
-          <stop offset="100%" stopColor="#e11d48"/>
-        </linearGradient>
-        <linearGradient id="starGrad" x1="123" y1="10" x2="139" y2="25" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#fbbf24"/>
-          <stop offset="100%" stopColor="#f59e0b"/>
-        </linearGradient>
-        <linearGradient id="bubbleGrad" x1="96" y1="60" x2="140" y2="90" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#a855f7"/>
-          <stop offset="100%" stopColor="#7c3aed"/>
-        </linearGradient>
-        <linearGradient id="glowGrad" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#a855f7"/>
-          <stop offset="100%" stopColor="#ec4899"/>
-        </linearGradient>
-        <linearGradient id="p1" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#a855f7"/><stop offset="1" stopColor="#7c3aed"/></linearGradient>
-        <linearGradient id="p2" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#ec4899"/><stop offset="1" stopColor="#be185d"/></linearGradient>
-        <linearGradient id="p3" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#06b6d4"/><stop offset="1" stopColor="#0284c7"/></linearGradient>
-        <linearGradient id="p4" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#f59e0b"/><stop offset="1" stopColor="#d97706"/></linearGradient>
-        <linearGradient id="p5" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#8b5cf6"/><stop offset="1" stopColor="#6d28d9"/></linearGradient>
-        <radialGradient id="dotGrad1"><stop stopColor="#a855f7"/></radialGradient>
-        <radialGradient id="dotGrad2"><stop stopColor="#ec4899"/></radialGradient>
-        <radialGradient id="dotGrad3"><stop stopColor="#06b6d4"/></radialGradient>
-      </defs>
-    </svg>
-  );
-}
+const features = [
+  { icon: Heart,         labelAr: "أعجبني",   labelEn: "Like"     },
+  { icon: MessageCircle, labelAr: "تعليق",    labelEn: "Comment"  },
+  { icon: Video,         labelAr: "ريلز",     labelEn: "Reels"    },
+  { icon: Users,         labelAr: "متابعة",   labelEn: "Follow"   },
+  { icon: Image,         labelAr: "صور",      labelEn: "Photos"   },
+  { icon: Bookmark,      labelAr: "حفظ",      labelEn: "Save"     },
+];
 
 export function GuestPromptProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -112,54 +41,96 @@ export function GuestPromptProvider({ children }: { children: React.ReactNode })
           onClick={() => setOpen(false)}
         >
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
 
-          {/* Card */}
+          {/* Sheet */}
           <div
             dir={isRTL ? "rtl" : "ltr"}
-            className="relative w-full sm:max-w-[400px] bg-background border border-border rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden"
+            className="relative w-full sm:max-w-sm bg-background border border-border/60 rounded-t-[2rem] sm:rounded-2xl shadow-2xl"
+            style={{ animation: "slideUp .28s cubic-bezier(.32,1.2,.5,1) both" }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Top gradient accent line */}
-            <div className="h-1 w-full" style={{ background: "linear-gradient(90deg, #a855f7, #ec4899, #06b6d4)" }} />
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-border" />
+            </div>
 
-            <div className="flex flex-col items-center px-8 pt-8 pb-10 gap-5">
+            <div className="flex flex-col items-center px-7 pt-6 pb-9 gap-6">
 
-              {/* Illustration */}
-              <NoviiIllustration />
+              {/* Logo + glow */}
+              <div className="relative flex items-center justify-center">
+                <div
+                  className="absolute w-28 h-28 rounded-full blur-2xl opacity-30"
+                  style={{ background: "linear-gradient(135deg,#a855f7,#ec4899)" }}
+                />
+                <div
+                  className="relative w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg"
+                  style={{ background: "linear-gradient(135deg,#a855f7 0%,#ec4899 100%)" }}
+                >
+                  <img
+                    src={logo}
+                    alt="Novii"
+                    className="w-12 h-12 object-contain brightness-0 invert"
+                  />
+                </div>
+              </div>
 
               {/* Text */}
-              <div className="text-center">
-                <h2 className="text-foreground text-xl font-bold mb-2">
-                  {isRTL ? "شايف إيه بتفوتك؟" : "See what you're missing"}
+              <div className="text-center space-y-2">
+                <h2 className="text-[1.35rem] font-bold tracking-tight text-foreground">
+                  {isRTL ? "في أكتر مما تشوف" : "There's more to see"}
                 </h2>
-                <p className="text-muted-foreground text-sm leading-relaxed">
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-[260px] mx-auto">
                   {isRTL
-                    ? "استمتع بصور وفيديوهات من أصحابك والمشاهير وأكتر"
-                    : "Enjoy photos and videos from your friends, public figures, and more."}
+                    ? "سجّل دخولك وانضم لمجتمع Novii — شارك، تابع، واستكشف"
+                    : "Sign in to like, comment, share reels and follow the people you love."}
                 </p>
               </div>
 
-              {/* Buttons */}
+              {/* Feature pills */}
+              <div className="flex flex-wrap justify-center gap-2 w-full">
+                {features.map(({ icon: Icon, labelAr, labelEn }) => (
+                  <div
+                    key={labelEn}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium"
+                  >
+                    <Icon className="w-3.5 h-3.5" style={{ color: "#a855f7" }} />
+                    {isRTL ? labelAr : labelEn}
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA Buttons */}
               <div className="flex flex-col gap-3 w-full">
                 <Link href="/auth?tab=signup" onClick={() => setOpen(false)}>
                   <button
-                    className="w-full py-3 rounded-xl font-bold text-white text-sm transition-opacity hover:opacity-90 active:opacity-75"
-                    style={{ background: "linear-gradient(135deg, #a855f7, #ec4899)" }}
+                    className="w-full py-3.5 rounded-xl font-bold text-white text-[0.95rem] tracking-wide transition-transform active:scale-[.97] hover:opacity-90"
+                    style={{ background: "linear-gradient(135deg,#a855f7 0%,#ec4899 100%)" }}
                   >
-                    {isRTL ? "إنشاء حساب" : "Sign up"}
+                    {isRTL ? "إنشاء حساب مجاني" : "Create Free Account"}
                   </button>
                 </Link>
 
                 <Link href="/auth" onClick={() => setOpen(false)}>
-                  <button className="w-full py-2.5 text-sm font-semibold bg-transparent border border-border rounded-xl text-foreground hover:bg-secondary transition-colors">
-                    {isRTL ? "تسجيل الدخول" : "Log in"}
+                  <button className="w-full py-3 rounded-xl text-[0.9rem] font-semibold border border-border bg-transparent text-foreground hover:bg-secondary transition-colors">
+                    {isRTL ? "تسجيل الدخول" : "Log In"}
                   </button>
                 </Link>
               </div>
 
+              {/* Fine print */}
+              <p className="text-[0.7rem] text-muted-foreground/60 text-center -mt-2">
+                {isRTL ? "بالتسجيل توافق على شروط الاستخدام وسياسة الخصوصية" : "By signing up you agree to our Terms & Privacy Policy"}
+              </p>
             </div>
           </div>
+
+          <style>{`
+            @keyframes slideUp {
+              from { opacity:0; transform:translateY(40px) scale(.97); }
+              to   { opacity:1; transform:translateY(0)    scale(1);   }
+            }
+          `}</style>
         </div>
       )}
     </GuestPromptContext.Provider>
