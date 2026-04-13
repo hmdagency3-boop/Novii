@@ -1,8 +1,24 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import {
-  X, Zap, ZapOff, Settings2, Type, Infinity, LayoutGrid,
+  X, Zap, ZapOff, Settings2, Infinity, LayoutGrid,
   ChevronDown, ImageIcon, RefreshCw, Check, MapPin, Camera
 } from "lucide-react";
+
+/* ─────────────────────────────────────────
+   Beauty Filters
+───────────────────────────────────────── */
+const FILTERS = [
+  { id: 'normal',    labelAr: 'عادي',     css: 'none' },
+  { id: 'clarendon', labelAr: 'كلارندون', css: 'brightness(1.1) contrast(1.2) saturate(1.35)' },
+  { id: 'gingham',   labelAr: 'جينغام',   css: 'brightness(1.06) sepia(0.12) hue-rotate(-5deg) contrast(0.92)' },
+  { id: 'moon',      labelAr: 'مون',      css: 'grayscale(1) brightness(1.1) contrast(0.9)' },
+  { id: 'lark',      labelAr: 'لارك',     css: 'brightness(1.08) contrast(0.9) saturate(1.15) hue-rotate(-5deg)' },
+  { id: 'reyes',     labelAr: 'ريز',      css: 'brightness(1.1) contrast(0.85) saturate(0.75) sepia(0.22)' },
+  { id: 'juno',      labelAr: 'جونو',     css: 'brightness(1.05) contrast(1.1) saturate(1.4) hue-rotate(-10deg)' },
+  { id: 'slumber',   labelAr: 'سلمبر',    css: 'brightness(0.95) saturate(0.65) sepia(0.35)' },
+  { id: 'crema',     labelAr: 'كريما',    css: 'sepia(0.25) saturate(0.88) brightness(1.06) contrast(0.95)' },
+] as const;
+type FilterId = typeof FILTERS[number]['id'];
 import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { useCreatePost } from "@/hooks/use-data";
@@ -105,7 +121,7 @@ function applyIPhoneProcessing(canvas: HTMLCanvasElement): void {
 /* ─────────────────────────────────────────
    Camera hook — live stream via getUserMedia
 ───────────────────────────────────────── */
-function useLiveCamera(active: boolean) {
+function useLiveCamera(active: boolean, filterCssRef: React.MutableRefObject<string>) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [facing, setFacing] = useState<FacingMode>('environment');
@@ -187,23 +203,55 @@ function useLiveCamera(active: boolean) {
     }
   }, []);
 
-  // Capture photo from stream → File (with iPhone-style processing)
+  // Helper: draw video frame onto a canvas (respecting facing + filter)
+  const drawFrame = useCallback((canvas: HTMLCanvasElement, filterCss?: string) => {
+    const video = videoRef.current;
+    if (!video) return false;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    if (facing === 'user') {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    const css = filterCss ?? filterCssRef.current;
+    ctx.filter = (css && css !== 'none') ? css : 'none';
+    ctx.drawImage(video, 0, 0);
+    ctx.filter = 'none';
+    return true;
+  }, [facing, filterCssRef]);
+
+  // Capture thumbnail (small square) for filter preview strip
+  const captureThumbnail = useCallback((): string | null => {
+    const video = videoRef.current;
+    if (!video || !ready) return null;
+    const size = 80;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    // crop centre square from video
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const side = Math.min(vw, vh);
+    const sx = (vw - side) / 2, sy = (vh - side) / 2;
+    if (facing === 'user') { ctx.translate(size, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(video, sx, sy, side, side, 0, 0, size, size);
+    return canvas.toDataURL('image/jpeg', 0.7);
+  }, [ready, facing]);
+
+  // Capture photo from stream → File (with selected filter + iPhone processing)
   const capturePhoto = useCallback((): File | null => {
     const video = videoRef.current;
     if (!video || !ready) return null;
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    if (facing === 'user') {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-    }
-    ctx.drawImage(video, 0, 0);
+    if (!drawFrame(canvas)) return null;
 
-    // Apply iPhone-style processing
-    applyIPhoneProcessing(canvas);
+    // Apply iPhone-style processing on top (only for 'normal' filter)
+    if (!filterCssRef.current || filterCssRef.current === 'none') {
+      applyIPhoneProcessing(canvas);
+    }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
     const arr = dataUrl.split(',');
@@ -213,7 +261,7 @@ function useLiveCamera(active: boolean) {
     const u8arr = new Uint8Array(n);
     while (n--) u8arr[n] = bstr.charCodeAt(n);
     return new File([u8arr], `photo_${Date.now()}.jpg`, { type: mime });
-  }, [ready, facing]);
+  }, [ready, drawFrame, filterCssRef]);
 
   useEffect(() => {
     if (active) startCamera(facing);
@@ -257,7 +305,7 @@ function useLiveCamera(active: boolean) {
     });
   }, [ready, capturePhoto]);
 
-  return { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto, torchSupported, torchOn, toggleTorch, isCapturingLive, captureLivePhoto };
+  return { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto, captureThumbnail, torchSupported, torchOn, toggleTorch, isCapturingLive, captureLivePhoto };
 }
 
 /* ─────────────────────────────────────────
@@ -287,13 +335,29 @@ export default function CreatePage() {
   const [shutterAnim, setShutterAnim] = useState(false);
   const lastTapRef = useRef<number>(0);
 
+  // Beauty filter
+  const [selectedFilter, setSelectedFilter] = useState<FilterId>('normal');
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const filterCssRef = useRef<string>('none');
+  filterCssRef.current = FILTERS.find(f => f.id === selectedFilter)?.css ?? 'none';
+
   const galleryRef = useRef<HTMLInputElement>(null);
 
   // Camera only active on 'camera' step
   const [livePhotoActive, setLivePhotoActive] = useState(false);
   // Reset live photo mode when switching away from story tab
   useEffect(() => { if (tab !== 'story') setLivePhotoActive(false); }, [tab]);
-  const { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto, torchSupported, torchOn, toggleTorch, isCapturingLive, captureLivePhoto } = useLiveCamera(step === 'camera');
+  const { videoRef, hasCamera, ready, facing, flipCamera, capturePhoto, captureThumbnail, torchSupported, torchOn, toggleTorch, isCapturingLive, captureLivePhoto } = useLiveCamera(step === 'camera', filterCssRef);
+
+  // Capture thumbnail when camera is ready (for filter preview strip)
+  useEffect(() => {
+    if (!ready) return;
+    const t = setTimeout(() => {
+      const url = captureThumbnail();
+      if (url) setThumbnailUrl(url);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [ready, captureThumbnail]);
 
   const accept =
     tab === 'reel'  ? 'video/*' :
@@ -641,7 +705,7 @@ export default function CreatePage() {
           lastTapRef.current = now;
         }}
       >
-        {/* Video element */}
+        {/* Video element — filter applied in real-time via CSS */}
         <video
           ref={videoRef}
           autoPlay
@@ -651,7 +715,10 @@ export default function CreatePage() {
             "absolute inset-0 w-full h-full object-cover transition-opacity duration-300",
             ready ? "opacity-100" : "opacity-0"
           )}
-          style={{ transform: facing === 'user' ? 'scaleX(-1)' : 'none' }}
+          style={{
+            transform: facing === 'user' ? 'scaleX(-1)' : 'none',
+            filter: filterCssRef.current !== 'none' ? filterCssRef.current : undefined,
+          }}
         />
 
         {/* No camera fallback */}
@@ -738,33 +805,55 @@ export default function CreatePage() {
         {/* ── Bottom area (gradient + controls) ── */}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pt-10 pb-2">
 
-          {/* Effect row — avatar circles */}
-          <div className="flex items-center justify-center gap-4 mb-5 px-4">
-            {/* Gallery thumb */}
+          {/* ── Beauty Filter Strip ── */}
+          <div className="mb-3">
+            <div
+              className="flex gap-3 px-4 overflow-x-auto"
+              style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+            >
+              {FILTERS.map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setSelectedFilter(f.id as FilterId)}
+                  className="flex flex-col items-center gap-1 flex-shrink-0"
+                >
+                  <div className={cn(
+                    "w-14 h-14 rounded-xl overflow-hidden border-2 transition-all",
+                    selectedFilter === f.id ? "border-white scale-105" : "border-white/25 opacity-75"
+                  )}>
+                    {thumbnailUrl ? (
+                      <img
+                        src={thumbnailUrl}
+                        alt={f.labelAr}
+                        className="w-full h-full object-cover"
+                        style={{ filter: f.css !== 'none' ? f.css : undefined }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-white/10 flex items-center justify-center">
+                        <span className="text-white/30 text-[10px]">●</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className={cn(
+                    "text-[10px] font-medium transition-colors",
+                    selectedFilter === f.id ? "text-white" : "text-white/50"
+                  )}>
+                    {f.labelAr}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Top action row: gallery + flip */}
+          <div className="flex items-center justify-between px-6 mb-4">
             <button
               onClick={() => galleryRef.current?.click()}
-              className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/50 bg-black/40 flex items-center justify-center flex-shrink-0"
+              className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/50 bg-black/40 flex items-center justify-center"
             >
               <ImageIcon className="w-5 h-5 text-white/60" />
             </button>
-
-            {/* Dummy effect dots */}
-            {[true, false, false, false].map((active, i) => (
-              <button key={i} className={cn(
-                "w-9 h-9 rounded-full overflow-hidden border-2 flex-shrink-0",
-                active ? "border-white ring-2 ring-white/50 ring-offset-1 ring-offset-black" : "border-white/30"
-              )}>
-                <Avatar className="w-9 h-9">
-                  <AvatarImage src={user?.user_metadata?.avatar_url} />
-                  <AvatarFallback className="text-[10px] bg-gray-700 text-white">
-                    {user?.user_metadata?.full_name?.[0] || '?'}
-                  </AvatarFallback>
-                </Avatar>
-              </button>
-            ))}
-
-            {/* Flip camera */}
-            <button onClick={flipCamera} className="w-10 h-10 flex items-center justify-center flex-shrink-0">
+            <button onClick={flipCamera} className="w-10 h-10 flex items-center justify-center">
               <RefreshCw className="w-5 h-5 text-white drop-shadow-lg" />
             </button>
           </div>
