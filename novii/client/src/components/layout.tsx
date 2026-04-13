@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { CreatePostModal } from "@/components/create-post-modal";
 import { CreateStoryModal } from "@/components/create-story-modal";
 
-const logo = "/assets/novii_app_logo.png";
+const logo = "/assets/novii_logo_transparent.png";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import { useState, useEffect, useRef } from "react";
@@ -210,7 +210,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           "mb-10 px-2 flex items-center gap-3 transition-all duration-300",
           isSidebarExpanded ? "justify-start" : "justify-center"
         )}>
-            <img src={logo} alt="Novii" className="w-8 h-8 rounded-xl shadow-lg shadow-primary/20 flex-shrink-0" />
+            <img src={logo} alt="Novii" className="w-8 h-8 flex-shrink-0 mix-blend-multiply dark:mix-blend-screen drop-shadow-[0_2px_8px_rgba(139,92,246,0.4)]" />
             <span className={cn(
               "font-display font-bold text-2xl tracking-tight bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent transition-opacity duration-300",
               isSidebarExpanded ? "block opacity-100" : "hidden opacity-0"
@@ -366,7 +366,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     ) : (
                         // Other pages: Logo and Novii
                         <>
-                            <img src={logo} alt="Novii" className="w-6 h-6 rounded-lg" />
+                            <img src={logo} alt="Novii" className="w-6 h-6 mix-blend-multiply dark:mix-blend-screen" />
                             <span className="font-display font-bold text-lg leading-none">Novii</span>
                         </>
                     )}
