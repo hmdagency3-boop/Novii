@@ -82,6 +82,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   full_name_changed_at          TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   gender_changed_at             TIMESTAMP WITH TIME ZONE DEFAULT NULL,
 
+  -- نظام التحذيرات
+  strikes_count                 INTEGER DEFAULT 0,
+
   created_at                    TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at                    TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -103,6 +106,8 @@ CREATE TABLE IF NOT EXISTS posts (
   is_pinned        BOOLEAN DEFAULT FALSE,
   hide_likes       BOOLEAN DEFAULT FALSE,
   replies_disabled BOOLEAN DEFAULT FALSE,
+  is_deleted       BOOLEAN DEFAULT FALSE,
+  deleted_at       TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -175,6 +180,8 @@ CREATE TABLE IF NOT EXISTS comments (
   content           TEXT NOT NULL,
   gif_url           TEXT,
   likes_count       INTEGER DEFAULT 0,
+  is_deleted        BOOLEAN DEFAULT FALSE,
+  deleted_at        TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -190,7 +197,12 @@ CREATE TABLE IF NOT EXISTS likes (
   user_id    UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(post_id, user_id),
-  UNIQUE(comment_id, user_id)
+  UNIQUE(comment_id, user_id),
+  CONSTRAINT check_likes_exactly_one CHECK (
+    (post_id    IS NOT NULL)::int +
+    (comment_id IS NOT NULL)::int +
+    (reel_id    IS NOT NULL)::int = 1
+  )
 );
 
 -- -----------------------------------------------------------------------
@@ -207,6 +219,8 @@ CREATE TABLE IF NOT EXISTS reels (
   comments_count INTEGER DEFAULT 0,
   views_count    INTEGER DEFAULT 0,
   is_private     BOOLEAN DEFAULT FALSE,
+  is_deleted     BOOLEAN DEFAULT FALSE,
+  deleted_at     TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   created_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -431,16 +445,16 @@ CREATE TABLE IF NOT EXISTS moderation_logs (
 );
 
 -- -----------------------------------------------------------------------
--- 2.24 TYPING INDICATORS
+-- 2.24 TYPING INDICATORS (composite PK: community_id + user_id)
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS typing_indicators (
-  id           TEXT PRIMARY KEY,
   community_id UUID NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
-  user_id      UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id      UUID NOT NULL REFERENCES auth.users(id)  ON DELETE CASCADE,
   username     TEXT NOT NULL,
   avatar_url   TEXT,
   updated_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (community_id, user_id)
 );
 
 -- -----------------------------------------------------------------------
@@ -460,9 +474,11 @@ CREATE TABLE IF NOT EXISTS user_devices (
   country         TEXT,
   country_code    TEXT,
   city            TEXT,
-  last_active_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  device_id           TEXT,
+  device_fingerprint  TEXT,
+  last_active_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- -----------------------------------------------------------------------
@@ -619,6 +635,64 @@ CREATE TABLE IF NOT EXISTS highlight_stories (
   UNIQUE(highlight_id, story_id)
 );
 
+-- -----------------------------------------------------------------------
+-- 2.37 HASHTAGS
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS hashtags (
+  id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT    NOT NULL UNIQUE,
+  posts_count INTEGER DEFAULT 0,
+  reels_count INTEGER DEFAULT 0,
+  created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS post_hashtags (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id    UUID NOT NULL REFERENCES posts(id)    ON DELETE CASCADE,
+  hashtag_id UUID NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(post_id, hashtag_id)
+);
+
+CREATE TABLE IF NOT EXISTS reel_hashtags (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reel_id    UUID NOT NULL REFERENCES reels(id)    ON DELETE CASCADE,
+  hashtag_id UUID NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(reel_id, hashtag_id)
+);
+
+-- -----------------------------------------------------------------------
+-- 2.38 USER WARNINGS / STRIKES
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_warnings (
+  id           UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID    NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  issued_by    UUID    REFERENCES profiles(id) ON DELETE SET NULL,
+  reason       TEXT    NOT NULL,
+  warning_type TEXT    DEFAULT 'warning' CHECK (warning_type IN ('warning', 'strike', 'ban')),
+  is_active    BOOLEAN DEFAULT TRUE,
+  expires_at   TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+  created_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- -----------------------------------------------------------------------
+-- 2.39 FEED SCORES (خوارزمية الـ Feed)
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS feed_scores (
+  id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID    NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  post_id     UUID    REFERENCES posts(id) ON DELETE CASCADE,
+  reel_id     UUID    REFERENCES reels(id) ON DELETE CASCADE,
+  score       DECIMAL(10, 4) DEFAULT 0,
+  reason      TEXT,
+  seen        BOOLEAN DEFAULT FALSE,
+  computed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT check_feed_one_target CHECK (
+    (post_id IS NOT NULL)::int + (reel_id IS NOT NULL)::int = 1
+  )
+);
+
 
 -- ============================================================================
 -- 3. INDEXES
@@ -739,7 +813,6 @@ CREATE INDEX IF NOT EXISTS idx_mod_logs_admin_user        ON moderation_logs(adm
 
 -- Typing Indicators
 CREATE INDEX IF NOT EXISTS idx_typing_indicators_comm     ON typing_indicators(community_id);
-CREATE INDEX IF NOT EXISTS idx_typing_indicators_user     ON typing_indicators(user_id);
 CREATE INDEX IF NOT EXISTS idx_typing_indicators_updated  ON typing_indicators(updated_at);
 
 -- User Devices
@@ -760,6 +833,32 @@ CREATE INDEX IF NOT EXISTS idx_conversation_members_conv_id    ON conversation_m
 CREATE INDEX IF NOT EXISTS idx_highlights_user_id              ON highlights(user_id);
 CREATE INDEX IF NOT EXISTS idx_highlight_stories_highlight_id  ON highlight_stories(highlight_id);
 CREATE INDEX IF NOT EXISTS idx_muted_conversations_user_id     ON muted_conversations(user_id);
+
+-- Soft delete indexes
+CREATE INDEX IF NOT EXISTS idx_posts_not_deleted    ON posts(user_id, created_at DESC)    WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_comments_not_deleted ON comments(post_id)                  WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_reels_not_deleted    ON reels(user_id, created_at DESC)    WHERE is_deleted = FALSE;
+
+-- User Devices fingerprint
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_devices_fingerprint
+  ON user_devices(device_fingerprint) WHERE device_fingerprint IS NOT NULL;
+
+-- Hashtags
+CREATE INDEX IF NOT EXISTS idx_hashtags_name           ON hashtags(name);
+CREATE INDEX IF NOT EXISTS idx_hashtags_posts_count    ON hashtags(posts_count DESC);
+CREATE INDEX IF NOT EXISTS idx_post_hashtags_post      ON post_hashtags(post_id);
+CREATE INDEX IF NOT EXISTS idx_post_hashtags_hashtag   ON post_hashtags(hashtag_id);
+CREATE INDEX IF NOT EXISTS idx_reel_hashtags_reel      ON reel_hashtags(reel_id);
+CREATE INDEX IF NOT EXISTS idx_reel_hashtags_hashtag   ON reel_hashtags(hashtag_id);
+
+-- User Warnings
+CREATE INDEX IF NOT EXISTS idx_user_warnings_user_id   ON user_warnings(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_warnings_active    ON user_warnings(is_active) WHERE is_active = TRUE;
+
+-- Feed Scores
+CREATE INDEX IF NOT EXISTS idx_feed_scores_user_score  ON feed_scores(user_id, score DESC) WHERE seen = FALSE;
+CREATE INDEX IF NOT EXISTS idx_feed_scores_post_id     ON feed_scores(post_id);
+CREATE INDEX IF NOT EXISTS idx_feed_scores_reel_id     ON feed_scores(reel_id);
 
 
 -- ============================================================================
@@ -801,6 +900,11 @@ ALTER TABLE conversation_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE muted_conversations  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE highlights         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE highlight_stories  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hashtags           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_hashtags      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reel_hashtags      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_warnings      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feed_scores        ENABLE ROW LEVEL SECURITY;
 
 
 -- ============================================================================
@@ -935,8 +1039,8 @@ CREATE POLICY "Users can remove their reactions"
 
 -- ---- NOTIFICATIONS ----
 CREATE POLICY "notifications_insert"  ON notifications FOR INSERT WITH CHECK (TRUE);
-CREATE POLICY "notifications_select"  ON notifications FOR SELECT USING (TRUE);
-CREATE POLICY "notifications_update"  ON notifications FOR UPDATE USING (TRUE);
+CREATE POLICY "notifications_select"  ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "notifications_update"  ON notifications FOR UPDATE USING (auth.uid() = user_id);
 
 -- ---- SAVED POSTS ----
 CREATE POLICY "Users can read their saved posts"
@@ -1133,6 +1237,36 @@ CREATE POLICY "Highlight owner can remove stories"
   ON highlight_stories FOR DELETE USING (
     EXISTS (SELECT 1 FROM highlights WHERE id = highlight_id AND user_id = auth.uid())
   );
+
+-- ---- HASHTAGS ----
+CREATE POLICY "Hashtags are public"
+  ON hashtags FOR SELECT USING (TRUE);
+CREATE POLICY "Authenticated can create hashtags"
+  ON hashtags FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "Post hashtags are public"
+  ON post_hashtags FOR SELECT USING (TRUE);
+CREATE POLICY "Post owners manage post hashtags"
+  ON post_hashtags FOR ALL USING (
+    EXISTS (SELECT 1 FROM posts WHERE id = post_id AND user_id = auth.uid())
+  );
+CREATE POLICY "Reel hashtags are public"
+  ON reel_hashtags FOR SELECT USING (TRUE);
+CREATE POLICY "Reel owners manage reel hashtags"
+  ON reel_hashtags FOR ALL USING (
+    EXISTS (SELECT 1 FROM reels WHERE id = reel_id AND user_id = auth.uid())
+  );
+
+-- ---- USER WARNINGS ----
+CREATE POLICY "Users can view own warnings"
+  ON user_warnings FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Admins can manage warnings"
+  ON user_warnings FOR ALL USING (TRUE);
+
+-- ---- FEED SCORES ----
+CREATE POLICY "Users can view own feed scores"
+  ON feed_scores FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "System manages feed scores"
+  ON feed_scores FOR ALL USING (TRUE);
 
 
 -- ============================================================================
@@ -1433,7 +1567,70 @@ CREATE TRIGGER trigger_approve_follow_request
   AFTER UPDATE ON follow_requests FOR EACH ROW EXECUTE FUNCTION approve_follow_request();
 
 -- -----------------------------------------------------------------------
--- دوال مساعدة أخرى
+-- عداد الهاشتاقات
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_hashtag_posts_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    UPDATE hashtags SET posts_count = posts_count + 1 WHERE id = NEW.hashtag_id;
+  ELSIF TG_OP = 'DELETE' THEN
+    UPDATE hashtags SET posts_count = GREATEST(posts_count - 1, 0) WHERE id = OLD.hashtag_id;
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS trigger_hashtag_posts_count ON post_hashtags;
+CREATE TRIGGER trigger_hashtag_posts_count
+  AFTER INSERT OR DELETE ON post_hashtags
+  FOR EACH ROW EXECUTE FUNCTION update_hashtag_posts_count();
+
+CREATE OR REPLACE FUNCTION update_hashtag_reels_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    UPDATE hashtags SET reels_count = reels_count + 1 WHERE id = NEW.hashtag_id;
+  ELSIF TG_OP = 'DELETE' THEN
+    UPDATE hashtags SET reels_count = GREATEST(reels_count - 1, 0) WHERE id = OLD.hashtag_id;
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS trigger_hashtag_reels_count ON reel_hashtags;
+CREATE TRIGGER trigger_hashtag_reels_count
+  AFTER INSERT OR DELETE ON reel_hashtags
+  FOR EACH ROW EXECUTE FUNCTION update_hashtag_reels_count();
+
+-- -----------------------------------------------------------------------
+-- عداد الـ strikes في profiles
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_profile_strikes()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' AND NEW.warning_type = 'strike' AND NEW.is_active = TRUE THEN
+    UPDATE profiles SET strikes_count = strikes_count + 1 WHERE id = NEW.user_id;
+  ELSIF TG_OP = 'DELETE' AND OLD.warning_type = 'strike' AND OLD.is_active = TRUE THEN
+    UPDATE profiles SET strikes_count = GREATEST(strikes_count - 1, 0) WHERE id = OLD.user_id;
+  ELSIF TG_OP = 'UPDATE' AND NEW.warning_type = 'strike' THEN
+    IF OLD.is_active = TRUE AND NEW.is_active = FALSE THEN
+      UPDATE profiles SET strikes_count = GREATEST(strikes_count - 1, 0) WHERE id = NEW.user_id;
+    ELSIF OLD.is_active = FALSE AND NEW.is_active = TRUE THEN
+      UPDATE profiles SET strikes_count = strikes_count + 1 WHERE id = NEW.user_id;
+    END IF;
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS trigger_profile_strikes ON user_warnings;
+CREATE TRIGGER trigger_profile_strikes
+  AFTER INSERT OR UPDATE OR DELETE ON user_warnings
+  FOR EACH ROW EXECUTE FUNCTION update_profile_strikes();
+
+-- -----------------------------------------------------------------------
+-- تنظيف دوري
 -- -----------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION cleanup_expired_stories()
 RETURNS VOID AS $$
@@ -1569,6 +1766,14 @@ GRANT SELECT, INSERT, DELETE ON muted_conversations TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON highlights TO authenticated;
 GRANT SELECT, INSERT, DELETE ON highlight_stories TO authenticated;
 
+GRANT SELECT ON hashtags      TO anon, authenticated;
+GRANT INSERT, UPDATE ON hashtags TO authenticated;
+GRANT SELECT, INSERT, DELETE ON post_hashtags TO authenticated;
+GRANT SELECT, INSERT, DELETE ON reel_hashtags TO authenticated;
+GRANT SELECT ON user_warnings TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON user_warnings TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON feed_scores TO authenticated;
+
 
 -- ============================================================================
 -- 10. STORAGE BUCKETS
@@ -1644,7 +1849,7 @@ ON CONFLICT (type) DO NOTHING;
 -- ============================================================================
 -- DONE! ✅
 -- ============================================================================
--- الجداول (36 جدول):
+-- الجداول (39 جدول):
 --   ✅ profiles              - الملفات الشخصية (+ cooldown timestamps)
 --   ✅ posts                 - المنشورات
 --   ✅ follows               - المتابعات
@@ -1681,4 +1886,16 @@ ON CONFLICT (type) DO NOTHING;
 --   ✅ muted_conversations   - المحادثات المكتومة
 --   ✅ highlights            - أبرز القصص
 --   ✅ highlight_stories     - قصص الهايلايت
+--   ✅ hashtags              - الهاشتاقات (+ post_hashtags + reel_hashtags)
+--   ✅ user_warnings         - نظام التحذيرات والـ strikes
+--   ✅ feed_scores           - أساس خوارزمية الـ Feed
+-- ============================================================================
+-- التحسينات المطبّقة:
+--   ✅ likes          — CHECK constraint (واحد بالظبط من post/comment/reel)
+--   ✅ notifications  — RLS مقيّدة: SELECT فقط لصاحب الإشعار
+--   ✅ posts/comments/reels — soft delete (is_deleted + deleted_at)
+--   ✅ typing_indicators    — composite PRIMARY KEY بدل TEXT
+--   ✅ user_devices         — device_fingerprint + device_id
+--   ✅ profiles             — strikes_count
+--   ✅ pg_cron              — راجع ملف schema-improvements.sql
 -- ============================================================================
