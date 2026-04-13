@@ -71,19 +71,30 @@ export default function Reels() {
   showPromptRef.current = showPrompt;
   reelsRef.current      = reels;
 
-  /* ── Stable scroll handlers (use reelsRef to avoid stale closure) ── */
+  /* ── Stable scroll handlers (debounced to avoid mid-snap flickering) ── */
+  const mobileScrollTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const desktopScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleMobileScroll = useCallback(() => {
-    const c = mobileContainerRef.current;
-    if (!c) return;
-    const idx = Math.round(c.scrollTop / c.clientHeight);
-    setActiveMobileIdx(Math.max(0, Math.min(idx, reelsRef.current.length - 1)));
+    if (mobileScrollTimer.current) clearTimeout(mobileScrollTimer.current);
+    mobileScrollTimer.current = setTimeout(() => {
+      const c = mobileContainerRef.current;
+      if (!c || c.clientHeight === 0) return;
+      const idx = Math.round(c.scrollTop / c.clientHeight);
+      const clamped = Math.max(0, Math.min(idx, reelsRef.current.length - 1));
+      if (Number.isFinite(clamped)) setActiveMobileIdx(clamped);
+    }, 80);
   }, []);
 
   const handleDesktopScroll = useCallback(() => {
-    const c = desktopContainerRef.current;
-    if (!c) return;
-    const idx = Math.round(c.scrollTop / c.clientHeight);
-    setActiveDesktopIdx(Math.max(0, Math.min(idx, reelsRef.current.length - 1)));
+    if (desktopScrollTimer.current) clearTimeout(desktopScrollTimer.current);
+    desktopScrollTimer.current = setTimeout(() => {
+      const c = desktopContainerRef.current;
+      if (!c || c.clientHeight === 0) return;
+      const idx = Math.round(c.scrollTop / c.clientHeight);
+      const clamped = Math.max(0, Math.min(idx, reelsRef.current.length - 1));
+      if (Number.isFinite(clamped)) setActiveDesktopIdx(clamped);
+    }, 80);
   }, []);
 
   /* ── Attach scroll listeners once ── */
@@ -268,6 +279,7 @@ export default function Reels() {
           overflowX: "hidden",
           scrollbarWidth: "none",
           WebkitOverflowScrolling: "touch",
+          overflowAnchor: "none",
         } as React.CSSProperties}
       >
         {reels.map((reel: any, idx: number) => (
@@ -280,8 +292,8 @@ export default function Reels() {
             {...cardProps(reel)}
           />
         ))}
-        {/* Mobile sentinel */}
-        <div ref={mobileSentinelRef} className="w-full h-2 shrink-0 snap-start" />
+        {/* Mobile sentinel — no snap-start so it never becomes an accidental snap target */}
+        <div ref={mobileSentinelRef} className="w-full h-2 shrink-0" />
         {isFetchingNextPage && (
           <div className="flex items-center justify-center w-full h-16 shrink-0">
             <div className="w-6 h-6 rounded-full border-2 border-white border-t-transparent animate-spin" />
@@ -295,7 +307,7 @@ export default function Reels() {
       <div
         ref={desktopContainerRef}
         className="fixed inset-0 left-20 hidden lg:block overflow-y-scroll snap-y snap-mandatory bg-background"
-        style={{ scrollbarWidth: "none" }}
+        style={{ scrollbarWidth: "none", overflowAnchor: "none" } as React.CSSProperties}
       >
         {reels.map((reel: any, idx: number) => (
           <DesktopReelCard
@@ -306,8 +318,8 @@ export default function Reels() {
             {...cardProps(reel)}
           />
         ))}
-        {/* Desktop sentinel */}
-        <div ref={desktopSentinelRef} className="w-full h-2 shrink-0 snap-start" />
+        {/* Desktop sentinel — no snap-start so it never becomes an accidental snap target */}
+        <div ref={desktopSentinelRef} className="w-full h-2 shrink-0" />
         {isFetchingNextPage && (
           <div className="flex items-center justify-center w-full h-16 shrink-0">
             <div className="w-6 h-6 rounded-full border-2 border-white border-t-transparent animate-spin" />
