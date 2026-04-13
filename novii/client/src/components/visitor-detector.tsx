@@ -22,8 +22,10 @@ export function VisitorDetector() {
     // Only check if user is not logged in and we haven't checked yet
     if (user || checked) return;
 
-    // Skip check on already specific routes (auth and reset-password)
-    if (location === "/auth" || location === "/reset-password") {
+    // Skip check on public routes — guests are allowed here
+    const publicPaths = ["/auth", "/reset-password", "/explore", "/reels", "/privacy", "/terms", "/help", "/about", "/features"];
+    const isPublicPath = publicPaths.some(p => location === p || location.startsWith("/reel/"));
+    if (isPublicPath) {
       setChecked(true);
       return;
     }
