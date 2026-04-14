@@ -6,7 +6,7 @@ import { useInfiniteReels, useToggleReelLike, useToggleFollow } from "@/hooks/us
 import { Spinner } from "@/components/ui/spinner";
 import {
   Heart, MessageCircle, Share2, Bookmark,
-  Volume2, VolumeX, Play, Pause, Plus, Music2,
+  Volume2, VolumeX, Play, Pause, Plus, Check, Music2,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useGuestPrompt } from "@/components/guest-login-prompt";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { supabase } from "@/lib/supabase";
 
 interface FloatingHeart { id: string; x: number; y: number }
 type VideoRefMap = React.MutableRefObject<{ [k: string]: HTMLVideoElement }>;
@@ -48,6 +49,29 @@ export default function Reels() {
   const lastTapRef       = useRef<number>(0);
   const guestViewCount   = useRef<number>(0);
   const guestPromptShown = useRef<boolean>(false);
+  const initialPlayDone  = useRef(false);
+
+  const followInitVersion = useRef(0);
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const profileIds = [...new Set(reels.map((r: any) => r.profile?.id).filter(Boolean))];
+    if (profileIds.length === 0) return;
+    const version = ++followInitVersion.current;
+    supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', currentUser.id)
+      .in('following_id', profileIds)
+      .then(({ data }) => {
+        if (data && version === followInitVersion.current) {
+          setFollowedUsers(prev => {
+            const merged = new Set(prev);
+            data.forEach(f => merged.add(f.following_id));
+            return merged;
+          });
+        }
+      });
+  }, [currentUser?.id, reels]);
 
   /* ── SEPARATE ref maps so mobile & desktop don't overwrite each other ── */
   const mobileRefs  = useRef<{ [k: string]: HTMLVideoElement }>({});
@@ -117,17 +141,16 @@ export default function Reels() {
     return () => { c.removeEventListener("scroll", onScroll); clearTimeout(t); };
   }, [computeDesktopIdx]);
 
-  /* ── Play active reel, pause all others — MOBILE ──
-     Uses reelsRef (not reels) in body so new page loads don't re-trigger this. ── */
-  useEffect(() => {
+  const playActiveReel = useCallback((activeIdx: number, refs: React.MutableRefObject<{ [k: string]: HTMLVideoElement }>) => {
     const list = reelsRef.current;
     if (!list.length) return;
     list.forEach((reel: any, idx: number) => {
-      const vid = mobileRefs.current[reel.id];
+      const vid = refs.current[reel.id];
       if (!vid) return;
-      if (idx === activeMobileIdx) {
+      if (idx === activeIdx) {
         vid.muted = mutedRef.current;
         vid.play().catch(() => {});
+        setPausedReels(p => { const n = new Set(p); n.delete(reel.id); return n; });
         if (isGuestRef.current && !guestPromptShown.current) {
           guestViewCount.current += 1;
           if (guestViewCount.current > 2) {
@@ -140,24 +163,34 @@ export default function Reels() {
         vid.currentTime = 0;
       }
     });
+  }, []);
+
+  /* ── Auto-play first reel once videos load ── */
+  useEffect(() => {
+    if (initialPlayDone.current || !reels.length) return;
+    const tryPlay = () => {
+      const mVid = mobileRefs.current[reels[0]?.id];
+      const dVid = desktopRefs.current[reels[0]?.id];
+      if (mVid || dVid) {
+        initialPlayDone.current = true;
+        playActiveReel(0, mobileRefs);
+        playActiveReel(0, desktopRefs);
+      }
+    };
+    tryPlay();
+    const t = setTimeout(tryPlay, 300);
+    return () => clearTimeout(t);
+  }, [reels, playActiveReel]);
+
+  /* ── Play active reel, pause all others — MOBILE ── */
+  useEffect(() => {
+    playActiveReel(activeMobileIdx, mobileRefs);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMobileIdx]);
 
   /* ── Play active reel, pause all others — DESKTOP ── */
   useEffect(() => {
-    const list = reelsRef.current;
-    if (!list.length) return;
-    list.forEach((reel: any, idx: number) => {
-      const vid = desktopRefs.current[reel.id];
-      if (!vid) return;
-      if (idx === activeDesktopIdx) {
-        vid.muted = mutedRef.current;
-        vid.play().catch(() => {});
-      } else {
-        vid.pause();
-        vid.currentTime = 0;
-      }
-    });
+    playActiveReel(activeDesktopIdx, desktopRefs);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDesktopIdx]);
 
@@ -213,11 +246,17 @@ export default function Reels() {
     toast.success(isRTL ? "تم نسخ الرابط" : "Link copied!");
   }, [isRTL]);
 
-  const handleFollow = useCallback((uid: string) => {
+  const handleFollow = useCallback(async (uid: string) => {
     if (!currentUser) { showPrompt(); return; }
-    toggleFollow.mutate({ targetUserId: uid });
-    setFollowedUsers(p => { const n = new Set(p); n.has(uid) ? n.delete(uid) : n.add(uid); return n; });
-  }, [currentUser, showPrompt, toggleFollow]);
+    const wasFollowed = followedUsers.has(uid);
+    setFollowedUsers(p => { const n = new Set(p); wasFollowed ? n.delete(uid) : n.add(uid); return n; });
+    try {
+      await toggleFollow.mutateAsync({ targetUserId: uid });
+    } catch {
+      setFollowedUsers(p => { const n = new Set(p); wasFollowed ? n.add(uid) : n.delete(uid); return n; });
+      toast.error(isRTL ? "حدث خطأ" : "Something went wrong");
+    }
+  }, [currentUser, showPrompt, toggleFollow, followedUsers, isRTL]);
 
   const handleSave = useCallback((id: string) => {
     if (!currentUser) { showPrompt(); return; }
@@ -408,13 +447,10 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
             </AvatarFallback>
           </Avatar>
         </Link>
-        {currentUserId !== reel.profile?.id && (
+        {currentUserId !== reel.profile?.id && !followed && (
           <button
             onClick={() => onFollow(reel.profile.id)}
-            className={cn(
-              "absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center shadow transition-all",
-              followed ? "bg-white/30" : "bg-[#ff3b5c]"
-            )}
+            className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center shadow transition-all bg-[#ff3b5c]"
           >
             <Plus className="w-3 h-3 text-white" strokeWidth={3} />
           </button>
@@ -455,9 +491,9 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
    MOBILE CARD
 ════════════════════════════════════════════════════ */
 function MobileReelCard({
-  reel, idx, isRTL, muted, setMuted, followed, saved,
+  reel, idx, isRTL, muted, setMuted, paused, followed, saved,
   currentUserId, videoRefs, cardHeight = "100svh",
-  onLike, onFollow, onSave, onShare, onComment,
+  onTap, onLike, onFollow, onSave, onShare, onComment,
 }: CardProps) {
   /* When the card is shorter (nav bar present), reduce bottom offsets so
      content stays at the same visual position relative to the screen bottom. */
@@ -526,7 +562,7 @@ function MobileReelCard({
     } else {
       lastTapTime.current = now;
       singleTapTimer.current = setTimeout(() => {
-        setMuted(m => !m);
+        onTap(reel.id);
       }, 350);
     }
   };
@@ -577,10 +613,22 @@ function MobileReelCard({
         </div>
       )}
 
-      {/* Mute indicator — top right */}
-      <div className="absolute top-4 right-4 z-30 bg-black/40 backdrop-blur-sm rounded-full p-2 border border-white/20 pointer-events-none">
+      {/* Paused overlay */}
+      {paused && !holdActive && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+          <div className="bg-black/40 rounded-full p-5 backdrop-blur-sm">
+            <Play className="w-12 h-12 text-white fill-white" />
+          </div>
+        </div>
+      )}
+
+      {/* Mute toggle — top right */}
+      <button
+        onClick={() => setMuted(m => !m)}
+        className="absolute top-4 right-4 z-30 bg-black/40 backdrop-blur-sm rounded-full p-2 border border-white/20 active:scale-90 transition-transform"
+      >
         {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
-      </div>
+      </button>
 
       {/* Action buttons — bottom-8 when nav present (32px above nav top = same visual spot) */}
       <div className={cn("absolute z-30", hasNav ? "bottom-8" : "bottom-24", isRTL ? "left-3" : "right-3")}>
@@ -630,7 +678,11 @@ function DesktopReelCard({
     >
       {/* Blurred bg */}
       <div className="absolute inset-0 pointer-events-none">
-        <video src={reel.video_url} className="w-full h-full object-cover scale-110 blur-2xl opacity-25" muted loop playsInline />
+        {reel.thumbnail_url ? (
+          <img src={reel.thumbnail_url} className="w-full h-full object-cover scale-110 blur-2xl opacity-25" alt="" />
+        ) : (
+          <video src={reel.video_url} className="w-full h-full object-cover scale-110 blur-2xl opacity-25" muted preload="metadata" />
+        )}
       </div>
 
       {/* Card + actions */}
