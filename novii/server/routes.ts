@@ -2038,7 +2038,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
     try {
-      const { data: admin, error } = await getDb(req)
+      const { data: admin, error } = await db
         .from('admins')
         .select('*')
         .eq('user_id', userId)
@@ -2069,7 +2069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   async function logAdminAction(req: Request, action: string, targetType?: string, targetId?: string, details?: string) {
     try {
-      await getDb(req)
+      await db
         .from('admin_logs')
         .insert({
           admin_user_id: req.userId,
@@ -2087,7 +2087,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/check — check if current user is admin
   app.get("/api/admin/check", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { data: admin } = await getDb(req)
+      const { data: admin } = await db
         .from('admins')
         .select('*')
         .eq('user_id', req.userId)
@@ -2103,24 +2103,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/stats — platform statistics
   app.get("/api/admin/stats", requireAuth, requireAdmin, checkPermission('can_view_analytics'), async (req: Request, res: Response) => {
     try {
-      const { data: profiles } = await getDb(req)
+      const { data: profiles } = await db
         .from('profiles')
         .select('posts_count, is_banned, created_at');
 
-      const { count: totalPosts } = await getDb(req)
+      const { count: totalPosts } = await db
         .from('posts')
         .select('*', { count: 'exact', head: true })
         .eq('is_deleted', false);
 
-      const { count: totalReports } = await getDb(req)
+      const { count: totalReports } = await db
         .from('reports')
         .select('*', { count: 'exact', head: true });
 
-      const { count: totalCommunities } = await getDb(req)
+      const { count: totalCommunities } = await db
         .from('communities')
         .select('*', { count: 'exact', head: true });
 
-      const { count: totalAdmins } = await getDb(req)
+      const { count: totalAdmins } = await db
         .from('admins')
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true);
@@ -2128,7 +2128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-      const { count: newUsersThisWeek } = await getDb(req)
+      const { count: newUsersThisWeek } = await db
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .gte('created_at', weekAgo.toISOString());
@@ -2152,7 +2152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/users — list all users
   app.get("/api/admin/users", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
     try {
-      const { data: users, error } = await getDb(req)
+      const { data: users, error } = await db
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
@@ -2185,7 +2185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         banUntil = now.toISOString();
       }
 
-      const { error } = await getDb(req)
+      const { error } = await db
         .from('profiles')
         .update({
           is_banned: ban,
@@ -2209,7 +2209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
 
-      const { error } = await getDb(req)
+      const { error } = await db
         .from('profiles')
         .delete()
         .eq('id', userId);
@@ -2230,7 +2230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId } = req.params;
       const { full_name, bio, website, location, is_verified, is_official, is_creator, is_premium, is_popular } = req.body;
 
-      const { data, error } = await getDb(req)
+      const { data, error } = await db
         .from('profiles')
         .update({
           full_name: full_name || null,
@@ -2260,7 +2260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/admins — list admins
   app.get("/api/admin/admins", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { data, error } = await getDb(req)
+      const { data, error } = await db
         .from('admins')
         .select('*');
 
@@ -2277,7 +2277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { user_id, role, is_active, can_manage_users, can_manage_content, can_manage_admins, can_manage_reports, can_view_analytics, can_manage_settings } = req.body;
 
-      const { data, error } = await getDb(req)
+      const { data, error } = await db
         .from('admins')
         .insert({
           user_id,
@@ -2308,7 +2308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId } = req.params;
       const { role, is_active, can_manage_users, can_manage_content, can_manage_admins, can_manage_reports, can_view_analytics, can_manage_settings } = req.body;
 
-      const { data, error } = await getDb(req)
+      const { data, error } = await db
         .from('admins')
         .update({
           role,
@@ -2339,7 +2339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
 
-      const { error } = await getDb(req)
+      const { error } = await db
         .from('admins')
         .delete()
         .eq('user_id', userId);
@@ -2357,7 +2357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/content — get posts for moderation
   app.get("/api/admin/content", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
     try {
-      const { data: posts, error } = await getDb(req)
+      const { data: posts, error } = await db
         .from('posts')
         .select('*, profiles!posts_user_id_fkey(username, full_name, avatar_url)')
         .eq('is_deleted', false)
@@ -2377,7 +2377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { postId } = req.params;
 
-      const { error } = await getDb(req)
+      const { error } = await db
         .from('posts')
         .update({ is_deleted: true })
         .eq('id', postId);
@@ -2395,7 +2395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/reports — get reports
   app.get("/api/admin/reports", requireAuth, requireAdmin, checkPermission('can_manage_reports'), async (req: Request, res: Response) => {
     try {
-      const { data: reports, error } = await getDb(req)
+      const { data: reports, error } = await db
         .from('reports')
         .select('*')
         .order('created_at', { ascending: false })
@@ -2417,7 +2417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/logs — get admin activity logs
   app.get("/api/admin/logs", requireAuth, requireAdmin, checkPermission('can_view_analytics'), async (req: Request, res: Response) => {
     try {
-      const { data: logs, error } = await getDb(req)
+      const { data: logs, error } = await db
         .from('admin_logs')
         .select('*, profiles!admin_logs_admin_user_id_fkey(username, full_name, avatar_url)')
         .order('created_at', { ascending: false })
@@ -2439,7 +2439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/settings — get platform settings
   app.get("/api/admin/settings", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { data, error } = await getDb(req)
+      const { data, error } = await db
         .from('platform_settings')
         .select('*');
 
@@ -2464,7 +2464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { key, value } = req.body;
 
-      const { error } = await getDb(req)
+      const { error } = await db
         .from('platform_settings')
         .upsert({
           key,
