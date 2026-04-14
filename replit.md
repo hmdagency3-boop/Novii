@@ -39,6 +39,12 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - `x-user-token` header used for JWT verification, `x-user-id` as fallback
 - Device management endpoints enforce ownership checks (IDOR protection)
 
+### Toast Notifications
+- **Dual system**: Sonner (primary, most pages) + Shadcn/Radix (auth, create flows)
+- **Sonner**: Glassmorphic style with backdrop-blur, colored tint per type (success=emerald, error=red, warning=amber, info=blue), positioned top-center, 3s duration
+- **Shadcn**: Matching glassmorphic style with auto-icons per variant, RTL-safe positioning (logical `end-2`), centered viewport, slide-from-top animation
+- **Styling**: Sonner classNames in `sonner.tsx`, icon colors via CSS in `index.css`, Shadcn variants in `toast.tsx`
+
 ### Error Handling
 - **ErrorBoundary**: `novii/client/src/components/error-boundary.tsx` wraps entire app in `App.tsx`
 - Prevents white screen on crashes, shows error UI with retry button

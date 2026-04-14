@@ -236,7 +236,7 @@ function App() {
                 <GuestPromptProvider>
                   <TooltipProvider>
                     <ShadcnToaster />
-                    <Toaster richColors position="top-right" />
+                    <Toaster richColors position="top-center" />
                     <GlobalMessageListener />
                     <TimeTracker />
                     <VisitorDetector />
