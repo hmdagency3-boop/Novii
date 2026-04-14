@@ -26,6 +26,7 @@ import { UserHoverCard } from "./user-hover-card";
 import { StoryAwareAvatar } from "./story-aware-avatar";
 import { useLanguage } from "@/lib/language-context";
 import { useSettings } from "@/lib/settings-context";
+import { ReportDialog } from "./report-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +57,7 @@ export default function PostCard({ post }: PostCardProps) {
   const [hideLikes, setHideLikes] = useState(post.hide_likes ?? false);
   const [repliesDisabled, setRepliesDisabled] = useState(post.replies_disabled ?? false);
   const [showInsights, setShowInsights] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
   
   const toggleLike = useToggleLike();
   const toggleSave = useToggleSave();
@@ -291,7 +293,10 @@ export default function PostCard({ post }: PostCardProps) {
               </>
             )}
             {currentUser?.id !== post.user_id && (
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem
+                onClick={() => setShowReportDialog(true)}
+                className="text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-950/20 cursor-pointer"
+              >
                 {t ? "الإبلاغ عن المنشور" : "Report Post"}
               </DropdownMenuItem>
             )}
@@ -471,6 +476,13 @@ export default function PostCard({ post }: PostCardProps) {
           </div>
         ))}
       </div>
+
+      <ReportDialog
+        open={showReportDialog}
+        onClose={() => setShowReportDialog(false)}
+        postId={post.id}
+        reportedUserId={post.user_id}
+      />
     </div>
   );
 }

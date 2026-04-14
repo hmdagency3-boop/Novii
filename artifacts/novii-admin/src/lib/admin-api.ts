@@ -229,9 +229,23 @@ export interface ReportRecord {
   reason: string;
   description: string;
   status: string;
+  admin_note: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
   created_at: string;
   reporter_username?: string;
+  reporter_avatar?: string;
   reported_username?: string;
+  reported_avatar?: string;
+  post_caption?: string;
+  post_image?: string;
+}
+
+export async function updateReport(reportId: string, data: { status?: string; admin_note?: string }): Promise<ReportRecord> {
+  return adminFetch(`/reports/${reportId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export interface LogRecord {

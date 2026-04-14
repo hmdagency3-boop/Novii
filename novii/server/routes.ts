@@ -2084,6 +2084,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
+  // POST /api/reports — user reports a post
+  app.post("/api/reports", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { post_id, reported_user_id, reason, description } = req.body;
+      if (!post_id || !reported_user_id || !reason) {
+        return res.status(400).json({ error: "post_id, reported_user_id, and reason are required" });
+      }
+
+      if (req.userId === reported_user_id) {
+        return res.status(400).json({ error: "You cannot report your own post" });
+      }
+
+      const { data: existing } = await adminDb
+        .from('reports')
+        .select('id')
+        .eq('reporter_id', req.userId)
+        .eq('reported_post_id', post_id)
+        .maybeSingle();
+
+      if (existing) {
+        return res.status(409).json({ error: "You have already reported this post" });
+      }
+
+      const { data, error } = await adminDb
+        .from('reports')
+        .insert({
+          reporter_id: req.userId,
+          reported_user_id,
+          reported_post_id: post_id,
+          reason,
+          description: description || null,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.status(201).json(data);
+    } catch (error) {
+      console.error('Report creation error:', error);
+      res.status(500).json({ error: "Failed to submit report" });
+    }
+  });
+
   // GET /api/admin/check — check if current user is admin
   app.get("/api/admin/check", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -2489,14 +2533,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/admin/reports — get reports
+  // GET /api/admin/reports — get reports with usernames and post info
   app.get("/api/admin/reports", requireAuth, requireAdmin, checkPermission('can_manage_reports'), async (req: Request, res: Response) => {
     try {
       const { data: reports, error } = await adminDb
         .from('reports')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) {
         if (error.code === '42P01') {
@@ -2504,10 +2548,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         throw error;
       }
-      res.json(reports || []);
+
+      if (!reports || reports.length === 0) return res.json([]);
+
+      const userIds = [...new Set([
+        ...reports.map((r: any) => r.reporter_id),
+        ...reports.map((r: any) => r.reported_user_id),
+      ].filter(Boolean))];
+
+      const postIds = [...new Set(reports.map((r: any) => r.reported_post_id).filter(Boolean))];
+
+      const { data: users } = await adminDb
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', userIds);
+
+      const userMap = Object.fromEntries((users || []).map((u: any) => [u.id, u]));
+
+      let postMap: Record<string, any> = {};
+      if (postIds.length > 0) {
+        const { data: posts } = await adminDb
+          .from('posts')
+          .select('id, caption, image_url, user_id')
+          .in('id', postIds);
+        postMap = Object.fromEntries((posts || []).map((p: any) => [p.id, p]));
+      }
+
+      const enriched = reports.map((r: any) => ({
+        ...r,
+        reporter_username: userMap[r.reporter_id]?.username || null,
+        reporter_avatar: userMap[r.reporter_id]?.avatar_url || null,
+        reported_username: userMap[r.reported_user_id]?.username || null,
+        reported_avatar: userMap[r.reported_user_id]?.avatar_url || null,
+        post_caption: postMap[r.reported_post_id]?.caption || null,
+        post_image: postMap[r.reported_post_id]?.image_url || null,
+      }));
+
+      res.json(enriched);
     } catch (error) {
       console.error('Admin reports error:', error);
       res.json([]);
+    }
+  });
+
+  // PATCH /api/admin/reports/:reportId — update report status
+  app.patch("/api/admin/reports/:reportId", requireAuth, requireAdmin, checkPermission('can_manage_reports'), async (req: Request, res: Response) => {
+    try {
+      const { reportId } = req.params;
+      const { status, admin_note } = req.body;
+
+      const updatePayload: Record<string, any> = {};
+      if (status) {
+        updatePayload.status = status;
+        if (status === 'resolved' || status === 'dismissed') {
+          updatePayload.resolved_by = req.userId;
+          updatePayload.resolved_at = new Date().toISOString();
+        }
+      }
+      if (admin_note !== undefined) updatePayload.admin_note = admin_note;
+
+      const { data, error } = await adminDb
+        .from('reports')
+        .update(updatePayload)
+        .eq('id', reportId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json(data);
+    } catch (error) {
+      console.error('Admin update report error:', error);
+      res.status(500).json({ error: "Failed to update report" });
     }
   });
 

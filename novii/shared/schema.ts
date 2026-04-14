@@ -238,6 +238,21 @@ export const platformSettings = pgTable("platform_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Reports table (بلاغات المنشورات)
+export const reports = pgTable("reports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reporterId: uuid("reporter_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  reportedUserId: uuid("reported_user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  reportedPostId: uuid("reported_post_id"),
+  reason: text("reason").notNull(),
+  description: text("description"),
+  status: text("status").default("pending"),
+  resolvedBy: uuid("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
+  adminNote: text("admin_note"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Badges catalog table - Contains all available badges
 export const badges = pgTable("badges", {
   id: uuid("id").primaryKey().defaultRandom(),
