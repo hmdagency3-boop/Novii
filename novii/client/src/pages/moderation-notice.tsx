@@ -8,17 +8,10 @@ import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import {
   AlertTriangle, Trash2, ShieldBan, ShieldCheck, Shield,
-  ArrowLeft, ArrowRight, FileText, Clock, Info, ChevronRight, ExternalLink
+  ArrowLeft, ArrowRight, Clock, Info, ChevronRight,
+  Smartphone, Lock, CheckCircle2, FileText, Heart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const GUIDELINES = [
-  { ar: "لا تنشر محتوى مسيء أو مخالف", en: "Do not post offensive or violating content" },
-  { ar: "احترم خصوصية الآخرين", en: "Respect others' privacy" },
-  { ar: "لا تنشر محتوى عنيف أو تحريضي", en: "Do not post violent or inciting content" },
-  { ar: "لا تستخدم المنصة للتحرش أو التنمر", en: "Do not use the platform for harassment or bullying" },
-  { ar: "لا ترسل رسائل مزعجة أو سبام", en: "Do not send spam or unwanted messages" },
-];
 
 export default function ModerationNotice() {
   const { id } = useParams<{ id: string }>();
@@ -107,7 +100,7 @@ export default function ModerationNotice() {
         };
       case "report_resolved":
         return {
-          icon: <Shield className="w-8 h-8 text-white" />,
+          icon: <CheckCircle2 className="w-8 h-8 text-white" />,
           bg: "bg-blue-600",
           bgLight: "bg-blue-50 dark:bg-blue-950/30",
           border: "border-blue-200 dark:border-blue-800",
@@ -115,9 +108,23 @@ export default function ModerationNotice() {
           titleEn: "Action Taken on Your Report",
           subtitleAr: "شكراً لمساعدتنا في الحفاظ على مجتمع نوفي آمناً",
           subtitleEn: "Thank you for helping keep the Novii community safe",
-          severityAr: "إجراء إداري",
-          severityEn: "Administrative Action",
+          severityAr: "بلاغ",
+          severityEn: "Report",
           severityColor: "text-blue-600 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400",
+        };
+      case "security":
+        return {
+          icon: <Smartphone className="w-8 h-8 text-white" />,
+          bg: "bg-slate-700",
+          bgLight: "bg-slate-50 dark:bg-slate-950/30",
+          border: "border-slate-200 dark:border-slate-800",
+          titleAr: "تنبيه أمان",
+          titleEn: "Security Alert",
+          subtitleAr: "تم رصد نشاط يتعلق بأمان حسابك",
+          subtitleEn: "Activity related to your account security was detected",
+          severityAr: "أمان",
+          severityEn: "Security",
+          severityColor: "text-slate-600 bg-slate-100 dark:bg-slate-900/40 dark:text-slate-400",
         };
       default:
         return {
@@ -162,6 +169,7 @@ export default function ModerationNotice() {
 
   const config = getTypeConfig(notification.type);
   const BackArrow = isAr ? ArrowRight : ArrowLeft;
+  const type = notification.type;
 
   return (
     <Layout>
@@ -203,7 +211,7 @@ export default function ModerationNotice() {
                   <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-1.5">
-                      {isAr ? "تفاصيل الإجراء" : "Action Details"}
+                      {isAr ? "التفاصيل" : "Details"}
                     </p>
                     <p className="text-sm text-foreground leading-relaxed">
                       {notification.content}
@@ -213,82 +221,352 @@ export default function ModerationNotice() {
               </div>
             )}
 
-            {notification.type !== "report_resolved" && notification.type !== "unban" && (
-              <div className="bg-background rounded-xl p-4 border border-border">
-                <div className="flex items-start gap-2.5">
-                  <FileText className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-muted-foreground mb-2.5">
-                      {isAr ? "إرشادات المجتمع" : "Community Guidelines"}
-                    </p>
-                    <ul className="space-y-2">
-                      {GUIDELINES.map((g, i) => (
-                        <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
-                          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 mt-1.5 flex-shrink-0" />
-                          {isAr ? g.ar : g.en}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
+            {type === "warning" && <WarningSection isAr={isAr} />}
+            {type === "post_removed" && <PostRemovedSection isAr={isAr} />}
+            {type === "ban" && <BanSection isAr={isAr} />}
+            {type === "unban" && <UnbanSection isAr={isAr} />}
+            {type === "report_resolved" && <ReportResolvedSection isAr={isAr} />}
+            {type === "security" && <SecuritySection isAr={isAr} />}
 
-            {notification.type === "report_resolved" && (
-              <div className="bg-background rounded-xl p-4 border border-border">
-                <div className="flex items-start gap-2.5">
-                  <Shield className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground mb-1.5">
-                      {isAr ? "شكراً لك" : "Thank You"}
-                    </p>
-                    <p className="text-sm text-foreground/80 leading-relaxed">
-                      {isAr
-                        ? "بلاغك يساعدنا في الحفاظ على مجتمع نوفي آمناً ومناسباً للجميع. نقدّر وقتك ومساهمتك في جعل المنصة مكاناً أفضل."
-                        : "Your report helps us keep the Novii community safe and appropriate for everyone. We appreciate your time and contribution to making the platform a better place."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {(notification.type === "warning" || notification.type === "post_removed") && (
-              <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
-                <div className="flex items-start gap-2.5">
-                  <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">
-                      {isAr ? "ماذا يحدث بعد ذلك؟" : "What happens next?"}
-                    </p>
-                    <p className="text-xs text-amber-600 dark:text-amber-500 leading-relaxed">
-                      {isAr
-                        ? "يرجى الالتزام بإرشادات المجتمع لتجنب إجراءات أشد مثل تقييد الحساب أو حظره. المخالفات المتكررة قد تؤدي إلى إجراءات أكثر صرامة."
-                        : "Please follow community guidelines to avoid stricter actions such as account restriction or ban. Repeated violations may lead to more severe measures."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="pt-2 space-y-2">
-              <Link
-                href="/terms"
-                className="flex items-center justify-between p-3 rounded-xl bg-background border border-border hover:bg-muted/50 transition-colors"
-              >
-                <span className="text-sm font-medium">{isAr ? "سياسة الاستخدام" : "Terms of Service"}</span>
-                <ChevronRight className={cn("w-4 h-4 text-muted-foreground", isAr && "rotate-180")} />
-              </Link>
-              <Link
-                href="/help"
-                className="flex items-center justify-between p-3 rounded-xl bg-background border border-border hover:bg-muted/50 transition-colors"
-              >
-                <span className="text-sm font-medium">{isAr ? "مركز المساعدة" : "Help Center"}</span>
-                <ChevronRight className={cn("w-4 h-4 text-muted-foreground", isAr && "rotate-180")} />
-              </Link>
-            </div>
+            <FooterLinks type={type} isAr={isAr} />
           </div>
         </div>
       </div>
     </Layout>
+  );
+}
+
+function WarningSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <FileText className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "ما الذي يعنيه هذا التحذير؟" : "What does this warning mean?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "تم رصد نشاط مخالف لسياسة الاستخدام في حسابك",
+                "هذا التحذير يُسجَّل في سجل حسابك",
+                "التحذيرات المتكررة قد تؤدي لتقييد الحساب أو حظره",
+              ] : [
+                "Activity violating our usage policy was detected on your account",
+                "This warning is recorded in your account history",
+                "Repeated warnings may lead to account restriction or ban",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
+        <div className="flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">
+              {isAr ? "كيف تتجنب ذلك مستقبلاً؟" : "How to avoid this in the future?"}
+            </p>
+            <p className="text-xs text-amber-600 dark:text-amber-500 leading-relaxed">
+              {isAr
+                ? "يرجى مراجعة إرشادات المجتمع والالتزام بها. تجنب نشر محتوى مسيء أو مخالف، واحرص على احترام الآخرين."
+                : "Please review and follow our community guidelines. Avoid posting offensive or violating content, and make sure to respect others."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function PostRemovedSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <Trash2 className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "لماذا تم حذف منشورك؟" : "Why was your post removed?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "المنشور خالف واحدة أو أكثر من سياسات المحتوى",
+                "تمت مراجعة المنشور من قبل فريق الإدارة",
+                "لا يمكنك استعادة المنشور المحذوف",
+              ] : [
+                "The post violated one or more content policies",
+                "The post was reviewed by our moderation team",
+                "You cannot restore the removed post",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
+        <div className="flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">
+              {isAr ? "تنبيه مهم" : "Important Notice"}
+            </p>
+            <p className="text-xs text-amber-600 dark:text-amber-500 leading-relaxed">
+              {isAr
+                ? "تكرار نشر محتوى مخالف قد يؤدي إلى تحذير رسمي أو تقييد حسابك. يرجى الالتزام بسياسة المحتوى."
+                : "Repeatedly posting violating content may lead to a formal warning or account restriction. Please follow our content policy."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function BanSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <ShieldBan className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "ما الذي يعنيه تقييد حسابك؟" : "What does account restriction mean?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "لن تتمكن من نشر محتوى جديد أو التفاعل مع المنشورات",
+                "لن تتمكن من إرسال رسائل لمستخدمين آخرين",
+                "حسابك وبياناتك محفوظة ولن تُحذف",
+                "يمكن للإدارة رفع التقييد في أي وقت بعد المراجعة",
+              ] : [
+                "You won't be able to post new content or interact with posts",
+                "You won't be able to send messages to other users",
+                "Your account and data are preserved and won't be deleted",
+                "Administration can lift the restriction at any time after review",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-red-50 dark:bg-red-950/20 rounded-xl p-4 border border-red-200 dark:border-red-800">
+        <div className="flex items-start gap-2.5">
+          <Info className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">
+              {isAr ? "هل يمكنني الاعتراض؟" : "Can I appeal?"}
+            </p>
+            <p className="text-xs text-red-600 dark:text-red-500 leading-relaxed">
+              {isAr
+                ? "إذا كنت تعتقد أن هذا القرار غير عادل، يمكنك التواصل مع فريق الدعم من خلال مركز المساعدة لمراجعة حالتك."
+                : "If you believe this decision was unfair, you can contact our support team through the Help Center to review your case."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function UnbanSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <ShieldCheck className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "ماذا يعني رفع التقييد؟" : "What does lifting the restriction mean?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "يمكنك الآن نشر محتوى جديد والتفاعل بشكل طبيعي",
+                "يمكنك إرسال واستقبال الرسائل مجدداً",
+                "جميع ميزات حسابك تعمل بالكامل",
+              ] : [
+                "You can now post new content and interact normally",
+                "You can send and receive messages again",
+                "All your account features are fully functional",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-green-50 dark:bg-green-950/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+        <div className="flex items-start gap-2.5">
+          <Heart className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">
+              {isAr ? "مرحباً بعودتك!" : "Welcome back!"}
+            </p>
+            <p className="text-xs text-green-600 dark:text-green-500 leading-relaxed">
+              {isAr
+                ? "نتمنى لك تجربة ممتعة. يرجى الالتزام بإرشادات المنصة للحفاظ على مجتمع آمن ومحترم للجميع."
+                : "We hope you enjoy your experience. Please follow platform guidelines to maintain a safe and respectful community for everyone."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ReportResolvedSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <CheckCircle2 className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "ماذا حدث؟" : "What happened?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "تم مراجعة بلاغك من قبل فريق الإدارة",
+                "تم اتخاذ الإجراء المناسب بناءً على سياسات المنصة",
+                "لا يمكننا مشاركة تفاصيل الإجراء المتخذ حماية للخصوصية",
+              ] : [
+                "Your report was reviewed by our moderation team",
+                "Appropriate action was taken based on platform policies",
+                "We cannot share details of the action taken for privacy reasons",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-blue-50 dark:bg-blue-950/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+        <div className="flex items-start gap-2.5">
+          <Shield className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">
+              {isAr ? "شكراً لك" : "Thank You"}
+            </p>
+            <p className="text-xs text-blue-600 dark:text-blue-500 leading-relaxed">
+              {isAr
+                ? "بلاغك يساعدنا في الحفاظ على مجتمع نوفي آمناً. نقدّر مساهمتك وإذا لاحظت أي محتوى آخر مخالف لا تتردد في الإبلاغ."
+                : "Your report helps us keep the Novii community safe. We appreciate your contribution and if you notice any other violating content, don't hesitate to report it."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function SecuritySection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <Lock className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "نصائح لحماية حسابك" : "Tips to protect your account"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "استخدم كلمة مرور قوية وفريدة لحسابك",
+                "لا تشارك بيانات تسجيل الدخول مع أي شخص",
+                "راجع الأجهزة المتصلة بحسابك من الإعدادات",
+                "إذا لم تتعرف على هذا النشاط، قم بتغيير كلمة المرور فوراً",
+              ] : [
+                "Use a strong and unique password for your account",
+                "Never share your login credentials with anyone",
+                "Review connected devices from your settings",
+                "If you don't recognize this activity, change your password immediately",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-slate-100 dark:bg-slate-800/30 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+        <div className="flex items-start gap-2.5">
+          <Smartphone className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              {isAr ? "إدارة الأجهزة" : "Manage Devices"}
+            </p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              {isAr
+                ? "يمكنك مراجعة وإزالة الأجهزة المتصلة بحسابك من إعدادات الأمان. إذا رأيت جهازاً لا تعرفه، قم بإزالته وتغيير كلمة المرور."
+                : "You can review and remove devices connected to your account from security settings. If you see an unfamiliar device, remove it and change your password."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function FooterLinks({ type, isAr }: { type: string; isAr: boolean }) {
+  const isViolation = type === "warning" || type === "post_removed" || type === "ban";
+  const isSecurity = type === "security";
+
+  return (
+    <div className="pt-2 space-y-2">
+      {isViolation && (
+        <Link
+          href="/terms"
+          className="flex items-center justify-between p-3 rounded-xl bg-background border border-border hover:bg-muted/50 transition-colors"
+        >
+          <span className="text-sm font-medium">{isAr ? "سياسة الاستخدام" : "Terms of Service"}</span>
+          <ChevronRight className={cn("w-4 h-4 text-muted-foreground", isAr && "rotate-180")} />
+        </Link>
+      )}
+      {isSecurity && (
+        <Link
+          href="/settings"
+          className="flex items-center justify-between p-3 rounded-xl bg-background border border-border hover:bg-muted/50 transition-colors"
+        >
+          <span className="text-sm font-medium">{isAr ? "إعدادات الأمان" : "Security Settings"}</span>
+          <ChevronRight className={cn("w-4 h-4 text-muted-foreground", isAr && "rotate-180")} />
+        </Link>
+      )}
+      {(isViolation || type === "ban") && (
+        <Link
+          href="/help"
+          className="flex items-center justify-between p-3 rounded-xl bg-background border border-border hover:bg-muted/50 transition-colors"
+        >
+          <span className="text-sm font-medium">{isAr ? "مركز المساعدة" : "Help Center"}</span>
+          <ChevronRight className={cn("w-4 h-4 text-muted-foreground", isAr && "rotate-180")} />
+        </Link>
+      )}
+    </div>
   );
 }
