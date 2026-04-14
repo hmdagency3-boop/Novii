@@ -128,24 +128,30 @@ export default function ModerationNotice() {
         };
       case "verified_granted":
         return {
-          icon: <BadgeCheck className="w-8 h-8 text-white" />,
-          bg: "bg-blue-500",
-          bgLight: "bg-blue-50 dark:bg-blue-950/30",
-          border: "border-blue-200 dark:border-blue-800",
-          titleAr: "تم توثيق حسابك ✓",
-          titleEn: "Your Account is Verified ✓",
+          icon: <BadgeCheck className="w-8 h-8 text-primary fill-primary/20" />,
+          bg: "bg-primary/10",
+          bgLight: "bg-primary/5 dark:bg-primary/10",
+          border: "border-primary/20 dark:border-primary/30",
+          headerCircle: "bg-primary/15",
+          headerText: "text-foreground",
+          headerSubtext: "text-muted-foreground",
+          titleAr: "تم توثيق حسابك",
+          titleEn: "Your Account is Verified",
           subtitleAr: "أصبح حسابك يحمل علامة التوثيق الرسمية",
           subtitleEn: "Your account now carries the official verification badge",
           severityAr: "توثيق",
           severityEn: "Verified",
-          severityColor: "text-blue-600 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400",
+          severityColor: "text-primary bg-primary/10 dark:bg-primary/20",
         };
       case "verified_removed":
         return {
-          icon: <BadgeCheck className="w-8 h-8 text-white" />,
-          bg: "bg-gray-500",
+          icon: <BadgeCheck className="w-8 h-8 text-gray-400" />,
+          bg: "bg-gray-100 dark:bg-gray-800",
           bgLight: "bg-gray-50 dark:bg-gray-950/30",
           border: "border-gray-200 dark:border-gray-800",
+          headerCircle: "bg-gray-200 dark:bg-gray-700",
+          headerText: "text-foreground",
+          headerSubtext: "text-muted-foreground",
           titleAr: "تم إزالة توثيق حسابك",
           titleEn: "Account Verification Removed",
           subtitleAr: "لم يعد حسابك يحمل علامة التوثيق",
@@ -279,13 +285,13 @@ export default function ModerationNotice() {
 
         <div className={cn("rounded-2xl overflow-hidden border", config.border, config.bgLight)}>
           <div className={cn("p-6 flex flex-col items-center text-center gap-3", config.bg)}>
-            <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
+            <div className={cn("w-16 h-16 rounded-full flex items-center justify-center", config.headerCircle || "bg-white/20")}>
               {config.icon}
             </div>
-            <h1 className="text-xl font-bold text-white">
+            <h1 className={cn("text-xl font-bold", config.headerText || "text-white")}>
               {isAr ? config.titleAr : config.titleEn}
             </h1>
-            <p className="text-sm text-white/80">
+            <p className={cn("text-sm", config.headerSubtext || "text-white/80")}>
               {isAr ? config.subtitleAr : config.subtitleEn}
             </p>
           </div>
@@ -640,27 +646,37 @@ function ReportResolvedSection({ isAr }: { isAr: boolean }) {
 function VerifiedGrantedSection({ isAr }: { isAr: boolean }) {
   return (
     <>
+      <div className="bg-primary/5 dark:bg-primary/10 rounded-xl p-5 border border-primary/20 text-center">
+        <BadgeCheck className="w-12 h-12 text-primary fill-primary/20 mx-auto mb-3" />
+        <p className="text-sm font-bold text-foreground mb-1">
+          {isAr ? "حسابك موثّق رسمياً" : "Your Account is Officially Verified"}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {isAr ? "أصبحت علامة التوثيق تظهر بجانب اسمك في كل مكان على نوفي" : "The verification badge now appears next to your name everywhere on Novii"}
+        </p>
+      </div>
+
       <div className="bg-background rounded-xl p-4 border border-border">
         <div className="flex items-start gap-2.5">
-          <BadgeCheck className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <BadgeCheck className="w-4 h-4 text-primary fill-primary/20 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
             <p className="text-xs font-semibold text-muted-foreground mb-2.5">
               {isAr ? "ماذا يعني التوثيق؟" : "What does verification mean?"}
             </p>
             <ul className="space-y-2">
               {(isAr ? [
-                "علامة التوثيق ✓ تؤكد أن حسابك حقيقي وموثوق",
-                "تظهر العلامة بجانب اسمك في كل مكان على المنصة",
+                "علامة التوثيق تؤكد أن حسابك حقيقي وموثوق",
+                "تظهر العلامة بجانب اسمك في المنشورات والتعليقات والبحث",
                 "الحسابات الموثقة تحظى بثقة أعلى من المستخدمين",
                 "التوثيق يساعد في حمايتك من انتحال الهوية",
               ] : [
-                "The ✓ verification mark confirms your account is authentic and trustworthy",
-                "The mark appears next to your name everywhere on the platform",
+                "The verification badge confirms your account is authentic and trustworthy",
+                "The badge appears next to your name in posts, comments, and search",
                 "Verified accounts enjoy higher trust from other users",
                 "Verification helps protect you from identity impersonation",
               ]).map((text, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 mt-1.5 flex-shrink-0" />
                   {text}
                 </li>
               ))}
@@ -669,17 +685,17 @@ function VerifiedGrantedSection({ isAr }: { isAr: boolean }) {
         </div>
       </div>
 
-      <div className="bg-blue-50 dark:bg-blue-950/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+      <div className="bg-primary/5 dark:bg-primary/10 rounded-xl p-4 border border-primary/20">
         <div className="flex items-start gap-2.5">
-          <Star className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <Star className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">
+            <p className="text-xs font-semibold text-primary mb-1">
               {isAr ? "تهانينا على التوثيق!" : "Congratulations on your verification!"}
             </p>
-            <p className="text-xs text-blue-600 dark:text-blue-500 leading-relaxed">
+            <p className="text-xs text-foreground/70 leading-relaxed">
               {isAr
-                ? "حسابك أصبح موثقاً رسمياً. حافظ على نشاطك الإيجابي واحترم إرشادات المنصة للحفاظ على هذه الصفة."
-                : "Your account is now officially verified. Maintain your positive activity and respect platform guidelines to keep this status."}
+                ? "حافظ على نشاطك الإيجابي واحترم إرشادات المنصة للحفاظ على هذه الصفة."
+                : "Maintain your positive activity and respect platform guidelines to keep this status."}
             </p>
           </div>
         </div>
@@ -691,9 +707,19 @@ function VerifiedGrantedSection({ isAr }: { isAr: boolean }) {
 function VerifiedRemovedSection({ isAr }: { isAr: boolean }) {
   return (
     <>
+      <div className="bg-gray-50 dark:bg-gray-900/30 rounded-xl p-5 border border-gray-200 dark:border-gray-800 text-center">
+        <BadgeCheck className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+        <p className="text-sm font-bold text-foreground mb-1">
+          {isAr ? "تم إزالة علامة التوثيق" : "Verification Badge Removed"}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {isAr ? "لم يعد حسابك يحمل علامة التوثيق على نوفي" : "Your account no longer carries the verification badge on Novii"}
+        </p>
+      </div>
+
       <div className="bg-background rounded-xl p-4 border border-border">
         <div className="flex items-start gap-2.5">
-          <BadgeCheck className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+          <Info className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
             <p className="text-xs font-semibold text-muted-foreground mb-2.5">
               {isAr ? "لماذا تم إزالة التوثيق؟" : "Why was verification removed?"}
@@ -702,12 +728,12 @@ function VerifiedRemovedSection({ isAr }: { isAr: boolean }) {
               {(isAr ? [
                 "قد يتم إزالة التوثيق بسبب مخالفة شروط الحصول عليه",
                 "تغيير بيانات الحساب الأساسية قد يستوجب إعادة التوثيق",
-                "لا يزال بإمكانك استخدام حسابك بشكل طبيعي",
+                "لا يزال بإمكانك استخدام حسابك ومحتواك بشكل طبيعي",
                 "يمكنك التواصل مع الدعم لمعرفة التفاصيل",
               ] : [
                 "Verification may be removed due to a violation of verification terms",
                 "Changing fundamental account information may require re-verification",
-                "You can still use your account normally",
+                "You can still use your account and content normally",
                 "You can contact support for more details",
               ]).map((text, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">

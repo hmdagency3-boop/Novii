@@ -260,8 +260,8 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
     report_resolved: { icon: <Shield className="w-3 h-3 text-white" />,                     bg: 'bg-blue-600' },
     badge_awarded:   { icon: <Award className="w-3 h-3 text-white" />,                      bg: 'bg-yellow-500' },
     badge_removed:   { icon: <XCircle className="w-3 h-3 text-white" />,                    bg: 'bg-gray-500' },
-    verified_granted:{ icon: <BadgeCheck className="w-3 h-3 text-white" />,                 bg: 'bg-blue-500' },
-    verified_removed:{ icon: <BadgeCheck className="w-3 h-3 text-white" />,                 bg: 'bg-gray-500' },
+    verified_granted:{ icon: <BadgeCheck className="w-3 h-3 text-primary fill-primary/20" />,  bg: 'bg-primary/10' },
+    verified_removed:{ icon: <BadgeCheck className="w-3 h-3 text-gray-400" />,               bg: 'bg-gray-200 dark:bg-gray-700' },
     official_granted:{ icon: <Building2 className="w-3 h-3 text-white" />,                  bg: 'bg-purple-600' },
     official_removed:{ icon: <Building2 className="w-3 h-3 text-white" />,                  bg: 'bg-gray-500' },
   };
@@ -312,12 +312,16 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
   const showFollowRequest = notif.type === 'follow_request' && actorId && !notif.is_read;
   const showThumbnail = !showFollowBack && !showFollowRequest && post?.image_url;
 
+  const isVerifiedType = notif.type === 'verified_granted' || notif.type === 'verified_removed';
+
   const rowContent = (
     <div
       className={cn(
         "flex items-center gap-3 px-4 py-2.5 transition-colors cursor-pointer",
         isModeration
-          ? (!notif.is_read ? "bg-amber-500/8 hover:bg-amber-500/12 border-s-2 border-amber-500" : "hover:bg-muted/40 border-s-2 border-transparent")
+          ? isVerifiedType
+            ? (!notif.is_read ? "bg-primary/5 hover:bg-primary/8 border-s-2 border-primary" : "hover:bg-muted/40 border-s-2 border-transparent")
+            : (!notif.is_read ? "bg-amber-500/8 hover:bg-amber-500/12 border-s-2 border-amber-500" : "hover:bg-muted/40 border-s-2 border-transparent")
           : (!notif.is_read ? "bg-primary/5 hover:bg-primary/8" : "hover:bg-muted/40")
       )}
       onClick={onRead}
@@ -340,8 +344,8 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
             {notif.type === 'report_resolved' && <Shield className="w-5 h-5 text-white" />}
             {notif.type === 'badge_awarded' && <Award className="w-5 h-5 text-white" />}
             {notif.type === 'badge_removed' && <XCircle className="w-5 h-5 text-white" />}
-            {notif.type === 'verified_granted' && <BadgeCheck className="w-5 h-5 text-white" />}
-            {notif.type === 'verified_removed' && <BadgeCheck className="w-5 h-5 text-white" />}
+            {notif.type === 'verified_granted' && <BadgeCheck className="w-5 h-5 text-primary fill-primary/20" />}
+            {notif.type === 'verified_removed' && <BadgeCheck className="w-5 h-5 text-gray-400" />}
             {notif.type === 'official_granted' && <Building2 className="w-5 h-5 text-white" />}
             {notif.type === 'official_removed' && <Building2 className="w-5 h-5 text-white" />}
           </div>
