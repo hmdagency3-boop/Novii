@@ -2,7 +2,7 @@ import Layout from "@/components/layout";
 import {
   Heart, MessageCircle, UserPlus, Loader2, Bell,
   CheckCheck, RefreshCw, Check, X, AtSign, Film,
-  BookmarkIcon, Repeat2, AlertTriangle, Trash2, ShieldBan, ShieldCheck, Shield
+  BookmarkIcon, Repeat2, AlertTriangle, Trash2, ShieldBan, ShieldCheck, Shield, ChevronRight
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { useSettings } from "@/lib/settings-context";
 
 type FilterType = 'all' | 'like' | 'comment' | 'follow' | 'follow_request' | 'mention' | 'moderation';
 
-const MODERATION_TYPES = ['warning', 'post_removed', 'ban', 'unban', 'security'];
+const MODERATION_TYPES = ['warning', 'post_removed', 'ban', 'unban', 'security', 'report_resolved'];
 
 const FILTERS: { key: FilterType; labelAr: string; labelEn: string; icon: React.ReactNode; color: string }[] = [
   { key: 'all',            labelAr: 'الكل',       labelEn: 'All',      icon: <Bell className="w-3.5 h-3.5" />,          color: 'bg-foreground text-background' },
@@ -251,11 +251,12 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
     reel_like:      { icon: <Film className="w-3 h-3 text-white" />,                       bg: 'bg-pink-500' },
     save:           { icon: <BookmarkIcon className="w-3 h-3 text-white" />,               bg: 'bg-indigo-500' },
     repost:         { icon: <Repeat2 className="w-3 h-3 text-white" />,                    bg: 'bg-teal-500' },
-    warning:        { icon: <AlertTriangle className="w-3 h-3 text-white" />,              bg: 'bg-amber-500' },
-    post_removed:   { icon: <Trash2 className="w-3 h-3 text-white" />,                     bg: 'bg-red-600' },
-    ban:            { icon: <ShieldBan className="w-3 h-3 text-white" />,                  bg: 'bg-red-700' },
-    unban:          { icon: <ShieldCheck className="w-3 h-3 text-white" />,                bg: 'bg-green-600' },
-    security:       { icon: <Shield className="w-3 h-3 text-white" />,                     bg: 'bg-slate-600' },
+    warning:         { icon: <AlertTriangle className="w-3 h-3 text-white" />,              bg: 'bg-amber-500' },
+    post_removed:    { icon: <Trash2 className="w-3 h-3 text-white" />,                     bg: 'bg-red-600' },
+    ban:             { icon: <ShieldBan className="w-3 h-3 text-white" />,                  bg: 'bg-red-700' },
+    unban:           { icon: <ShieldCheck className="w-3 h-3 text-white" />,                bg: 'bg-green-600' },
+    security:        { icon: <Shield className="w-3 h-3 text-white" />,                     bg: 'bg-slate-600' },
+    report_resolved: { icon: <Shield className="w-3 h-3 text-white" />,                     bg: 'bg-blue-600' },
   };
   const iconInfo = iconMap[notif.type] || { icon: <Bell className="w-3 h-3 text-white" />, bg: 'bg-primary' };
   const isModeration = MODERATION_TYPES.includes(notif.type);
@@ -275,14 +276,15 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
       case 'post_removed':   return notif.content || (isAr ? 'تم إزالة منشورك لمخالفته سياسة الاستخدام.' : 'Your post was removed for violating community guidelines.');
       case 'ban':            return notif.content || (isAr ? 'تم تقييد حسابك.' : 'Your account has been restricted.');
       case 'unban':          return notif.content || (isAr ? 'تم رفع التقييد عن حسابك.' : 'Your account restriction has been lifted.');
-      case 'security':       return notif.content || (isAr ? 'إشعار أمني.' : 'Security notification.');
+      case 'security':        return notif.content || (isAr ? 'إشعار أمني.' : 'Security notification.');
+      case 'report_resolved': return notif.content || (isAr ? 'تم اتخاذ إجراء بخصوص بلاغك. شكراً لمساهمتك.' : 'Action was taken on your report. Thank you for your contribution.');
       default:               return notif.content || '';
     }
   };
 
   /* ── Link destination ── */
   const getHref = () => {
-    if (isModeration) return null;
+    if (isModeration) return `/moderation/${notif.id}`;
     if (notif.type === 'follow' || notif.type === 'follow_request') return `/user?id=${actorId}`;
     if (notif.post_id) {
       if (notif.comment_id) return `/post/${notif.post_id}?commentId=${notif.comment_id}`;
@@ -320,6 +322,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
             {notif.type === 'ban' && <ShieldBan className="w-5 h-5 text-white" />}
             {notif.type === 'unban' && <ShieldCheck className="w-5 h-5 text-white" />}
             {notif.type === 'security' && <Shield className="w-5 h-5 text-white" />}
+            {notif.type === 'report_resolved' && <Shield className="w-5 h-5 text-white" />}
           </div>
         </div>
       ) : (
@@ -409,7 +412,10 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
             <img src={post.image_url} alt="" className="w-full h-full object-cover" />
           </div>
         )}
-        {!showFollowRequest && !showFollowBack && !showThumbnail && notif.post_id && (
+        {isModeration && (
+          <ChevronRight className={cn("w-5 h-5 text-muted-foreground/50", isAr && "rotate-180")} />
+        )}
+        {!isModeration && !showFollowRequest && !showFollowBack && !showThumbnail && notif.post_id && (
           <div className="w-11 h-11 rounded-md bg-muted flex-shrink-0 flex items-center justify-center border border-border/30">
             <Film className="w-4 h-4 text-muted-foreground/40" />
           </div>

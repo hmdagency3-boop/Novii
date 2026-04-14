@@ -2669,6 +2669,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (admin_note !== undefined) updatePayload.admin_note = admin_note;
 
+      let previousStatus: string | null = null;
+      if (status === 'resolved') {
+        const { data: current } = await adminDb.from('reports').select('status, reporter_id').eq('id', reportId).single();
+        previousStatus = current?.status || null;
+      }
+
       const { data, error } = await adminDb
         .from('reports')
         .update(updatePayload)
@@ -2677,6 +2683,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .single();
 
       if (error) throw error;
+
+      if (status === 'resolved' && previousStatus !== 'resolved' && data?.reporter_id) {
+        const { error: notifErr } = await adminDb.from('notifications').insert({
+          user_id: data.reporter_id,
+          type: 'report_resolved',
+          content: 'شكراً لإبلاغك! تم مراجعة بلاغك واتخاذ الإجراء اللازم. مساهمتك تساعدنا في الحفاظ على مجتمع نوفي آمناً.',
+        });
+        if (notifErr) console.error('⚠️ Failed to send report_resolved notification:', notifErr);
+      }
+
       res.json(data);
     } catch (error) {
       console.error('Admin update report error:', error);

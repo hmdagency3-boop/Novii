@@ -35,6 +35,7 @@ import PrivacyPolicy from "@/pages/privacy";
 import TermsOfService from "@/pages/terms";
 import Help from "@/pages/help";
 import About from "@/pages/about";
+import ModerationNotice from "@/pages/moderation-notice";
 import ProtectedLayout from "@/components/protected-layout";
 import PublicRoute from "@/components/public-route";
 import { GuestPromptProvider } from "@/components/guest-login-prompt";
@@ -203,6 +204,11 @@ function Router() {
       <Route path="/followers-detail">
         <ProtectedLayout>
           <FollowersDetail />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/moderation/:id">
+        <ProtectedLayout>
+          <ModerationNotice />
         </ProtectedLayout>
       </Route>
 
