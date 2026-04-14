@@ -20,10 +20,24 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - Privacy toggle (is_private) saves to Supabase profiles table
 - Migration SQL in `novii/supabase-migration.sql` (also includes conversations, highlights tables)
 
+### Device Tracking System
+- **Schema**: `user_devices` table with fingerprinting (`device_fingerprint`), trust system (`is_trusted`), session tokens, login count, status (`active`/`revoked`)
+- **Backend**: `novii/server/utils/device-detector.ts` — UA parsing, SHA-256 fingerprint generation, geo-location with caching, session token generation
+- **Upsert Logic**: Same device (by fingerprint + userId) is updated on re-login instead of creating duplicates; max 10 active devices per user
+- **Auth-protected endpoints**: track, get, delete, trust, revoke-all, heartbeat — all require auth via `requireAuth` middleware with IDOR ownership checks
+- **Client fingerprint**: Collects screen resolution, timezone, language, hardware concurrency, touch points, pixel ratio (`collectClientFingerprint()` in `api.ts`)
+- **Heartbeat**: `DeviceHeartbeat` component sends activity ping every 5 minutes to keep `last_active_at` current
+- **Trust System**: Users can mark devices as trusted (protected from auto-removal when device limit is reached)
+- **Security Alerts**: New device login creates a `security` notification
+- **Visitor Detection**: Uses fingerprint hash to detect returning devices without login
+- **Settings UI**: `ConnectedDevicesSection` shows current device badge, device details (OS, browser, location, login count, timezone), trust toggle, remove button, "Log out all" action
+- **Migration SQL**: `novii/supabase/upgrade_device_tracking.sql`
+
 ### Security
 - **Auth Middleware**: JWT verification via `requireAuth` middleware in `novii/server/routes.ts`
 - Upload endpoint protected with: auth check, MIME validation (images/video/audio only), rate limiting (10/min per user)
 - `x-user-token` header used for JWT verification, `x-user-id` as fallback
+- Device management endpoints enforce ownership checks (IDOR protection)
 
 ### Error Handling
 - **ErrorBoundary**: `novii/client/src/components/error-boundary.tsx` wraps entire app in `App.tsx`

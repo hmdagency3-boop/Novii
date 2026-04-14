@@ -6,7 +6,7 @@ function getDb(req: Request) {
   const token = req.headers['x-user-token'] as string;
   return token ? getUserDb(token) : db;
 }
-import { parseUserAgent, getClientIp, getGeoLocation } from "./utils/device-detector";
+import { parseUserAgent, getClientIp, getGeoLocation, generateDeviceFingerprint, generateSessionToken, MAX_DEVICES_PER_USER, type ClientFingerprint } from "./utils/device-detector";
 import { userDevices, profiles } from "../shared/schema";
 import { sql, eq } from "drizzle-orm";
 import crypto from "crypto";
@@ -290,30 +290,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Track device when user logs in or signs up (using Supabase)
+  // ─── Device Tracking System (Professional) ───────────────────────────
+
+  const formatDeviceResponse = (d: any, includeSessionToken = false) => {
+    const result: any = {
+      id: d.id,
+      user_id: d.user_id,
+      device_fingerprint: d.device_fingerprint,
+      ip_address: d.ip_address,
+      browser: d.browser,
+      browser_version: d.browser_version,
+      device_type: d.device_type,
+      device_name: d.device_name,
+      device_model: d.device_model,
+      os_name: d.os_name,
+      os_version: d.os_version,
+      country: d.country,
+      country_code: d.country_code,
+      city: d.city,
+      screen_resolution: d.screen_resolution,
+      timezone: d.timezone,
+      language: d.language,
+      is_trusted: d.is_trusted || false,
+      status: d.status || 'active',
+      login_count: d.login_count || 1,
+      last_login_ip: d.last_login_ip,
+      last_active_at: d.last_active_at,
+      first_login_at: d.first_login_at || d.created_at,
+      created_at: d.created_at,
+      updated_at: d.updated_at,
+    };
+    if (includeSessionToken) result.session_token = d.session_token;
+    return result;
+  };
+
   app.post("/api/devices/track", async (req: Request, res: Response) => {
     try {
-      const { userId } = req.body;
+      const { userId, clientFingerprint } = req.body as { userId?: string; clientFingerprint?: ClientFingerprint };
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
+      }
+      const authUserId = req.userId || req.headers['x-user-id'] as string;
+      if (authUserId && authUserId !== userId) {
+        return res.status(403).json({ error: "Forbidden" });
       }
 
       const userAgent = req.headers["user-agent"] || "";
       const ipAddress = getClientIp(req);
-      
-      // Parse device info from user agent
       const deviceInfo = parseUserAgent(userAgent);
-      
-      // Get geolocation from IP
-      const geoLocation = await getGeoLocation(ipAddress);
+      const fingerprint = generateDeviceFingerprint(deviceInfo, clientFingerprint);
+      const sessionToken = generateSessionToken();
 
-      // Insert into database via Supabase
-      console.log('📱 Inserting device for user:', userId);
+      const [geoLocation] = await Promise.all([getGeoLocation(ipAddress)]);
+
+      console.log('📱 Device fingerprint:', fingerprint, 'for user:', userId);
+
+      const { data: existing, error: findErr } = await db
+        .from('user_devices')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('device_fingerprint', fingerprint)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+
+      if (!findErr && existing) {
+        console.log('🔄 Existing device found, updating...');
+        const { data: updated, error: upErr } = await db
+          .from('user_devices')
+          .update({
+            ip_address: ipAddress,
+            last_login_ip: ipAddress,
+            last_active_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            login_count: (existing.login_count || 1) + 1,
+            session_token: sessionToken,
+            browser_version: deviceInfo.browserVersion,
+            os_version: deviceInfo.osVersion,
+            country: geoLocation.country,
+            country_code: geoLocation.countryCode,
+            city: geoLocation.city,
+            screen_resolution: clientFingerprint?.screenResolution || existing.screen_resolution,
+            timezone: clientFingerprint?.timezone || existing.timezone,
+            language: clientFingerprint?.language || existing.language,
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+
+        if (upErr) throw upErr;
+        console.log('✅ Device updated successfully (login #' + ((existing.login_count || 1) + 1) + ')');
+        return res.json({ ...formatDeviceResponse(updated, true), isNewDevice: false, sessionToken });
+      }
+
+      const { count: deviceCount } = await db
+        .from('user_devices')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('status', 'active');
+
+      if ((deviceCount || 0) >= MAX_DEVICES_PER_USER) {
+        const { data: oldest } = await db
+          .from('user_devices')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .eq('is_trusted', false)
+          .order('last_active_at', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (oldest) {
+          await db.from('user_devices').update({ status: 'revoked' }).eq('id', oldest.id);
+          console.log('🗑️ Removed oldest untrusted device to make room');
+        }
+      }
+
+      console.log('🆕 New device, inserting...');
       const { data: inserted, error: insertError } = await db
         .from('user_devices')
         .insert({
           user_id: userId,
+          device_fingerprint: fingerprint,
           ip_address: ipAddress,
+          last_login_ip: ipAddress,
           browser: deviceInfo.browser,
           browser_version: deviceInfo.browserVersion,
           device_type: deviceInfo.deviceType,
@@ -323,89 +423,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
           os_version: deviceInfo.osVersion,
           country: geoLocation.country,
           country_code: geoLocation.countryCode,
-          city: geoLocation.city
+          city: geoLocation.city,
+          screen_resolution: clientFingerprint?.screenResolution || null,
+          timezone: clientFingerprint?.timezone || null,
+          language: clientFingerprint?.language || null,
+          session_token: sessionToken,
+          status: 'active',
+          login_count: 1,
+          is_trusted: false,
+          first_login_at: new Date().toISOString(),
         })
         .select()
         .single();
-      
+
       if (insertError) throw insertError;
 
-      console.log('✅ Device inserted successfully');
-      
-      // Format response
-      const formatted = {
-        id: inserted.id,
-        userId: inserted.user_id,
-        ipAddress: inserted.ip_address,
-        browser: inserted.browser,
-        browserVersion: inserted.browser_version,
-        deviceType: inserted.device_type,
-        deviceName: inserted.device_name,
-        deviceModel: inserted.device_model,
-        osName: inserted.os_name,
-        osVersion: inserted.os_version,
-        country: inserted.country,
-        countryCode: inserted.country_code,
-        city: inserted.city,
-        lastActiveAt: inserted.last_active_at,
-        createdAt: inserted.created_at,
-        updatedAt: inserted.updated_at,
-      };
-      console.log('✅ Device tracked successfully:', formatted);
-      res.json(formatted);
+      try {
+        await db.from('notifications').insert({
+          user_id: userId,
+          type: 'security',
+          content: `تسجيل دخول من جهاز جديد: ${deviceInfo.deviceName} (${deviceInfo.browser}) - ${geoLocation.city}, ${geoLocation.country}`,
+        });
+      } catch (_) {}
+
+      console.log('✅ New device registered successfully');
+      res.json({ ...formatDeviceResponse(inserted, true), isNewDevice: true, sessionToken });
     } catch (error) {
       console.error("❌ Device tracking error:", error);
       res.status(500).json({ error: "Failed to track device" });
     }
   });
 
-  // Get all devices for a user (using Supabase)
-  app.get("/api/devices/user/:userId", async (req: Request, res: Response) => {
+  app.get("/api/devices/user/:userId", requireAuth as any, async (req: Request, res: Response) => {
     try {
-      const { userId } = req.params;
-      
+      const userId = req.userId || req.params.userId;
+
       const { data, error } = await db
         .from('user_devices')
         .select('*')
         .eq('user_id', userId)
-        .order('last_active_at', { ascending: false });
-      
-      if (error) throw error;
+        .eq('status', 'active')
+        .order('last_active_at', { ascending: false })
+        .limit(MAX_DEVICES_PER_USER);
 
-      const mapped = ((data || []).slice(0, 50)).map((d: any) => ({
-        id: d.id,
-        user_id: d.user_id,
-        ip_address: d.ip_address,
-        browser: d.browser,
-        browser_version: d.browser_version,
-        device_type: d.device_type,
-        device_name: d.device_name,
-        device_model: d.device_model,
-        os_name: d.os_name,
-        os_version: d.os_version,
-        country: d.country,
-        country_code: d.country_code,
-        city: d.city,
-        last_active_at: d.last_active_at,
-        created_at: d.created_at,
-        updated_at: d.updated_at,
-      }));
-      
-      res.json(mapped);
+      if (error) throw error;
+      res.json((data || []).map(formatDeviceResponse));
     } catch (error) {
       console.error("Get devices error:", error);
       res.status(500).json({ error: "Failed to get devices" });
     }
   });
 
-  // Remove a device
-  app.delete("/api/devices/:deviceId", async (req: Request, res: Response) => {
+  app.delete("/api/devices/:deviceId", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const { deviceId } = req.params;
-      
-      // Delete from database using Supabase
-      await db.from('user_devices').delete().eq('id', deviceId);
-      
+      const userId = req.userId;
+      const { data: device } = await db.from('user_devices').select('user_id').eq('id', deviceId).maybeSingle();
+      if (!device || device.user_id !== userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      await db.from('user_devices').update({ status: 'revoked', session_token: null }).eq('id', deviceId);
       res.json({ success: true });
     } catch (error) {
       console.error("Delete device error:", error);
@@ -413,12 +490,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get current device info
+  app.post("/api/devices/trust/:deviceId", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const { deviceId } = req.params;
+      const userId = req.userId;
+      const { trusted } = req.body;
+      const { data: existing } = await db.from('user_devices').select('user_id').eq('id', deviceId).maybeSingle();
+      if (!existing || existing.user_id !== userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const { data, error } = await db
+        .from('user_devices')
+        .update({ is_trusted: trusted !== false, updated_at: new Date().toISOString() })
+        .eq('id', deviceId)
+        .select()
+        .single();
+      if (error) throw error;
+      res.json(formatDeviceResponse(data));
+    } catch (error) {
+      console.error("Trust device error:", error);
+      res.status(500).json({ error: "Failed to update device trust" });
+    }
+  });
+
+  app.post("/api/devices/revoke-all/:userId", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId;
+      const { exceptDeviceId } = req.body;
+
+      let query = db
+        .from('user_devices')
+        .update({ status: 'revoked', session_token: null, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('status', 'active');
+
+      if (exceptDeviceId) {
+        query = query.neq('id', exceptDeviceId);
+      }
+
+      await query;
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Revoke all devices error:", error);
+      res.status(500).json({ error: "Failed to revoke devices" });
+    }
+  });
+
+  app.post("/api/devices/heartbeat", async (req: Request, res: Response) => {
+    try {
+      const { sessionToken } = req.body;
+      if (!sessionToken) return res.status(400).json({ error: "sessionToken required" });
+
+      const ipAddress = getClientIp(req);
+      const { data, error } = await db
+        .from('user_devices')
+        .update({ last_active_at: new Date().toISOString(), ip_address: ipAddress })
+        .eq('session_token', sessionToken)
+        .eq('status', 'active')
+        .select('id')
+        .maybeSingle();
+
+      if (error) throw error;
+      res.json({ success: !!data });
+    } catch (error) {
+      console.error("Heartbeat error:", error);
+      res.status(500).json({ error: "Failed to update heartbeat" });
+    }
+  });
+
   app.post("/api/devices/current", async (req: Request, res: Response) => {
     try {
       const userAgent = req.headers["user-agent"] || "";
       const ipAddress = getClientIp(req);
-      
       const deviceInfo = parseUserAgent(userAgent);
       const geoLocation = await getGeoLocation(ipAddress);
 
@@ -433,52 +576,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Check if visitor device is already registered
   app.post("/api/devices/check-visitor", async (req: Request, res: Response) => {
     try {
+      const { clientFingerprint } = req.body as { clientFingerprint?: ClientFingerprint };
       const userAgent = req.headers["user-agent"] || "";
-      const ipAddress = getClientIp(req);
-      
       const deviceInfo = parseUserAgent(userAgent);
-      
-      // Create a device signature: browser + os + device_type
-      // This identifies unique device without needing exact IP match
-      const deviceSignature = `${deviceInfo.browser}_${deviceInfo.osName}_${deviceInfo.deviceType}`;
-      
-      console.log('🔍 Checking visitor device signature:', deviceSignature);
-      
-      // Search for ANY device matching this signature (using Supabase)
-      const { data: existingDevices, error: devError } = await db
-        .from('user_devices')
-        .select('id, user_id, browser, os_name, device_type')
-        .eq('browser', deviceInfo.browser)
-        .eq('os_name', deviceInfo.osName)
-        .eq('device_type', deviceInfo.deviceType)
-        .limit(1)
-        .single();
+      const fingerprint = generateDeviceFingerprint(deviceInfo, clientFingerprint);
 
-      if (!devError && existingDevices) {
-        console.log('✅ Returning visitor detected! Device registered to user:', existingDevices.user_id);
-        
+      const { data: existingDevice, error: devError } = await db
+        .from('user_devices')
+        .select('id, user_id, device_fingerprint, browser, os_name, device_name, status')
+        .eq('device_fingerprint', fingerprint)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+
+      if (!devError && existingDevice) {
         return res.json({
           isReturningVisitor: true,
-          deviceId: existingDevices.id,
-          userId: existingDevices.user_id,
+          deviceId: existingDevice.id,
+          userId: existingDevice.user_id,
           message: 'Welcome back! This device is already registered with Novii.',
         });
       }
-      
-      console.log('🆕 New visitor device');
+
       res.json({
         isReturningVisitor: false,
         message: 'Welcome to Novii! Please sign up or log in.',
       });
     } catch (error) {
       console.error("Check visitor error:", error);
-      res.status(500).json({ 
-        isReturningVisitor: false,
-        error: "Failed to check device" 
-      });
+      res.status(500).json({ isReturningVisitor: false, error: "Failed to check device" });
     }
   });
 

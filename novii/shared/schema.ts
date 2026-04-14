@@ -407,18 +407,28 @@ export const communityMessagesRelations = relations(communityMessages, ({ one })
 export const userDevices = pgTable("user_devices", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  deviceFingerprint: text("device_fingerprint").notNull(),
   ipAddress: text("ip_address").notNull(),
-  browser: text("browser"), // e.g., "Chrome", "Safari", "Firefox"
+  browser: text("browser"),
   browserVersion: text("browser_version"),
-  deviceType: text("device_type"), // "mobile", "tablet", "desktop"
-  deviceName: text("device_name"), // e.g., "iPhone 12", "Samsung Galaxy S21"
-  deviceModel: text("device_model"), // e.g., "SM-G991B"
-  osName: text("os_name"), // "iOS", "Android", "Windows", "macOS", "Linux"
+  deviceType: text("device_type"),
+  deviceName: text("device_name"),
+  deviceModel: text("device_model"),
+  osName: text("os_name"),
   osVersion: text("os_version"),
   country: text("country"),
   countryCode: text("country_code"),
   city: text("city"),
+  screenResolution: text("screen_resolution"),
+  timezone: text("timezone"),
+  language: text("language"),
+  isTrusted: boolean("is_trusted").default(false),
+  status: text("status").default("active"),
+  loginCount: integer("login_count").default(1),
+  lastLoginIp: text("last_login_ip"),
+  sessionToken: text("session_token"),
   lastActiveAt: timestamp("last_active_at").defaultNow(),
+  firstLoginAt: timestamp("first_login_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

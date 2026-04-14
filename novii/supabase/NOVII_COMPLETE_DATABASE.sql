@@ -461,22 +461,30 @@ CREATE TABLE IF NOT EXISTS typing_indicators (
 -- 2.25 USER DEVICES
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS user_devices (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  ip_address      TEXT NOT NULL,
-  browser         TEXT,
-  browser_version TEXT,
-  device_type     TEXT,
-  device_name     TEXT,
-  device_model    TEXT,
-  os_name         TEXT,
-  os_version      TEXT,
-  country         TEXT,
-  country_code    TEXT,
-  city            TEXT,
-  device_id           TEXT,
-  device_fingerprint  TEXT,
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  device_fingerprint  TEXT NOT NULL,
+  ip_address          TEXT NOT NULL,
+  browser             TEXT,
+  browser_version     TEXT,
+  device_type         TEXT,
+  device_name         TEXT,
+  device_model        TEXT,
+  os_name             TEXT,
+  os_version          TEXT,
+  country             TEXT,
+  country_code        TEXT,
+  city                TEXT,
+  screen_resolution   TEXT,
+  timezone            TEXT,
+  language            TEXT,
+  is_trusted          BOOLEAN DEFAULT FALSE,
+  status              TEXT DEFAULT 'active',
+  login_count         INTEGER DEFAULT 1,
+  last_login_ip       TEXT,
+  session_token       TEXT,
   last_active_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  first_login_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -820,6 +828,10 @@ CREATE INDEX IF NOT EXISTS idx_user_devices_user_id       ON user_devices(user_i
 CREATE INDEX IF NOT EXISTS idx_user_devices_ip            ON user_devices(ip_address);
 CREATE INDEX IF NOT EXISTS idx_user_devices_last_active   ON user_devices(last_active_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_devices_user_active   ON user_devices(user_id, last_active_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_devices_fingerprint   ON user_devices(device_fingerprint);
+CREATE INDEX IF NOT EXISTS idx_user_devices_session       ON user_devices(session_token) WHERE session_token IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_user_devices_status        ON user_devices(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_user_devices_trusted       ON user_devices(user_id, is_trusted) WHERE is_trusted = TRUE;
 
 -- User Settings / extra tables
 CREATE INDEX IF NOT EXISTS idx_user_settings_user_id           ON user_settings(user_id);

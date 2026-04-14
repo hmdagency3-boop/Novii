@@ -837,8 +837,12 @@ export function useSuggestedUsers(limit = 5) {
 
 // Device Tracking hooks
 export function useTrackDevice() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (userId: string) => api.trackDevice(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+    },
     onError: (error: any) => {
       console.error('Device tracking error:', error);
     },
@@ -864,6 +868,38 @@ export function useRemoveDevice() {
       console.error('Remove device error:', error);
     },
   });
+}
+
+export function useTrustDevice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ deviceId, trusted }: { deviceId: string; trusted: boolean }) =>
+      api.trustDevice(deviceId, trusted),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+    },
+  });
+}
+
+export function useRevokeAllDevices() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, exceptDeviceId }: { userId: string; exceptDeviceId?: string }) =>
+      api.revokeAllDevices(userId, exceptDeviceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+    },
+  });
+}
+
+export function useDeviceHeartbeat(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    const interval = setInterval(() => {
+      api.sendHeartbeat().catch(() => {});
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [enabled]);
 }
 
 export function useCurrentDeviceInfo() {

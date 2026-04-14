@@ -179,6 +179,7 @@ export interface Reel {
 export interface UserDevice {
   id: string;
   user_id: string;
+  device_fingerprint: string;
   ip_address: string;
   browser: string;
   browser_version: string;
@@ -190,9 +191,42 @@ export interface UserDevice {
   country: string;
   country_code: string;
   city: string;
+  screen_resolution: string;
+  timezone: string;
+  language: string;
+  is_trusted: boolean;
+  status: string;
+  login_count: number;
+  last_login_ip: string;
+  session_token: string;
   last_active_at: string;
+  first_login_at: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ClientFingerprint {
+  screenResolution?: string;
+  timezone?: string;
+  language?: string;
+  colorDepth?: number;
+  pixelRatio?: number;
+  hardwareConcurrency?: number;
+  maxTouchPoints?: number;
+  platform?: string;
+}
+
+export function collectClientFingerprint(): ClientFingerprint {
+  return {
+    screenResolution: `${screen.width}x${screen.height}`,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    language: navigator.language,
+    colorDepth: screen.colorDepth,
+    pixelRatio: window.devicePixelRatio,
+    hardwareConcurrency: navigator.hardwareConcurrency,
+    maxTouchPoints: navigator.maxTouchPoints,
+    platform: navigator.platform,
+  };
 }
 
 async function communityFetch(url: string, options: RequestInit = {}): Promise<Response> {
@@ -2372,27 +2406,65 @@ export const api = {
   },
 
   // Device Tracking APIs
-  async trackDevice(userId: string): Promise<UserDevice> {
-    const response = await fetch('/api/devices/track', {
+  async trackDevice(userId: string): Promise<UserDevice & { isNewDevice: boolean; sessionToken: string }> {
+    const { collectClientFingerprint: collect } = await import('./api');
+    const clientFingerprint = collect();
+    const response = await communityFetch('/api/devices/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, clientFingerprint }),
     });
     if (!response.ok) throw new Error('Failed to track device');
-    return response.json();
+    const result = await response.json();
+    if (result.sessionToken) {
+      try { sessionStorage.setItem('novii_device_session', result.sessionToken); } catch (_) {}
+    }
+    return result;
   },
 
   async getUserDevices(userId: string): Promise<UserDevice[]> {
-    const response = await fetch(`/api/devices/user/${userId}`);
+    const response = await communityFetch(`/api/devices/user/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch devices');
     return response.json();
   },
 
   async removeDevice(deviceId: string): Promise<void> {
-    const response = await fetch(`/api/devices/${deviceId}`, {
+    const response = await communityFetch(`/api/devices/${deviceId}`, {
       method: 'DELETE',
     });
     if (!response.ok) throw new Error('Failed to remove device');
+  },
+
+  async trustDevice(deviceId: string, trusted: boolean): Promise<UserDevice> {
+    const response = await communityFetch(`/api/devices/trust/${deviceId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trusted }),
+    });
+    if (!response.ok) throw new Error('Failed to update device trust');
+    return response.json();
+  },
+
+  async revokeAllDevices(userId: string, exceptDeviceId?: string): Promise<void> {
+    const response = await communityFetch(`/api/devices/revoke-all/${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exceptDeviceId }),
+    });
+    if (!response.ok) throw new Error('Failed to revoke all devices');
+  },
+
+  async sendHeartbeat(): Promise<void> {
+    const sessionToken = sessionStorage.getItem('novii_device_session');
+    if (!sessionToken) return;
+    try {
+      const response = await fetch('/api/devices/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionToken }),
+      });
+      if (!response.ok) console.warn('Heartbeat failed:', response.status);
+    } catch (_) {}
   },
 
   async getCurrentDeviceInfo(): Promise<any> {

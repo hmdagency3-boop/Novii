@@ -13,6 +13,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { GlobalMessageListener } from "@/components/global-message-listener";
 import { TimeTracker } from "@/components/time-tracker";
 import { VisitorDetector } from "@/components/visitor-detector";
+import { DeviceHeartbeat } from "@/components/device-heartbeat";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Create from "@/pages/create";
@@ -239,6 +240,7 @@ function App() {
                     <GlobalMessageListener />
                     <TimeTracker />
                     <VisitorDetector />
+                    <DeviceHeartbeat />
                     {showSplash && <SplashOverlay />}
                     <Router />
                   </TooltipProvider>
