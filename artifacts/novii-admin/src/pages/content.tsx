@@ -303,7 +303,7 @@ function DeletePostModal({ post, onClose, onDone }: { post: PostRecord; onClose:
             <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
             <div>
               <p className="text-sm text-amber-700 font-medium">هل تريد حذف هذا المنشور؟</p>
-              <p className="text-xs text-amber-600 mt-0.5">المنشور بواسطة @{post.username || "مستخدم"} — سيُنقل إلى الأرشيف ويمكنك استعادته لاحقاً.</p>
+              <p className="text-xs text-amber-600 mt-0.5">المنشور بواسطة @{post.username || "مستخدم"} — لن يظهر للمستخدمين بعد الحذف.</p>
             </div>
           </div>
           {post.content && (
