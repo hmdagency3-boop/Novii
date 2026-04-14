@@ -46,7 +46,7 @@ export function ReportDialog({ open, onClose, postId, reportedUserId }: ReportDi
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
+          "x-user-token": session.access_token,
         },
         body: JSON.stringify({
           post_id: postId,
