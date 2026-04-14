@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { fetchReports, updateReport, deleteContent, banUser, type ReportRecord } from "@/lib/admin-api";
+import { fetchReports, updateReport, deleteContent, banUser, warnUser, type ReportRecord } from "@/lib/admin-api";
 import {
   Flag, RefreshCw, Eye, XCircle, Clock, AlertTriangle, User, CheckCircle, Ban,
   MessageSquare, Image, Trash2, Search, Shield, ExternalLink, ChevronDown,
@@ -169,9 +169,10 @@ export default function ReportsPage() {
   };
 
   const handleWarnUser = async () => {
-    if (!viewReport) return;
+    if (!viewReport?.reported_user_id) return;
     setUpdating(true);
     try {
+      await warnUser(viewReport.reported_user_id, { reason: warnMessage || "مخالفة سياسة الاستخدام" });
       const note = (adminNote.trim() ? adminNote.trim() + " — " : "") + "⚠️ تحذير للمستخدم: " + (warnMessage || "مخالفة سياسة الاستخدام");
       await updateReport(viewReport.id, { status: "resolved", admin_note: note });
       setActionSuccess("تم إرسال التحذير وإغلاق البلاغ");

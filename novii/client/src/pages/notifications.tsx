@@ -2,7 +2,7 @@ import Layout from "@/components/layout";
 import {
   Heart, MessageCircle, UserPlus, Loader2, Bell,
   CheckCheck, RefreshCw, Check, X, AtSign, Film,
-  BookmarkIcon, Repeat2
+  BookmarkIcon, Repeat2, AlertTriangle, Trash2, ShieldBan, ShieldCheck, Shield
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,9 @@ import { useState, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSettings } from "@/lib/settings-context";
 
-type FilterType = 'all' | 'like' | 'comment' | 'follow' | 'follow_request' | 'mention';
+type FilterType = 'all' | 'like' | 'comment' | 'follow' | 'follow_request' | 'mention' | 'moderation';
+
+const MODERATION_TYPES = ['warning', 'post_removed', 'ban', 'unban', 'security'];
 
 const FILTERS: { key: FilterType; labelAr: string; labelEn: string; icon: React.ReactNode; color: string }[] = [
   { key: 'all',            labelAr: 'الكل',       labelEn: 'All',      icon: <Bell className="w-3.5 h-3.5" />,          color: 'bg-foreground text-background' },
@@ -28,6 +30,7 @@ const FILTERS: { key: FilterType; labelAr: string; labelEn: string; icon: React.
   { key: 'follow',         labelAr: 'متابعون',    labelEn: 'Follows',  icon: <UserPlus className="w-3.5 h-3.5" />,      color: 'bg-purple-500 text-white' },
   { key: 'follow_request', labelAr: 'طلبات',      labelEn: 'Requests', icon: <UserPlus className="w-3.5 h-3.5" />,      color: 'bg-orange-500 text-white' },
   { key: 'mention',        labelAr: 'إشارات',     labelEn: 'Mentions', icon: <AtSign className="w-3.5 h-3.5" />,        color: 'bg-green-500 text-white' },
+  { key: 'moderation',     labelAr: 'إدارية',     labelEn: 'Admin',    icon: <Shield className="w-3.5 h-3.5" />,        color: 'bg-amber-500 text-white' },
 ];
 
 function getGroupLabel(date: Date, isAr: boolean) {
@@ -67,10 +70,11 @@ export default function Notifications() {
     [notifications, blockedIds]
   );
 
-  const filtered = useMemo(() =>
-    filter === 'all' ? visibleNotifications : visibleNotifications.filter(n => n.type === filter),
-    [visibleNotifications, filter]
-  );
+  const filtered = useMemo(() => {
+    if (filter === 'all') return visibleNotifications;
+    if (filter === 'moderation') return visibleNotifications.filter(n => MODERATION_TYPES.includes(n.type));
+    return visibleNotifications.filter(n => n.type === filter);
+  }, [visibleNotifications, filter]);
 
   const unreadCount = visibleNotifications.filter(n => !n.is_read).length;
 
@@ -208,7 +212,8 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
   const actorId = actor?.id;
   const queryClient = useQueryClient();
 
-  const { data: isFollowing = false } = useIsFollowing(actorId || '');
+  const isModerationNotif = MODERATION_TYPES.includes(notif.type);
+  const { data: isFollowing = false } = useIsFollowing(isModerationNotif ? '' : (actorId || ''));
   const toggleFollow = useToggleFollow();
 
   const approveMutation = useMutation({
@@ -246,8 +251,14 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
     reel_like:      { icon: <Film className="w-3 h-3 text-white" />,                       bg: 'bg-pink-500' },
     save:           { icon: <BookmarkIcon className="w-3 h-3 text-white" />,               bg: 'bg-indigo-500' },
     repost:         { icon: <Repeat2 className="w-3 h-3 text-white" />,                    bg: 'bg-teal-500' },
+    warning:        { icon: <AlertTriangle className="w-3 h-3 text-white" />,              bg: 'bg-amber-500' },
+    post_removed:   { icon: <Trash2 className="w-3 h-3 text-white" />,                     bg: 'bg-red-600' },
+    ban:            { icon: <ShieldBan className="w-3 h-3 text-white" />,                  bg: 'bg-red-700' },
+    unban:          { icon: <ShieldCheck className="w-3 h-3 text-white" />,                bg: 'bg-green-600' },
+    security:       { icon: <Shield className="w-3 h-3 text-white" />,                     bg: 'bg-slate-600' },
   };
   const iconInfo = iconMap[notif.type] || { icon: <Bell className="w-3 h-3 text-white" />, bg: 'bg-primary' };
+  const isModeration = MODERATION_TYPES.includes(notif.type);
 
   /* ── Notification text ── */
   const getActionText = () => {
@@ -260,12 +271,18 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
       case 'reel_like':      return isAr ? 'أعجب بريلز.' : 'liked your reel.';
       case 'story_reply':    return isAr ? 'رد على استوريك.' : 'replied to your story.';
       case 'save':           return isAr ? 'حفظ منشورك.' : 'saved your post.';
+      case 'warning':        return notif.content || (isAr ? 'تم تحذيرك بسبب مخالفة سياسة الاستخدام.' : 'You have been warned for violating community guidelines.');
+      case 'post_removed':   return notif.content || (isAr ? 'تم إزالة منشورك لمخالفته سياسة الاستخدام.' : 'Your post was removed for violating community guidelines.');
+      case 'ban':            return notif.content || (isAr ? 'تم تقييد حسابك.' : 'Your account has been restricted.');
+      case 'unban':          return notif.content || (isAr ? 'تم رفع التقييد عن حسابك.' : 'Your account restriction has been lifted.');
+      case 'security':       return notif.content || (isAr ? 'إشعار أمني.' : 'Security notification.');
       default:               return notif.content || '';
     }
   };
 
   /* ── Link destination ── */
   const getHref = () => {
+    if (isModeration) return null;
     if (notif.type === 'follow' || notif.type === 'follow_request') return `/user?id=${actorId}`;
     if (notif.post_id) {
       if (notif.comment_id) return `/post/${notif.post_id}?commentId=${notif.comment_id}`;
@@ -283,7 +300,9 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
     <div
       className={cn(
         "flex items-center gap-3 px-4 py-2.5 transition-colors cursor-pointer",
-        !notif.is_read ? "bg-primary/5 hover:bg-primary/8" : "hover:bg-muted/40"
+        isModeration
+          ? (!notif.is_read ? "bg-amber-500/8 hover:bg-amber-500/12 border-s-2 border-amber-500" : "hover:bg-muted/40 border-s-2 border-transparent")
+          : (!notif.is_read ? "bg-primary/5 hover:bg-primary/8" : "hover:bg-muted/40")
       )}
       onClick={onRead}
     >
@@ -293,39 +312,65 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
       </div>
 
       {/* Avatar + icon badge */}
-      <Link href={`/user?id=${actorId}`} onClick={e => e.stopPropagation()} className="relative flex-shrink-0">
-        <Avatar className="w-11 h-11">
-          <AvatarImage src={actor?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${actor?.username}`} />
-          <AvatarFallback className="text-xs font-bold">{actor?.username?.[0]?.toUpperCase() || '?'}</AvatarFallback>
-        </Avatar>
-        <span className={cn(
-          "absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center border-2 border-background",
-          iconInfo.bg
-        )}>
-          {iconInfo.icon}
-        </span>
-      </Link>
+      {isModeration ? (
+        <div className="relative flex-shrink-0">
+          <div className={cn("w-11 h-11 rounded-full flex items-center justify-center", iconInfo.bg)}>
+            {notif.type === 'warning' && <AlertTriangle className="w-5 h-5 text-white" />}
+            {notif.type === 'post_removed' && <Trash2 className="w-5 h-5 text-white" />}
+            {notif.type === 'ban' && <ShieldBan className="w-5 h-5 text-white" />}
+            {notif.type === 'unban' && <ShieldCheck className="w-5 h-5 text-white" />}
+            {notif.type === 'security' && <Shield className="w-5 h-5 text-white" />}
+          </div>
+        </div>
+      ) : (
+        <Link href={`/user?id=${actorId}`} onClick={e => e.stopPropagation()} className="relative flex-shrink-0">
+          <Avatar className="w-11 h-11">
+            <AvatarImage src={actor?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${actor?.username}`} />
+            <AvatarFallback className="text-xs font-bold">{actor?.username?.[0]?.toUpperCase() || '?'}</AvatarFallback>
+          </Avatar>
+          <span className={cn(
+            "absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center border-2 border-background",
+            iconInfo.bg
+          )}>
+            {iconInfo.icon}
+          </span>
+        </Link>
+      )}
 
       {/* Text */}
       <div className="flex-1 min-w-0">
-        <p className="text-[13.5px] leading-snug text-foreground">
-          <Link
-            href={`/user?id=${actorId}`}
-            className="font-bold hover:underline"
-            onClick={e => e.stopPropagation()}
-          >
-            {actor?.username || (isAr ? 'مستخدم' : 'user')}
-          </Link>
-          {' '}
-          <span className="font-normal text-foreground/90">{getActionText()}</span>
-        </p>
-        {/* Comment preview */}
-        {(notif.type === 'comment' || notif.type === 'mention' || notif.type === 'story_reply') && notif.content && (
-          <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-1">
-            {notif.content}
-          </p>
+        {isModeration ? (
+          <>
+            <p className="text-[13.5px] leading-snug text-foreground">
+              <span className="font-bold">{isAr ? 'إدارة نوفي' : 'Novii Admin'}</span>
+            </p>
+            <p className="text-[12.5px] text-foreground/80 mt-0.5 leading-relaxed">
+              {getActionText()}
+            </p>
+            <span className="text-[11px] text-muted-foreground mt-0.5 block">{timeAgo}</span>
+          </>
+        ) : (
+          <>
+            <p className="text-[13.5px] leading-snug text-foreground">
+              <Link
+                href={`/user?id=${actorId}`}
+                className="font-bold hover:underline"
+                onClick={e => e.stopPropagation()}
+              >
+                {actor?.username || (isAr ? 'مستخدم' : 'user')}
+              </Link>
+              {' '}
+              <span className="font-normal text-foreground/90">{getActionText()}</span>
+            </p>
+            {/* Comment preview */}
+            {(notif.type === 'comment' || notif.type === 'mention' || notif.type === 'story_reply') && notif.content && (
+              <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-1">
+                {notif.content}
+              </p>
+            )}
+            <span className="text-[11px] text-muted-foreground mt-0.5 block">{timeAgo}</span>
+          </>
         )}
-        <span className="text-[11px] text-muted-foreground mt-0.5 block">{timeAgo}</span>
       </div>
 
       {/* Right side: thumbnail or action buttons */}

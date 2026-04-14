@@ -440,7 +440,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: 'security',
           content: `تسجيل دخول من جهاز جديد: ${deviceInfo.deviceName} (${deviceInfo.browser}) - ${geoLocation.city}, ${geoLocation.country}`,
         });
-      } catch (_) {}
+      } catch (notifErr) {
+        console.error('⚠️ Failed to send security notification:', notifErr);
+      }
 
       console.log('✅ New device registered successfully');
       res.json({ ...formatDeviceResponse(inserted, true), isNewDevice: true, sessionToken });
@@ -2245,11 +2247,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (error) throw error;
 
+      try {
+        if (ban) {
+          await adminDb.from('notifications').insert({
+            user_id: userId,
+            type: 'ban',
+            content: reason
+              ? `تم تقييد حسابك بسبب: ${reason}`
+              : 'تم تقييد حسابك لمخالفة سياسة الاستخدام.',
+          });
+        } else {
+          await adminDb.from('notifications').insert({
+            user_id: userId,
+            type: 'unban',
+            content: 'تم رفع التقييد عن حسابك. يمكنك الآن استخدام المنصة بشكل طبيعي.',
+          });
+        }
+      } catch (notifErr) {
+        console.error('⚠️ Failed to send ban/unban notification:', notifErr);
+      }
+
       await logAdminAction(req, ban ? 'ban_user' : 'unban_user', 'user', userId, reason || undefined);
       res.json({ success: true });
     } catch (error) {
       console.error('Admin ban error:', error);
       res.status(500).json({ error: 'Failed to ban/unban user' });
+    }
+  });
+
+  // POST /api/admin/users/:userId/warn — warn a user
+  app.post("/api/admin/users/:userId/warn", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { reason } = req.body;
+
+      await adminDb.from('notifications').insert({
+        user_id: userId,
+        type: 'warning',
+        content: reason
+          ? `⚠️ تحذير: ${reason}`
+          : '⚠️ تحذير: سلوكك يخالف سياسة الاستخدام. يرجى الالتزام بالقواعد لتجنب إجراءات أشد.',
+      });
+
+      await logAdminAction(req, 'warn_user', 'user', userId, reason || undefined);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin warn error:', error);
+      res.status(500).json({ error: 'Failed to warn user' });
     }
   });
 
@@ -2517,6 +2561,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/content/:postId", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
     try {
       const { postId } = req.params;
+      const reason = (req.body && (req as any).body?.reason) || undefined;
+
+      const { data: post } = await adminDb
+        .from('posts')
+        .select('user_id, content')
+        .eq('id', postId)
+        .single();
 
       const { error } = await adminDb
         .from('posts')
@@ -2524,6 +2575,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .eq('id', postId);
 
       if (error) throw error;
+
+      if (post?.user_id) {
+        try {
+          await adminDb.from('notifications').insert({
+            user_id: post.user_id,
+            type: 'post_removed',
+            content: reason
+              ? `تم إزالة منشورك بسبب: ${reason}`
+              : 'تم إزالة منشورك لمخالفته سياسة الاستخدام.',
+            post_id: postId,
+          });
+        } catch (notifErr) {
+          console.error('⚠️ Failed to send post_removed notification:', notifErr);
+        }
+      }
 
       await logAdminAction(req, 'delete_post', 'post', postId);
       res.json({ success: true });

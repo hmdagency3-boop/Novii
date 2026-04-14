@@ -159,7 +159,7 @@ export interface Notification {
   id: string;
   user_id: string;
   actor_id: string | null;
-  type: 'like' | 'comment' | 'follow' | 'mention';
+  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'mention' | 'reel_like' | 'story_reply' | 'save' | 'repost' | 'warning' | 'post_removed' | 'ban' | 'unban' | 'security';
   post_id: string | null;
   comment_id: string | null;
   content: string | null;

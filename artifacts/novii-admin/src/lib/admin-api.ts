@@ -120,6 +120,16 @@ export async function deleteContent(postId: string): Promise<unknown> {
   return adminFetch(`/content/${postId}`, { method: "DELETE" });
 }
 
+export async function warnUser(
+  userId: string,
+  data: { reason?: string }
+): Promise<unknown> {
+  return adminFetch(`/users/${userId}/warn`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function fetchReports(): Promise<ReportRecord[]> {
   return adminFetch("/reports");
 }

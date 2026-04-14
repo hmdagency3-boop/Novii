@@ -38,8 +38,9 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - **Server middleware**: `requireAdmin` (checks admins table), `checkPermission(perm)` (granular permission gating), `logAdminAction()` (auto-logs all admin actions)
 - **Roles**: `super_admin` (full access), `admin`, `moderator` — super_admin bypasses all permission checks
 - **Permissions**: `can_manage_users`, `can_manage_content`, `can_manage_admins`, `can_manage_reports`, `can_view_analytics`, `can_manage_settings`
-- **Server endpoints**: `/api/admin/check`, `/api/admin/stats`, `/api/admin/users`, `/api/admin/users/:id/ban`, `/api/admin/users/:id` (DELETE/PATCH), `/api/admin/admins` (GET/POST), `/api/admin/admins/:id` (PATCH/DELETE), `/api/admin/content` (GET), `/api/admin/content/:id` (DELETE), `/api/admin/reports`, `/api/admin/logs`, `/api/admin/settings` (GET/PATCH)
+- **Server endpoints**: `/api/admin/check`, `/api/admin/stats`, `/api/admin/users`, `/api/admin/users/:id/ban`, `/api/admin/users/:id/warn`, `/api/admin/users/:id` (DELETE/PATCH), `/api/admin/admins` (GET/POST), `/api/admin/admins/:id` (PATCH/DELETE), `/api/admin/content` (GET), `/api/admin/content/:id` (DELETE), `/api/admin/reports`, `/api/admin/logs`, `/api/admin/settings` (GET/PATCH)
 - **Admin page removed from main platform** — all admin UI is now exclusively in the standalone admin panel (`artifacts/novii-admin`)
+- **Moderation Notifications**: Admin actions (post removal, warnings, bans, unbans) now send visible notifications to affected users. Notification types: `warning`, `post_removed`, `ban`, `unban`, `security`. Rendered in notifications page with distinct icons (AlertTriangle, Trash2, ShieldBan, ShieldCheck, Shield), amber highlight styling, and "Novii Admin" label instead of user avatar. Filter tab "إدارية/Admin" groups all moderation notifications.
 - **Migration SQL**: `novii/supabase/upgrade_admin_system.sql`
 
 ### Standalone Admin Panel (`artifacts/novii-admin`)
