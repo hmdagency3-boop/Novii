@@ -591,7 +591,7 @@ function MobileReelCard({
         className="absolute inset-0 w-full h-full object-cover"
         loop playsInline muted
         preload="auto"
-        onLoadedData={e => { if (idx === 0 && !initialPlayDone.current) { initialPlayDone.current = true; safePlay(e.currentTarget); } }}
+        onLoadedData={e => { const v = e.currentTarget; if (idx === 0 && !v.dataset.initPlayed) { v.dataset.initPlayed = "1"; v.muted = true; v.play().catch(() => {}); } }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
