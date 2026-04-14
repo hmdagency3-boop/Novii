@@ -46,10 +46,8 @@ export default function Reels() {
   const [pausedReels,   setPausedReels]     = useState<Set<string>>(new Set());
   const [floatingHearts, setFloatingHearts] = useState<FloatingHeart[]>([]);
   const [commentReelId, setCommentReelId]   = useState<string | null>(null);
-  const lastTapRef       = useRef<number>(0);
   const guestViewCount   = useRef<number>(0);
   const guestPromptShown = useRef<boolean>(false);
-  const initialPlayDone  = useRef(false);
 
   const followInitVersion = useRef(0);
   useEffect(() => {
@@ -73,19 +71,13 @@ export default function Reels() {
       });
   }, [currentUser?.id, reels]);
 
-  /* ── SEPARATE ref maps so mobile & desktop don't overwrite each other ── */
   const mobileRefs  = useRef<{ [k: string]: HTMLVideoElement }>({});
   const desktopRefs = useRef<{ [k: string]: HTMLVideoElement }>({});
-
-  /* ── Container refs for scroll-based index tracking ── */
   const mobileContainerRef  = useRef<HTMLDivElement>(null);
   const desktopContainerRef = useRef<HTMLDivElement>(null);
-
-  /* ── Currently visible reel index per container ── */
   const [activeMobileIdx,  setActiveMobileIdx]  = useState(0);
   const [activeDesktopIdx, setActiveDesktopIdx] = useState(0);
 
-  /* ── Stable refs so effects always see latest values ── */
   const mutedRef        = useRef(muted);
   const isGuestRef      = useRef(isGuest);
   const showPromptRef   = useRef(showPrompt);
@@ -95,7 +87,6 @@ export default function Reels() {
   showPromptRef.current = showPrompt;
   reelsRef.current      = reels;
 
-  /* ── Index computers (run AFTER snap settles, not during) ── */
   const computeMobileIdx = useCallback(() => {
     const c = mobileContainerRef.current;
     if (!c || c.clientHeight === 0) return;
@@ -112,7 +103,6 @@ export default function Reels() {
     if (Number.isFinite(clamped)) setActiveDesktopIdx(clamped);
   }, []);
 
-  /* ── Attach listeners: prefer scrollend (fires after snap), fallback debounced scroll ── */
   useEffect(() => {
     const c = mobileContainerRef.current;
     if (!c) return;
@@ -141,24 +131,24 @@ export default function Reels() {
     return () => { c.removeEventListener("scroll", onScroll); clearTimeout(t); };
   }, [computeDesktopIdx]);
 
-  const userPausedRef = useRef<Set<string>>(new Set());
-
-  const safePlay = useCallback((vid: HTMLVideoElement) => {
-    vid.muted = true;
-    const p = vid.play();
-    if (p) p.catch(() => {});
-  }, []);
-
   const playActiveReel = useCallback((activeIdx: number, refs: React.MutableRefObject<{ [k: string]: HTMLVideoElement }>) => {
     const list = reelsRef.current;
     if (!list.length) return;
+    setPausedReels(new Set());
     list.forEach((reel: any, idx: number) => {
       const vid = refs.current[reel.id];
       if (!vid) return;
       if (idx === activeIdx) {
-        if (userPausedRef.current.has(reel.id)) return;
-        safePlay(vid);
-        setPausedReels(p => { const n = new Set(p); n.delete(reel.id); return n; });
+        vid.muted = mutedRef.current;
+        if (vid.readyState >= 2) {
+          vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); });
+        } else {
+          const onReady = () => {
+            vid.muted = mutedRef.current;
+            vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); });
+          };
+          vid.addEventListener('canplay', onReady, { once: true });
+        }
         if (isGuestRef.current && !guestPromptShown.current) {
           guestViewCount.current += 1;
           if (guestViewCount.current > 2) {
@@ -169,24 +159,20 @@ export default function Reels() {
       } else {
         vid.pause();
         vid.currentTime = 0;
-        userPausedRef.current.delete(reel.id);
       }
     });
-  }, [safePlay]);
+  }, []);
 
-  /* ── Play active reel, pause all others — MOBILE ── */
   useEffect(() => {
     playActiveReel(activeMobileIdx, mobileRefs);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMobileIdx]);
 
-  /* ── Play active reel, pause all others — DESKTOP ── */
   useEffect(() => {
     playActiveReel(activeDesktopIdx, desktopRefs);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDesktopIdx]);
 
-  /* ── Sync mute change only to the currently active videos ── */
   useEffect(() => {
     const mr = reels[activeMobileIdx];
     const dr = reels[activeDesktopIdx];
@@ -194,7 +180,6 @@ export default function Reels() {
     if (dr) { const v = desktopRefs.current[dr.id]; if (v) v.muted = muted; }
   }, [muted, activeMobileIdx, activeDesktopIdx, reels]);
 
-  /* ── Load next page when sentinel is visible ── */
   useEffect(() => {
     const load = () => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); };
     const obs = new IntersectionObserver((entries) => {
@@ -205,7 +190,6 @@ export default function Reels() {
     return () => obs.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  /* ── spawn floating heart at tap position ── */
   const spawnHeart = useCallback((e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).closest(".reel-item")!.getBoundingClientRect();
     const id   = Math.random().toString(36).slice(2);
@@ -218,25 +202,14 @@ export default function Reels() {
     try { await toggleReelLike.mutateAsync(reel.id); if (e) spawnHeart(e); } catch {}
   }, [currentUser, showPrompt, toggleReelLike, spawnHeart]);
 
-  const handleDoubleTap = useCallback((reel: any, e: React.MouseEvent) => {
-    const now = Date.now();
-    if (now - lastTapRef.current < 350) {
-      if (!reel.is_liked) handleLike(reel, e); else spawnHeart(e);
-    }
-    lastTapRef.current = now;
-  }, [handleLike, spawnHeart]);
-
   const handleTap = useCallback((id: string, refs: VideoRefMap) => {
     const v = refs.current[id];
     if (!v) return;
     if (v.paused) {
-      userPausedRef.current.delete(id);
       v.muted = mutedRef.current;
-      const p = v.play();
-      if (p) p.catch(() => { v.muted = true; v.play().catch(() => {}); });
+      v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
       setPausedReels(p => { const n = new Set(p); n.delete(id); return n; });
     } else {
-      userPausedRef.current.add(id);
       v.pause();
       setPausedReels(p => new Set([...Array.from(p), id]));
     }
@@ -270,7 +243,6 @@ export default function Reels() {
     setCommentReelId(id);
   }, [currentUser, showPrompt]);
 
-  /* ── shared card props builder ── */
   const cardProps = (reel: any) => ({
     reel,
     isRTL,
@@ -281,7 +253,7 @@ export default function Reels() {
     saved:    savedReels.has(reel.id),
     floatingHearts,
     currentUserId: currentUser?.id,
-    onDoubleTap: handleDoubleTap,
+    onDoubleTap: handleLike,
     onLike:   handleLike,
     onFollow: handleFollow,
     onSave:    handleSave,
@@ -289,11 +261,9 @@ export default function Reels() {
     onComment: handleComment,
   });
 
-  /* ── helper wrapper ── */
   const Wrap = ({ children }: { children: React.ReactNode }) =>
     isGuest ? <>{children}</> : <Layout>{children}</Layout>;
 
-  /* ── loading / empty ── */
   if (isLoading) return (
     <Wrap>
       <div className="fixed inset-0 lg:left-20 flex items-center justify-center bg-background">
@@ -315,9 +285,7 @@ export default function Reels() {
   return (
     <Wrap>
 
-      {/* ══════════════════════════════════════════
-          MOBILE  — fullscreen snap scroll
-      ══════════════════════════════════════════ */}
+      {/* MOBILE — fullscreen snap scroll */}
       <div
         ref={mobileContainerRef}
         className={cn(
@@ -342,7 +310,6 @@ export default function Reels() {
             {...cardProps(reel)}
           />
         ))}
-        {/* Mobile sentinel — no snap-start so it never becomes an accidental snap target */}
         <div ref={mobileSentinelRef} className="w-full h-2 shrink-0" />
         {isFetchingNextPage && (
           <div className="flex items-center justify-center w-full h-16 shrink-0">
@@ -351,9 +318,7 @@ export default function Reels() {
         )}
       </div>
 
-      {/* ══════════════════════════════════════════
-          DESKTOP — centered 9:16 + side actions
-      ══════════════════════════════════════════ */}
+      {/* DESKTOP — centered 9:16 + side actions */}
       <div
         ref={desktopContainerRef}
         className="fixed inset-0 left-20 hidden lg:block overflow-y-scroll snap-y snap-mandatory bg-background"
@@ -368,7 +333,6 @@ export default function Reels() {
             {...cardProps(reel)}
           />
         ))}
-        {/* Desktop sentinel — no snap-start so it never becomes an accidental snap target */}
         <div ref={desktopSentinelRef} className="w-full h-2 shrink-0" />
         {isFetchingNextPage && (
           <div className="flex items-center justify-center w-full h-16 shrink-0">
@@ -377,7 +341,6 @@ export default function Reels() {
         )}
       </div>
 
-      {/* Comments Sheet */}
       {commentReelId && (
         <ReelCommentsSheet
           reelId={commentReelId}
@@ -412,7 +375,7 @@ interface CardProps {
   videoRefs: VideoRefMap;
   cardHeight?: string;
   onTap: (id: string) => void;
-  onDoubleTap: (reel: any, e: React.MouseEvent) => void;
+  onDoubleTap: (reel: any, e?: React.MouseEvent) => void;
   onLike:   (reel: any, e?: React.MouseEvent) => void;
   onFollow: (uid: string) => void;
   onSave:    (id: string) => void;
@@ -438,7 +401,6 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
   const nc = size === "sm" ? "text-[11px]" : "text-xs";
   return (
     <div className="flex flex-col items-center gap-5">
-      {/* Avatar + follow */}
       <div className="relative">
         <Link href={`/user?id=${reel.profile?.id}`}>
           <Avatar className={cn("ring-2 ring-white cursor-pointer", size === "sm" ? "w-10 h-10" : "w-12 h-12")}>
@@ -458,27 +420,23 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
         )}
       </div>
 
-      {/* Like */}
       <button onClick={(e) => onLike(reel, e)} className="flex flex-col items-center gap-1 group">
         <Heart className={cn(ic, "transition-all drop-shadow group-active:scale-125",
           reel.is_liked ? "fill-[#ff3b5c] text-[#ff3b5c] scale-110" : "text-white")} />
         <span className={cn(nc, "text-white font-semibold drop-shadow")}>{fmt(reel.likes_count)}</span>
       </button>
 
-      {/* Comment */}
       <button onClick={() => onComment(reel.id)} className="flex flex-col items-center gap-1 group">
         <MessageCircle className={cn(ic, "text-white drop-shadow group-active:scale-125 transition-transform")} />
         <span className={cn(nc, "text-white font-semibold drop-shadow")}>{fmt(reel.comments_count)}</span>
       </button>
 
-      {/* Bookmark */}
       <button onClick={() => onSave(reel.id)} className="flex flex-col items-center gap-1 group">
         <Bookmark className={cn(ic, "drop-shadow transition-all group-active:scale-125",
           saved ? "fill-yellow-400 text-yellow-400" : "text-white")} />
         <span className={cn(nc, "text-white font-semibold drop-shadow")}>{fmt(reel.saves_count || 0)}</span>
       </button>
 
-      {/* Share */}
       <button onClick={() => onShare(reel)} className="flex flex-col items-center gap-1 group">
         <Share2 className={cn(ic, "text-white drop-shadow group-active:scale-125 transition-transform")} />
         <span className={cn(nc, "text-white font-semibold drop-shadow")}>{isRTL ? "مشاركة" : "Share"}</span>
@@ -496,8 +454,6 @@ function MobileReelCard({
   currentUserId, videoRefs, cardHeight = "100svh",
   onTap, onLike, onFollow, onSave, onShare, onComment,
 }: CardProps) {
-  /* When the card is shorter (nav bar present), reduce bottom offsets so
-     content stays at the same visual position relative to the screen bottom. */
   const hasNav = cardHeight !== "100svh";
   const longPressTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPress     = useRef(false);
@@ -531,7 +487,6 @@ function MobileReelCard({
     if (e.button !== 0) return;
     isLongPress.current = false;
     pointerStart.current = { x: e.clientX, y: e.clientY };
-    // 600ms threshold — short enough to feel responsive, long enough not to fire during swipes
     longPressTimer.current = setTimeout(() => {
       isLongPress.current = true;
       setHoldActive(true);
@@ -544,18 +499,16 @@ function MobileReelCard({
     if (!pointerStart.current) return;
     const dx = Math.abs(e.clientX - pointerStart.current.x);
     const dy = Math.abs(e.clientY - pointerStart.current.y);
-    // If finger moved more than 8px it's a scroll — kill the long press
     if (dx > 8 || dy > 8) cancelLongPress(false);
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
     const wasLong = isLongPress.current;
-    cancelLongPress(true); // resume if was holding
-    if (wasLong) return;   // don't treat release of hold as a tap
+    cancelLongPress(true);
+    if (wasLong) return;
 
     const now = Date.now();
     if (now - lastTapTime.current < 350) {
-      // Double tap → like
       clearTimeout(singleTapTimer.current ?? undefined);
       lastTapTime.current = 0;
       onLike(reel, e as any);
@@ -568,9 +521,7 @@ function MobileReelCard({
     }
   };
 
-  // pointercancel = browser took over (scroll) — cancel long press without resuming
   const handlePointerCancel = () => cancelLongPress(false);
-  // pointerleave without cancel means finger left element edge — resume if holding
   const handlePointerLeave  = () => cancelLongPress(true);
 
   return (
@@ -579,19 +530,12 @@ function MobileReelCard({
       className="reel-item relative w-full overflow-hidden bg-black flex-shrink-0"
       style={{ height: cardHeight, scrollSnapAlign: "start", scrollSnapStop: "always" }}
     >
-      {/* Video */}
       <video
-        ref={el => {
-          if (el) {
-            videoRefs.current[reel.id] = el;
-            el.muted = true;
-          }
-        }}
+        ref={el => { if (el) videoRefs.current[reel.id] = el; }}
         src={reel.video_url}
         className="absolute inset-0 w-full h-full object-cover"
         loop playsInline muted
         preload="auto"
-        onLoadedData={e => { const v = e.currentTarget; if (idx === 0 && !v.dataset.initPlayed) { v.dataset.initPlayed = "1"; v.muted = true; v.play().catch(() => {}); } }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -601,10 +545,8 @@ function MobileReelCard({
         style={{ userSelect: "none", WebkitUserSelect: "none" } as React.CSSProperties}
       />
 
-      {/* Gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/80 pointer-events-none" />
 
-      {/* Floating hearts */}
       {localFloatingHearts.map(h => (
         <div key={h.id} className="absolute pointer-events-none z-50"
           style={{ left: h.x - 32, top: h.y - 32, animation: "floatHeart .9s ease-out forwards" }}>
@@ -612,7 +554,6 @@ function MobileReelCard({
         </div>
       ))}
 
-      {/* Hold overlay */}
       {holdActive && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div className="bg-black/50 rounded-full p-5 backdrop-blur-sm">
@@ -621,7 +562,6 @@ function MobileReelCard({
         </div>
       )}
 
-      {/* Paused overlay */}
       {paused && !holdActive && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div className="bg-black/40 rounded-full p-5 backdrop-blur-sm">
@@ -630,7 +570,6 @@ function MobileReelCard({
         </div>
       )}
 
-      {/* Mute toggle — top right */}
       <button
         onClick={() => setMuted(m => !m)}
         className="absolute top-4 right-4 z-30 bg-black/40 backdrop-blur-sm rounded-full p-2 border border-white/20 active:scale-90 transition-transform"
@@ -638,14 +577,12 @@ function MobileReelCard({
         {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
       </button>
 
-      {/* Action buttons — bottom-8 when nav present (32px above nav top = same visual spot) */}
       <div className={cn("absolute z-30", hasNav ? "bottom-8" : "bottom-24", isRTL ? "left-3" : "right-3")}>
         <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
           currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
           onSave={onSave} onShare={onShare} onComment={onComment} size="sm" />
       </div>
 
-      {/* Bottom info — pb-4 when nav present (16px above nav top = same visual spot) */}
       <div className={cn("absolute bottom-0 z-20 px-4 w-full", hasNav ? "pb-4" : "pb-20",
         isRTL ? "text-right pr-4 pl-16" : "pl-4 pr-16")}>
         <Link href={`/user?id=${reel.profile?.id}`}>
@@ -678,13 +615,29 @@ function DesktopReelCard({
   floatingHearts, currentUserId, videoRefs,
   onTap, onDoubleTap, onLike, onFollow, onSave, onShare, onComment,
 }: CardProps) {
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clickCount = useRef(0);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    clickCount.current += 1;
+    if (clickCount.current === 1) {
+      clickTimer.current = setTimeout(() => {
+        clickCount.current = 0;
+        onTap(reel.id);
+      }, 300);
+    } else if (clickCount.current >= 2) {
+      clearTimeout(clickTimer.current!);
+      clickCount.current = 0;
+      onDoubleTap(reel, e);
+    }
+  }, [reel, onTap, onDoubleTap]);
+
   return (
     <div
       data-id={reel.id} data-index={idx}
       className="reel-item w-full snap-start flex-shrink-0 flex items-center justify-center bg-black relative overflow-hidden"
       style={{ height: "100svh" }}
     >
-      {/* Blurred bg */}
       <div className="absolute inset-0 pointer-events-none">
         {reel.thumbnail_url ? (
           <img src={reel.thumbnail_url} className="w-full h-full object-cover scale-110 blur-2xl opacity-25" alt="" />
@@ -693,32 +646,22 @@ function DesktopReelCard({
         )}
       </div>
 
-      {/* Card + actions */}
       <div className="relative z-10 flex items-end gap-6">
 
-        {/* 9:16 video card */}
         <div
           className="relative overflow-hidden rounded-2xl shadow-2xl bg-black cursor-pointer select-none"
           style={{ height: "min(calc(100vh - 40px), 860px)", aspectRatio: "9/16" }}
-          onClick={() => onTap(reel.id)}
-          onDoubleClick={e => onDoubleTap(reel, e)}
+          onClick={handleClick}
         >
           <video
-            ref={el => {
-              if (el) {
-                videoRefs.current[reel.id] = el;
-                el.muted = true;
-              }
-            }}
+            ref={el => { if (el) videoRefs.current[reel.id] = el; }}
             src={reel.video_url}
             className="w-full h-full object-cover"
             loop playsInline muted
             preload="auto"
-            onLoadedData={e => { const v = e.currentTarget; if (idx === 0 && !v.dataset.initPlayed) { v.dataset.initPlayed = "1"; v.muted = true; v.play().catch(() => {}); } }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/70 pointer-events-none" />
 
-          {/* Floating hearts */}
           {floatingHearts.map(h => (
             <div key={h.id} className="absolute pointer-events-none z-50"
               style={{ left: h.x - 32, top: h.y - 32, animation: "floatHeart .9s ease-out forwards" }}>
@@ -726,7 +669,6 @@ function DesktopReelCard({
             </div>
           ))}
 
-          {/* Paused */}
           {paused && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
               <div className="bg-black/40 rounded-full p-6 backdrop-blur-sm">
@@ -736,7 +678,6 @@ function DesktopReelCard({
           )}
 
 
-          {/* Bottom info */}
           <div className="absolute bottom-0 left-0 right-0 z-20 p-5">
             <Link href={`/user?id=${reel.profile?.id}`}>
               <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity drop-shadow">
@@ -769,7 +710,6 @@ function DesktopReelCard({
           </div>
         </div>
 
-        {/* Action column */}
         <div className="flex-shrink-0 pb-5">
           <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
             currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
