@@ -1,7 +1,7 @@
 // Badge utility functions and types
 import { supabase } from './supabase';
 
-export type BadgeType = 'gold_early_member' | 'silver_early_member' | 'bronze_early_member' | 'beta_tester';
+export type BadgeType = 'gold_early_member' | 'silver_early_member' | 'bronze_early_member' | 'beta_tester' | 'bug_hunter';
 
 export interface BadgeInfo {
   type: BadgeType;
@@ -44,6 +44,14 @@ export const BADGES_CONFIG: Record<BadgeType, BadgeInfo> = {
     title: 'Beta Tester',
     description: 'Participated in platform beta testing',
     color: 'text-purple-500',
+  },
+  bug_hunter: {
+    type: 'bug_hunter',
+    columnName: 'is_bug_hunter',
+    dateColumnName: 'bug_hunter_at',
+    title: 'Bug Hunter',
+    description: 'Found and reported platform bugs',
+    color: 'text-green-500',
   },
 };
 
@@ -93,6 +101,7 @@ export function getUserBadges(profile: any): BadgeType[] {
   if (profile?.is_silver_early_member) badges.push('silver_early_member');
   if (profile?.is_bronze_early_member) badges.push('bronze_early_member');
   if (profile?.is_beta_tester) badges.push('beta_tester');
+  if (profile?.is_bug_hunter) badges.push('bug_hunter');
   
   return badges;
 }

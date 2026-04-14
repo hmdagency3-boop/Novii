@@ -14,6 +14,7 @@ import { GoldMemberBadge } from "@/components/ui/gold-member-badge";
 import { SilverMemberBadge } from "@/components/ui/silver-member-badge";
 import { BronzeMemberBadge } from "@/components/ui/bronze-member-badge";
 import { BetaTesterBadge } from "@/components/ui/beta-tester-badge";
+import { BugHunterBadge } from "@/components/ui/bug-hunter-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -344,12 +345,13 @@ export default function Profile() {
                 </div>
 
                 {/* Display member medals under stats */}
-                {(profile.is_gold_early_member || profile.is_silver_early_member || profile.is_bronze_early_member || profile.is_beta_tester) && (
+                {(profile.is_gold_early_member || profile.is_silver_early_member || profile.is_bronze_early_member || profile.is_beta_tester || profile.is_bug_hunter) && (
                   <div className="flex items-center gap-1 flex-wrap pt-2 border-t border-border">
                     {profile.is_gold_early_member && <GoldMemberBadge size={isMobile ? "xs" : "md"} iconOnly />}
                     {profile.is_silver_early_member && <SilverMemberBadge size={isMobile ? "xs" : "md"} iconOnly />}
                     {profile.is_bronze_early_member && <BronzeMemberBadge size={isMobile ? "xs" : "md"} iconOnly />}
                     {profile.is_beta_tester && <BetaTesterBadge size={isMobile ? "xs" : "md"} iconOnly />}
+                    {profile.is_bug_hunter && <BugHunterBadge size={isMobile ? "xs" : "md"} iconOnly />}
                   </div>
                 )}
 

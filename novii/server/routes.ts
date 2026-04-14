@@ -2233,7 +2233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/users/:userId", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;
-      const { full_name, bio, website, location, is_verified, is_official, is_creator, is_premium, is_popular, is_active, is_gold_early_member, is_silver_early_member, is_bronze_early_member, is_beta_tester } = req.body;
+      const { full_name, bio, website, location, is_verified, is_official, is_creator, is_premium, is_popular, is_active, is_gold_early_member, is_silver_early_member, is_bronze_early_member, is_beta_tester, is_bug_hunter } = req.body;
 
       const updatePayload: Record<string, any> = {
         updated_at: new Date().toISOString(),
@@ -2263,6 +2263,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (is_beta_tester !== undefined) {
         updatePayload.is_beta_tester = is_beta_tester === true;
         updatePayload.beta_tester_at = is_beta_tester ? new Date().toISOString() : null;
+      }
+      if (is_bug_hunter !== undefined) {
+        updatePayload.is_bug_hunter = is_bug_hunter === true;
+        updatePayload.bug_hunter_at = is_bug_hunter ? new Date().toISOString() : null;
       }
 
       console.log('🔧 Admin edit user:', userId, JSON.stringify(updatePayload));

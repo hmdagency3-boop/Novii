@@ -30,6 +30,7 @@ export const PROFILE_COLUMNS = `
   is_silver_early_member,
   is_bronze_early_member,
   is_beta_tester,
+  is_bug_hunter,
   gender,
   username_changed_at,
   full_name_changed_at,
@@ -67,6 +68,7 @@ export const PROFILE_CARD = `
   is_silver_early_member,
   is_bronze_early_member,
   is_beta_tester,
+  is_bug_hunter,
   followers_count,
   following_count
 `;

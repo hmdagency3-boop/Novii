@@ -16,6 +16,7 @@ import { GoldMemberBadge } from "@/components/ui/gold-member-badge";
 import { SilverMemberBadge } from "@/components/ui/silver-member-badge";
 import { BronzeMemberBadge } from "@/components/ui/bronze-member-badge";
 import { BetaTesterBadge } from "@/components/ui/beta-tester-badge";
+import { BugHunterBadge } from "@/components/ui/bug-hunter-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -460,7 +461,7 @@ export default function UserProfile() {
                 </div>
 
                 {/* Display member medals under stats */}
-                {(profile.is_gold_early_member || profile.is_silver_early_member || profile.is_bronze_early_member || profile.is_beta_tester) && (
+                {(profile.is_gold_early_member || profile.is_silver_early_member || profile.is_bronze_early_member || profile.is_beta_tester || profile.is_bug_hunter) && (
                   <div className="flex items-center gap-1 flex-wrap pt-2 border-t border-border">
                     {profile.is_gold_early_member && (
                       <>
@@ -499,6 +500,16 @@ export default function UserProfile() {
                         </div>
                         <div className="hidden md:inline">
                           <BetaTesterBadge size="md" iconOnly />
+                        </div>
+                      </>
+                    )}
+                    {profile.is_bug_hunter && (
+                      <>
+                        <div className="md:hidden">
+                          <BugHunterBadge size="xs" iconOnly />
+                        </div>
+                        <div className="hidden md:inline">
+                          <BugHunterBadge size="md" iconOnly />
                         </div>
                       </>
                     )}

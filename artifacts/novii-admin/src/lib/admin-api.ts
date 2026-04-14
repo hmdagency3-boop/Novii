@@ -176,6 +176,7 @@ export interface UserProfile {
   is_silver_early_member: boolean;
   is_bronze_early_member: boolean;
   is_beta_tester: boolean;
+  is_bug_hunter: boolean;
   is_banned: boolean;
   ban_reason: string;
   banned_reason?: string;

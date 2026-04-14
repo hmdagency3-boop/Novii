@@ -26,6 +26,7 @@ import {
   Medal,
   Trophy,
   FlaskConical,
+  Bug,
 } from "lucide-react";
 
 export default function UsersPage() {
@@ -162,6 +163,7 @@ export default function UsersPage() {
                         {user.is_silver_early_member && <Medal className="w-4 h-4 text-slate-400" title="عضو فضي مبكر" />}
                         {user.is_bronze_early_member && <Award className="w-4 h-4 text-orange-600" title="عضو برونزي مبكر" />}
                         {user.is_beta_tester && <FlaskConical className="w-4 h-4 text-violet-500" title="مختبر بيتا" />}
+                        {user.is_bug_hunter && <Bug className="w-4 h-4 text-lime-500" title="باك هانتر" />}
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
@@ -241,6 +243,7 @@ function ViewUserModal({ user, onClose }: { user: UserProfile; onClose: () => vo
           {user.is_silver_early_member && <Badge color="slate">عضو فضي مبكر</Badge>}
           {user.is_bronze_early_member && <Badge color="orange">عضو برونزي مبكر</Badge>}
           {user.is_beta_tester && <Badge color="violet">مختبر بيتا</Badge>}
+          {user.is_bug_hunter && <Badge color="lime">باك هانتر</Badge>}
           {user.is_banned && <Badge color="red">محظور</Badge>}
         </div>
         {user.is_banned && (user.ban_reason || user.banned_reason) && (
@@ -401,6 +404,7 @@ function EditModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =
     is_silver_early_member: user.is_silver_early_member,
     is_bronze_early_member: user.is_bronze_early_member,
     is_beta_tester: user.is_beta_tester,
+    is_bug_hunter: user.is_bug_hunter,
   });
   const [bio, setBio] = useState(user.bio || "");
   const [busy, setBusy] = useState(false);
@@ -433,7 +437,7 @@ function EditModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">الشارات</label>
           <div className="space-y-2">
-            {Object.entries({ is_verified: "موثق ✓", is_official: "رسمي 🛡", is_creator: "صانع محتوى ✨", is_premium: "مميز 👑", is_popular: "مشهور 🔥", is_active: "نشط ⚡", is_gold_early_member: "عضو ذهبي مبكر 🏆", is_silver_early_member: "عضو فضي مبكر 🥈", is_bronze_early_member: "عضو برونزي مبكر 🥉", is_beta_tester: "مختبر بيتا 🧪" }).map(([key, label]) => (
+            {Object.entries({ is_verified: "موثق ✓", is_official: "رسمي 🛡", is_creator: "صانع محتوى ✨", is_premium: "مميز 👑", is_popular: "مشهور 🔥", is_active: "نشط ⚡", is_gold_early_member: "عضو ذهبي مبكر 🏆", is_silver_early_member: "عضو فضي مبكر 🥈", is_bronze_early_member: "عضو برونزي مبكر 🥉", is_beta_tester: "مختبر بيتا 🧪", is_bug_hunter: "باك هانتر 🐛" }).map(([key, label]) => (
               <label key={key} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
                 <input
                   type="checkbox"
@@ -494,6 +498,7 @@ function Badge({ children, color }: { children: React.ReactNode; color: string }
     slate: "bg-slate-100 text-slate-600",
     orange: "bg-orange-50 text-orange-600",
     violet: "bg-violet-50 text-violet-600",
+    lime: "bg-lime-50 text-lime-600",
   };
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${colors[color] || colors.blue}`}>

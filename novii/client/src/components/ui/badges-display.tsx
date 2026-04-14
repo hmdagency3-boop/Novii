@@ -2,11 +2,12 @@ import { GoldMemberBadge } from './gold-member-badge';
 import { SilverMemberBadge } from './silver-member-badge';
 import { BronzeMemberBadge } from './bronze-member-badge';
 import { BetaTesterBadge } from './beta-tester-badge';
+import { BugHunterBadge } from './bug-hunter-badge';
 import { BadgeType } from '@/lib/badges';
 import { cn } from '@/lib/utils';
 
 interface UserBadgesDisplayProps {
-  badges: string[]; // array of badge types
+  badges: string[];
   size?: 'sm' | 'md' | 'lg';
   showText?: boolean;
   className?: string;
@@ -25,6 +26,7 @@ export function BadgesDisplay({
     silver_early_member: SilverMemberBadge,
     bronze_early_member: BronzeMemberBadge,
     beta_tester: BetaTesterBadge,
+    bug_hunter: BugHunterBadge,
   };
 
   return (
