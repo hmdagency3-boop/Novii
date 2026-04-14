@@ -36,6 +36,8 @@ export const profiles = pgTable("profiles", {
   bronzeEarlyMemberAt: timestamp("bronze_early_member_at"),
   isBetaTester: boolean("is_beta_tester").default(false),
   betaTesterAt: timestamp("beta_tester_at"),
+  isBugHunter: boolean("is_bug_hunter").default(false),
+  bugHunterAt: timestamp("bug_hunter_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

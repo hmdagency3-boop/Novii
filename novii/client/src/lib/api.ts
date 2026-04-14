@@ -54,6 +54,7 @@ export interface Profile {
   bronze_early_member_at?: string | null;
   is_beta_tester?: boolean;
   is_bug_hunter?: boolean;
+  bug_hunter_at?: string | null;
   beta_tester_at?: string | null;
   gender?: string | null;
   username_changed_at?: string | null;
