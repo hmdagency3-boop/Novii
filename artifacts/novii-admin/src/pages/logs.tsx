@@ -81,7 +81,7 @@ export default function LogsPage() {
                     )}
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    بواسطة {log.admin_username || log.admin_id?.slice(0, 8)} &middot; {new Date(log.created_at).toLocaleString("ar-EG")}
+                    بواسطة {log.admin_username || (log.admin_user_id || log.admin_id || "").slice(0, 8)} &middot; {new Date(log.created_at).toLocaleString("ar-EG")}
                   </p>
                 </div>
                 <button onClick={() => setViewLog(log)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0">
@@ -108,7 +108,7 @@ export default function LogsPage() {
                 </div>
                 <div className="bg-gray-50 rounded-xl p-3">
                   <p className="text-xs text-gray-400 mb-0.5">المشرف</p>
-                  <p className="text-sm font-semibold text-gray-700">{viewLog.admin_username || viewLog.admin_id?.slice(0, 8)}</p>
+                  <p className="text-sm font-semibold text-gray-700">{viewLog.admin_username || (viewLog.admin_user_id || viewLog.admin_id || "").slice(0, 8)}</p>
                 </div>
                 <div className="bg-gray-50 rounded-xl p-3">
                   <p className="text-xs text-gray-400 mb-0.5">النوع</p>
@@ -119,11 +119,11 @@ export default function LogsPage() {
                   <p className="text-sm font-semibold text-gray-700 break-all" dir="ltr">{viewLog.target_id}</p>
                 </div>
               </div>
-              {viewLog.details && Object.keys(viewLog.details).length > 0 && (
+              {viewLog.details && (typeof viewLog.details === 'string' ? viewLog.details : Object.keys(viewLog.details).length > 0) && (
                 <div>
                   <p className="text-xs font-semibold text-gray-500 mb-1">التفاصيل</p>
                   <pre className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 overflow-x-auto font-mono" dir="ltr">
-                    {JSON.stringify(viewLog.details, null, 2)}
+                    {typeof viewLog.details === 'string' ? viewLog.details : JSON.stringify(viewLog.details, null, 2)}
                   </pre>
                 </div>
               )}

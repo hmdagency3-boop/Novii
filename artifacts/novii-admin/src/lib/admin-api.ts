@@ -163,6 +163,7 @@ export interface UserProfile {
   id: string;
   username: string;
   display_name: string;
+  full_name?: string;
   bio: string;
   avatar_url: string;
   is_verified: boolean;
@@ -172,7 +173,9 @@ export interface UserProfile {
   is_popular: boolean;
   is_banned: boolean;
   ban_reason: string;
+  banned_reason?: string;
   ban_expires_at: string | null;
+  ban_until?: string | null;
   created_at: string;
   followers_count: number;
   following_count: number;
@@ -204,11 +207,12 @@ export interface PostRecord {
   likes_count: number;
   comments_count: number;
   shares_count: number;
+  views_count: number;
   is_deleted: boolean;
   created_at: string;
-  username?: string;
-  display_name?: string;
-  avatar_url?: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
 }
 
 export interface ReportRecord {
@@ -227,10 +231,11 @@ export interface ReportRecord {
 export interface LogRecord {
   id: string;
   admin_id: string;
+  admin_user_id?: string;
   action: string;
   target_type: string;
   target_id: string;
-  details: Record<string, unknown>;
+  details: Record<string, unknown> | string;
   created_at: string;
   admin_username?: string;
 }

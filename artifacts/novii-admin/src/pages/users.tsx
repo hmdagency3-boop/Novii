@@ -227,10 +227,13 @@ function ViewUserModal({ user, onClose }: { user: UserProfile; onClose: () => vo
           {user.is_popular && <Badge color="pink">مشهور</Badge>}
           {user.is_banned && <Badge color="red">محظور</Badge>}
         </div>
-        {user.is_banned && user.ban_reason && (
+        {user.is_banned && (user.ban_reason || user.banned_reason) && (
           <div className="bg-red-50 border border-red-100 rounded-xl p-3">
             <p className="text-xs font-semibold text-red-600 mb-1">سبب الحظر:</p>
-            <p className="text-sm text-red-500">{user.ban_reason}</p>
+            <p className="text-sm text-red-500">{user.ban_reason || user.banned_reason}</p>
+            {(user.ban_expires_at || user.ban_until) && (
+              <p className="text-xs text-red-400 mt-1">ينتهي: {new Date(user.ban_expires_at || user.ban_until!).toLocaleString("ar-EG")}</p>
+            )}
           </div>
         )}
       </div>

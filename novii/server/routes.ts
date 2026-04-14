@@ -2398,6 +2398,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GET /api/admin/content — get posts for moderation
   app.get("/api/admin/content", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    const normalizePost = (p: any, prof?: any) => ({
+      id: p.id,
+      user_id: p.user_id,
+      content: p.caption || p.content || '',
+      media_urls: p.image_url ? [p.image_url] : (p.media_urls || []),
+      likes_count: p.likes_count || 0,
+      comments_count: p.comments_count || 0,
+      shares_count: p.shares_count || 0,
+      views_count: p.views_count || 0,
+      is_deleted: p.is_deleted || false,
+      created_at: p.created_at,
+      username: prof?.username || p.profiles?.username || null,
+      display_name: prof?.full_name || p.profiles?.full_name || null,
+      avatar_url: prof?.avatar_url || p.profiles?.avatar_url || null,
+    });
+
     try {
       const { data: posts, error } = await adminDb
         .from('posts')
@@ -2422,21 +2438,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .in('id', userIds);
 
         const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-        const enriched = (fallbackPosts || []).map((p: any) => {
-          const prof = profileMap.get(p.user_id);
-          return { ...p, username: prof?.username || null, display_name: prof?.full_name || null, avatar_url: prof?.avatar_url || p.avatar_url || null };
-        });
-        return res.json(enriched);
+        return res.json((fallbackPosts || []).map((p: any) => normalizePost(p, profileMap.get(p.user_id))));
       }
 
-      const flat = (posts || []).map((p: any) => ({
-        ...p,
-        username: p.profiles?.username || null,
-        display_name: p.profiles?.full_name || null,
-        avatar_url: p.profiles?.avatar_url || p.avatar_url || null,
-        profiles: undefined,
-      }));
-      res.json(flat);
+      res.json((posts || []).map((p: any) => normalizePost(p)));
     } catch (error) {
       console.error('Admin content error:', error);
       res.status(500).json({ error: 'Failed to fetch content' });
@@ -2490,7 +2495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { data: logs, error } = await adminDb
         .from('admin_logs')
-        .select('*, profiles!admin_logs_admin_user_id_fkey(username, full_name, avatar_url)')
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -2498,20 +2503,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (error.code === '42P01') {
           return res.json([]);
         }
-        const { data: fallbackLogs, error: fallbackErr } = await adminDb
-          .from('admin_logs')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(100);
-        if (fallbackErr) throw fallbackErr;
-        return res.json(fallbackLogs || []);
+        throw error;
       }
-      const flat = (logs || []).map((l: any) => ({
-        ...l,
-        admin_username: l.profiles?.username || null,
-        profiles: undefined,
-      }));
-      res.json(flat);
+
+      const adminUserIds = [...new Set((logs || []).map((l: any) => l.admin_user_id).filter(Boolean))];
+      let profileMap = new Map();
+      if (adminUserIds.length > 0) {
+        const { data: profiles } = await adminDb
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .in('id', adminUserIds);
+        profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+      }
+
+      const enriched = (logs || []).map((l: any) => {
+        const prof = profileMap.get(l.admin_user_id);
+        return {
+          ...l,
+          admin_username: prof?.username || null,
+        };
+      });
+      res.json(enriched);
     } catch (error) {
       console.error('Admin logs error:', error);
       res.json([]);
