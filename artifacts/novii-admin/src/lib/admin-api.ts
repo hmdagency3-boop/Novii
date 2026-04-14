@@ -25,7 +25,14 @@ export async function adminFetch<T = unknown>(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || `HTTP ${res.status}`);
+    let msg = `HTTP ${res.status}`;
+    try {
+      const json = JSON.parse(text);
+      msg = json.error || json.message || msg;
+    } catch {
+      if (text) msg = text;
+    }
+    throw new Error(msg);
   }
 
   return res.json();
@@ -118,6 +125,14 @@ export async function fetchContent(): Promise<PostRecord[]> {
 
 export async function deleteContent(postId: string): Promise<unknown> {
   return adminFetch(`/content/${postId}`, { method: "DELETE" });
+}
+
+export async function fetchDeletedContent(): Promise<PostRecord[]> {
+  return adminFetch("/content/deleted");
+}
+
+export async function restoreContent(postId: string): Promise<unknown> {
+  return adminFetch(`/content/${postId}/restore`, { method: "POST" });
 }
 
 export async function warnUser(

@@ -2556,6 +2556,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/admin/content/deleted — get soft-deleted posts (archive)
+  app.get("/api/admin/content/deleted", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    const normalizePost = (p: any, prof?: any) => ({
+      id: p.id,
+      user_id: p.user_id,
+      content: p.caption || p.content || '',
+      media_urls: p.image_url ? [p.image_url] : (p.media_urls || []),
+      likes_count: p.likes_count || 0,
+      comments_count: p.comments_count || 0,
+      shares_count: p.shares_count || 0,
+      views_count: p.views_count || 0,
+      is_deleted: true,
+      deleted_at: p.deleted_at || p.updated_at || null,
+      created_at: p.created_at,
+      username: prof?.username || p.profiles?.username || null,
+      display_name: prof?.full_name || p.profiles?.full_name || null,
+      avatar_url: prof?.avatar_url || p.profiles?.avatar_url || null,
+    });
+
+    try {
+      const { data: posts, error } = await adminDb
+        .from('posts')
+        .select('*, profiles!posts_user_id_fkey(username, full_name, avatar_url)')
+        .eq('is_deleted', true)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        const { data: fallbackPosts, error: fallbackErr } = await adminDb
+          .from('posts')
+          .select('*')
+          .eq('is_deleted', true)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (fallbackErr) throw fallbackErr;
+
+        const userIds = [...new Set((fallbackPosts || []).map((p: any) => p.user_id))];
+        const { data: profiles } = await adminDb
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .in('id', userIds);
+
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+        return res.json((fallbackPosts || []).map((p: any) => normalizePost(p, profileMap.get(p.user_id))));
+      }
+
+      res.json((posts || []).map((p: any) => normalizePost(p)));
+    } catch (error) {
+      console.error('Admin deleted content error:', error);
+      res.status(500).json({ error: 'Failed to fetch deleted content' });
+    }
+  });
+
+  // POST /api/admin/content/:postId/restore — restore a soft-deleted post
+  app.post("/api/admin/content/:postId/restore", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { postId } = req.params;
+
+      const { data: post, error: fetchErr } = await adminDb
+        .from('posts')
+        .select('user_id, is_deleted')
+        .eq('id', postId)
+        .single();
+
+      if (fetchErr || !post) {
+        return res.status(404).json({ error: 'المنشور غير موجود' });
+      }
+      if (!post.is_deleted) {
+        return res.status(400).json({ error: 'المنشور غير محذوف أصلاً' });
+      }
+
+      const { data: updated, error } = await adminDb
+        .from('posts')
+        .update({ is_deleted: false, deleted_at: null })
+        .eq('id', postId)
+        .select('id');
+
+      if (error) throw error;
+      if (!updated || updated.length === 0) {
+        return res.status(500).json({ error: 'فشل في استعادة المنشور' });
+      }
+
+      if (post.user_id) {
+        const { error: notifErr } = await adminDb.from('notifications').insert({
+          user_id: post.user_id,
+          type: 'security',
+          content: 'تم استعادة منشورك وأصبح مرئياً مجدداً.',
+          post_id: postId,
+        });
+        if (notifErr) console.error('⚠️ Failed to send post_restored notification:', notifErr);
+      }
+
+      await logAdminAction(req, 'restore_post', 'post', postId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin restore post error:', error);
+      res.status(500).json({ error: 'Failed to restore post' });
+    }
+  });
+
   // DELETE /api/admin/content/:postId — soft-delete a post
   app.delete("/api/admin/content/:postId", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
     try {
