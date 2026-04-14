@@ -141,20 +141,13 @@ export default function Reels() {
     return () => { c.removeEventListener("scroll", onScroll); clearTimeout(t); };
   }, [computeDesktopIdx]);
 
-  const tryPlayVideo = useCallback((vid: HTMLVideoElement) => {
-    vid.muted = true;
-    const attempt = () => {
-      const p = vid.play();
-      if (p) p.catch(() => {});
-    };
-    if (vid.readyState >= 2) {
-      attempt();
-    } else {
-      vid.addEventListener('canplay', () => attempt(), { once: true });
-    }
-  }, []);
-
   const userPausedRef = useRef<Set<string>>(new Set());
+
+  const safePlay = useCallback((vid: HTMLVideoElement) => {
+    vid.muted = true;
+    const p = vid.play();
+    if (p) p.catch(() => {});
+  }, []);
 
   const playActiveReel = useCallback((activeIdx: number, refs: React.MutableRefObject<{ [k: string]: HTMLVideoElement }>) => {
     const list = reelsRef.current;
@@ -164,7 +157,7 @@ export default function Reels() {
       if (!vid) return;
       if (idx === activeIdx) {
         if (userPausedRef.current.has(reel.id)) return;
-        tryPlayVideo(vid);
+        safePlay(vid);
         setPausedReels(p => { const n = new Set(p); n.delete(reel.id); return n; });
         if (isGuestRef.current && !guestPromptShown.current) {
           guestViewCount.current += 1;
@@ -179,28 +172,7 @@ export default function Reels() {
         userPausedRef.current.delete(reel.id);
       }
     });
-  }, [tryPlayVideo]);
-
-  /* ── Auto-play first reel once videos load ── */
-  useEffect(() => {
-    if (initialPlayDone.current || !reels.length) return;
-    const tryPlay = () => {
-      const mVid = mobileRefs.current[reels[0]?.id];
-      const dVid = desktopRefs.current[reels[0]?.id];
-      if (mVid || dVid) {
-        initialPlayDone.current = true;
-        playActiveReel(0, mobileRefs);
-        playActiveReel(0, desktopRefs);
-        return true;
-      }
-      return false;
-    };
-    if (tryPlay()) return;
-    const timers = [300, 600, 1200].map(ms => setTimeout(() => {
-      if (!initialPlayDone.current) tryPlay();
-    }, ms));
-    return () => timers.forEach(clearTimeout);
-  }, [reels, playActiveReel]);
+  }, [safePlay]);
 
   /* ── Play active reel, pause all others — MOBILE ── */
   useEffect(() => {
@@ -618,7 +590,8 @@ function MobileReelCard({
         src={reel.video_url}
         className="absolute inset-0 w-full h-full object-cover"
         loop playsInline muted
-        autoPlay={idx === 0}
+        preload="auto"
+        onLoadedData={e => { if (idx === 0 && !initialPlayDone.current) { initialPlayDone.current = true; safePlay(e.currentTarget); } }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -741,7 +714,7 @@ function DesktopReelCard({
             className="w-full h-full object-cover"
             loop playsInline muted
             preload="auto"
-            autoPlay={idx === 0}
+            onLoadedData={e => { const v = e.currentTarget; if (idx === 0 && !v.dataset.initPlayed) { v.dataset.initPlayed = "1"; v.muted = true; v.play().catch(() => {}); } }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/70 pointer-events-none" />
 
