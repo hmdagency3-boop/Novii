@@ -186,7 +186,8 @@ export default function AuthPage() {
         
         // Track device on login
         try {
-          const { data: { user } } = await supabase.auth.getUser();
+          const { data: { session } } = await supabase.auth.getSession();
+          const user = session?.user;
           console.log('🔐 Login successful, user ID:', user?.id);
           if (user?.id) {
             console.log('📱 Tracking device for user:', user.id);
@@ -205,7 +206,8 @@ export default function AuthPage() {
         
         // Create profile with gender
         try {
-          const { data: { user } } = await supabase.auth.getUser();
+          const { data: { session } } = await supabase.auth.getSession();
+          const user = session?.user;
           console.log('🔐 Signup successful, user ID:', user?.id);
           if (user?.id) {
             console.log('📱 Creating profile with gender:', gender);
@@ -219,7 +221,8 @@ export default function AuthPage() {
 
         // Track device on signup
         try {
-          const { data: { user } } = await supabase.auth.getUser();
+          const { data: { session: s2 } } = await supabase.auth.getSession();
+          const user = s2?.user;
           if (user?.id) {
             console.log('📱 Tracking device for user:', user.id);
             const result = await api.trackDevice(user.id);

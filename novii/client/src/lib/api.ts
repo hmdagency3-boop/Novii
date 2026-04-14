@@ -5,6 +5,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 function assertUUID(value: string, label = 'ID'): void {
   if (!UUID_RE.test(value)) throw new Error(`Invalid ${label}`);
 }
+
+async function getCurrentUser() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user ?? null;
+}
 import { getFromCache, saveToCache, invalidateCache, getOrFetch, CACHE_DURATIONS } from './cache-utils';
 import {
   PROFILE_COLUMNS,
@@ -278,7 +283,7 @@ async function saveHashtags(
 export const api = {
   // Profile APIs
   async getCurrentProfile(): Promise<Profile | null> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return null;
 
     // Try cache first
@@ -375,7 +380,7 @@ export const api = {
   },
 
   async updateProfile(updates: Partial<Profile>): Promise<Profile> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const ALLOWED_FIELDS = ['username', 'full_name', 'bio', 'website', 'location', 'avatar_url', 'cover_url', 'is_private', 'gender'] as const;
@@ -402,7 +407,7 @@ export const api = {
   },
 
   async updateOnlineStatus(isOnline: boolean): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return;
 
     try {
@@ -489,7 +494,7 @@ export const api = {
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     const posts = data || [];
 
     if (user && posts.length > 0) {
@@ -525,7 +530,7 @@ export const api = {
       .range(0, BATCH - 1);
 
     if (error) throw error;
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     let posts: any[] = data || [];
 
     if (user && posts.length > 0) {
@@ -573,7 +578,7 @@ export const api = {
     const posts = data || [];
 
     // Add is_liked and is_saved for current user
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (user && posts.length > 0) {
       const postIds = posts.map(p => p.id);
       const [likesData, savedData] = await Promise.all([
@@ -595,7 +600,7 @@ export const api = {
   },
 
   async getUserPosts(userId: string): Promise<Post[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     // Privacy gate: if private account and current user is not the owner → check follow
     if (user && user.id !== userId) {
@@ -655,7 +660,7 @@ export const api = {
     const reels = data || [];
 
     // Add is_liked for current user (batch query)
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (user && reels.length > 0) {
       const reelIds = reels.map(r => r.id);
       const { data: likesData } = await supabase
@@ -693,7 +698,7 @@ export const api = {
 
     if (!data) return null;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (user) {
       const [likeData, saveData] = await Promise.all([
         supabase.from('likes').select('id').eq('post_id', postId).eq('user_id', user.id).maybeSingle(),
@@ -719,7 +724,7 @@ export const api = {
   },
 
   async createPost(caption: string, imageUrl: string, location?: string): Promise<Post> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     // Use optimized column selection (40-70% egress reduction)
@@ -748,7 +753,7 @@ export const api = {
   },
 
   async deleteReel(reelId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { error } = await supabase
@@ -761,7 +766,7 @@ export const api = {
   },
 
   async deletePost(postId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { error } = await supabase
@@ -777,7 +782,7 @@ export const api = {
 
   // Likes APIs
   async toggleLike(postId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { data: existingLike, error: likeError } = await supabase
@@ -837,7 +842,7 @@ export const api = {
 
   // Reel Likes APIs
   async toggleReelLike(reelId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { data: existingLike, error: likeError } = await supabase
@@ -942,7 +947,7 @@ export const api = {
   },
 
   async createComment(postId: string, content: string, parentCommentId?: string, gifUrl?: string): Promise<Comment> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     // Use optimized column selection with COMMENT_WITH_PROFILE (40% egress reduction)
@@ -1024,7 +1029,7 @@ export const api = {
   },
 
   async toggleCommentLike(commentId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { data: existingLike } = await supabase
@@ -1057,7 +1062,7 @@ export const api = {
   },
 
   async deleteComment(commentId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     // Get the comment to verify permissions (also fetch reel_id for reel comments)
@@ -1123,7 +1128,7 @@ export const api = {
 
   // Stories APIs
   async getStories(): Promise<Story[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     // Get user's following list (only ids)
@@ -1168,7 +1173,7 @@ export const api = {
   },
 
   async getUserStories(userId: string): Promise<Story[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     // Privacy gate: private account → must be a follower
     if (user && user.id !== userId) {
@@ -1193,7 +1198,7 @@ export const api = {
   },
 
   async createStory(mediaUrl: string, mediaType: 'image' | 'video' = 'image', music?: { url: string; title: string; artist: string; artwork_url: string } | null, filterName?: string): Promise<Story> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const insertData: any = {
@@ -1221,7 +1226,7 @@ export const api = {
   },
 
   async deleteStory(storyId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     try {
@@ -1255,7 +1260,7 @@ export const api = {
 
   // Follow APIs — uses dedicated `follow_requests` table for private-account requests
   async toggleFollow(targetUserId: string): Promise<{isFollowing: boolean; actorProfile: Profile | null; isPending?: boolean; wasCancelled?: boolean}> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const [{ data: currentProfile }, { data: targetProfile }, { data: existingFollow }, { data: pendingRequest }] = await Promise.all([
@@ -1316,7 +1321,7 @@ export const api = {
   },
 
   async getPendingFollowRequests(): Promise<any[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return [];
 
     const { data, error } = await supabase
@@ -1345,7 +1350,7 @@ export const api = {
   },
 
   async approveFollowRequest(actorId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     try {
@@ -1380,7 +1385,7 @@ export const api = {
   },
 
   async sendStoryReply(storyId: string, content: string): Promise<Message> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     try {
@@ -1421,7 +1426,7 @@ export const api = {
   },
 
   async addStoryView(storyId: string): Promise<number> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     try {
@@ -1523,7 +1528,7 @@ export const api = {
   },
 
   async rejectFollowRequest(actorId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     try {
@@ -1547,7 +1552,7 @@ export const api = {
   },
 
   async hasFollowRequest(targetUserId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return false;
 
     const { data } = await supabase
@@ -1562,7 +1567,7 @@ export const api = {
   },
 
   async hasIncomingFollowRequest(fromUserId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return false;
 
     const { data } = await supabase
@@ -1577,7 +1582,7 @@ export const api = {
   },
 
   async isFollowing(targetUserId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return false;
 
     const { data } = await supabase
@@ -1591,7 +1596,7 @@ export const api = {
   },
 
   async isMutualFollow(targetUserId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return false;
 
     // Check if current user follows target AND target follows current user
@@ -1614,7 +1619,7 @@ export const api = {
 
   // Messages APIs
   async getConversations(): Promise<any[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return [];
 
     const { data, error } = await supabase
@@ -1662,7 +1667,7 @@ export const api = {
   },
 
   async getMessages(userId: string): Promise<Message[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return [];
 
     
@@ -1705,7 +1710,7 @@ export const api = {
   },
 
   async sendMessage(receiverId: string, content: string, imageUrl?: string, replyToId?: string, audioUrl?: string): Promise<Message> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     // Prevent sending messages to self
@@ -1741,7 +1746,7 @@ export const api = {
   },
 
   async markMessagesAsRead(senderId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
 
@@ -1760,7 +1765,7 @@ export const api = {
   },
 
   async updateMessage(messageId: string, newContent: string): Promise<Message> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { data, error } = await supabase
@@ -1785,7 +1790,7 @@ export const api = {
   },
 
   async deleteMessage(messageId: string): Promise<Message> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { data, error } = await supabase
@@ -1810,7 +1815,7 @@ export const api = {
 
   // Notifications APIs
   async getNotifications(): Promise<Notification[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return [];
 
     // Fetch notifications + pending follow_requests in parallel
@@ -1908,7 +1913,7 @@ export const api = {
   },
 
   async addMessageReaction(messageId: string, reaction: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { error } = await supabase
@@ -1923,7 +1928,7 @@ export const api = {
   },
 
   async removeMessageReaction(messageId: string, reaction: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { error } = await supabase
@@ -1952,7 +1957,7 @@ export const api = {
   },
 
   async getUserMessageReaction(messageId: string): Promise<string | null> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return null;
 
     const { data, error } = await supabase
@@ -1967,7 +1972,7 @@ export const api = {
   },
 
   async markAllMessageNotificationsAsRead(): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     // Mark all message-related notifications as read
@@ -1987,7 +1992,7 @@ export const api = {
 
   // Saved Posts APIs
   async toggleSave(postId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { data: existingSave } = await supabase
@@ -2007,7 +2012,7 @@ export const api = {
   },
 
   async getSavedPosts(): Promise<Post[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return [];
 
     // Use optimized column selection (40-70% egress reduction)
@@ -2030,7 +2035,7 @@ export const api = {
   // Followers and Following
   async getFollowers(userId: string): Promise<Profile[]> {
     assertUUID(userId, 'userId');
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const currentUser = await getCurrentUser();
     
     const { data, error } = await supabase
       .from('follows')
@@ -2076,7 +2081,7 @@ export const api = {
 
   async getFollowing(userId: string): Promise<Profile[]> {
     assertUUID(userId, 'userId');
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const currentUser = await getCurrentUser();
     
     const { data, error } = await supabase
       .from('follows')
@@ -2121,7 +2126,7 @@ export const api = {
   },
 
   async getMyFollowing(): Promise<Profile[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return [];
     
     return this.getFollowing(user.id);
@@ -2129,7 +2134,7 @@ export const api = {
 
   // Suggestions with advanced recommendation algorithm
   async getSuggestedUsers(limit = 50): Promise<Profile[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return [];
 
     try {
@@ -2188,7 +2193,7 @@ export const api = {
     if (error) throw error;
     if (!profile) return null;
 
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const currentUser = await getCurrentUser();
 
     // Calculate correct counts from follows table
     const { count: followersCount } = await supabase
@@ -2224,7 +2229,7 @@ export const api = {
   },
 
   async getUserStatistics() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     // Count likes given
@@ -2268,7 +2273,7 @@ export const api = {
   },
 
   async updateTimeSpent(seconds: number) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     try {
@@ -2285,7 +2290,7 @@ export const api = {
 
   // Pin/Unpin Posts
   async togglePinPost(postId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { data: post, error: getError } = await supabase
@@ -2312,7 +2317,7 @@ export const api = {
 
   // Hide/Show Likes
   async toggleHideLikes(postId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { data: post, error: getError } = await supabase
@@ -2339,7 +2344,7 @@ export const api = {
 
   // Toggle Reply Settings
   async toggleRepliesDisabled(postId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     const { data: post, error: getError } = await supabase
@@ -2366,7 +2371,7 @@ export const api = {
 
   // Record Post View
   async recordPostView(postId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return;
 
     try {
@@ -2477,7 +2482,7 @@ export const api = {
 
   // Communities APIs
   async createCommunity(name: string, description?: string, isPrivate?: boolean): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch('/api/communities/create', {
@@ -2494,7 +2499,7 @@ export const api = {
 
   async getCommunities(): Promise<any[]> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
       if (!user) {
         console.warn("❌ getCommunities: No authenticated user");
         return [];
@@ -2519,7 +2524,7 @@ export const api = {
   },
 
   async sendCommunityMessage(communityId: string, content: string, imageUrl?: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/send-message`, {
@@ -2542,7 +2547,7 @@ export const api = {
   },
 
   async addCommunityMember(communityId: string, memberId: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/add-member`, {
@@ -2558,7 +2563,7 @@ export const api = {
   },
 
   async joinCommunityWithCode(inviteCode: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch('/api/communities/join-with-code', {
@@ -2577,7 +2582,7 @@ export const api = {
   },
 
   async updateCommunityTypingStatus(communityId: string, isTyping: boolean): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return null;
 
     if (isTyping) {
@@ -2611,7 +2616,7 @@ export const api = {
   },
 
   async getCommunityMembers(communityId: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/members`, {
@@ -2622,7 +2627,7 @@ export const api = {
   },
 
   async muteCommunityMember(communityId: string, targetUserId: string, reason?: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/mute-member`, {
@@ -2641,7 +2646,7 @@ export const api = {
   },
 
   async unmuteCommunityMember(communityId: string, targetUserId: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/unmute-member`, {
@@ -2660,7 +2665,7 @@ export const api = {
   },
 
   async temporarilyMuteCommunityMember(communityId: string, targetUserId: string, durationMinutes: number, reason?: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/temporary-mute`, {
@@ -2679,7 +2684,7 @@ export const api = {
   },
 
   async kickCommunityMember(communityId: string, targetUserId: string, reason?: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/kick-member`, {
@@ -2698,7 +2703,7 @@ export const api = {
   },
 
   async makeAdminCommunityMember(communityId: string, targetUserId: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/make-admin`, {
@@ -2717,7 +2722,7 @@ export const api = {
   },
 
   async removeAdminCommunityMember(communityId: string, targetUserId: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/remove-admin`, {
@@ -2736,7 +2741,7 @@ export const api = {
   },
 
   async checkCommunityKickStatus(communityId: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/check-kick-status`, {
@@ -2754,7 +2759,7 @@ export const api = {
   },
 
   async getKickedMembers(communityId: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/kicked-members`, {
@@ -2765,7 +2770,7 @@ export const api = {
   },
 
   async unkickCommunityMember(communityId: string, targetUserId: string, reason?: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/unkick-member`, {
@@ -2784,7 +2789,7 @@ export const api = {
   },
 
   async deleteCommunityMessage(communityId: string, messageId: string): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}/messages/${messageId}`, {
@@ -2806,7 +2811,7 @@ export const api = {
   },
 
   async updateCommunity(communityId: string, updates: { name?: string; description?: string; avatarUrl?: string }): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) throw new Error('User not authenticated');
 
     const response = await communityFetch(`/api/communities/${communityId}`, {

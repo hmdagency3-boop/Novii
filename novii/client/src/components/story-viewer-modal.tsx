@@ -54,7 +54,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   /* ─── Auth ─── */
   useEffect(() => {
     const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-    supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id || null));
+    supabase.auth.getSession().then(({ data: { session } }) => setCurrentUserId(session?.user?.id || null));
   }, []);
 
   /* ─── Reset on open / index change ─── */
