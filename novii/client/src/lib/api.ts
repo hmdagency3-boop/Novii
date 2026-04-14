@@ -1802,7 +1802,7 @@ export const api = {
     // Fetch notifications + pending follow_requests in parallel
     const [{ data: notifs }, { data: pendingReqs }] = await Promise.all([
       supabase.from('notifications')
-        .select(`*, actor:profiles!notifications_actor_id_fkey(*), post:posts!notifications_post_id_fkey(id, image_url, content)`)
+        .select(`*, actor:profiles!notifications_actor_id_fkey(*), post:posts!notifications_post_id_fkey(id, image_url, caption)`)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(80),
