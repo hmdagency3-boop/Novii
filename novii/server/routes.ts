@@ -129,6 +129,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const authSupabase = createClient(supabaseUrl, supabaseAnonKey);
 
+  // ===== TEMPORARY: Bootstrap first super admin (remove after use) =====
+  app.post("/api/bootstrap-admin", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { secret } = req.body;
+      if (secret !== 'NOVII_BOOTSTRAP_2026') {
+        return res.status(403).json({ error: 'Invalid bootstrap secret' });
+      }
+      const { data: existing } = await getDb(req).from('admins').select('id').limit(1);
+      if (existing && existing.length > 0) {
+        return res.status(400).json({ error: 'Admin already exists. Bootstrap disabled.' });
+      }
+      const { data, error } = await getDb(req).from('admins').insert({
+        user_id: req.userId,
+        role: 'super_admin',
+        permissions: 'full',
+        is_active: true,
+        can_manage_users: true,
+        can_manage_content: true,
+        can_manage_admins: true,
+        can_manage_reports: true,
+        can_view_analytics: true,
+        can_manage_settings: true,
+      }).select();
+      if (error) throw error;
+      res.json({ success: true, admin: data?.[0] });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Bootstrap failed' });
+    }
+  });
+
   // ===== Cloudinary Upload Route (with auth, rate limit, file validation) =====
   app.post("/api/upload", requireAuth as any, upload.single("file") as any, validateUploadFile as any, rateLimitUpload as any, handleUpload as any);
 
