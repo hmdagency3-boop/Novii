@@ -2230,24 +2230,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId } = req.params;
       const { full_name, bio, website, location, is_verified, is_official, is_creator, is_premium, is_popular } = req.body;
 
-      const { data, error } = await db
+      const updatePayload = {
+        full_name: full_name || null,
+        bio: bio || null,
+        website: website || null,
+        location: location || null,
+        is_verified: is_verified === true,
+        is_official: is_official === true,
+        is_creator: is_creator === true,
+        is_premium: is_premium === true,
+        is_popular: is_popular === true,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log('🔧 Admin edit user:', userId, JSON.stringify(updatePayload));
+
+      const { data, error, count } = await db
         .from('profiles')
-        .update({
-          full_name: full_name || null,
-          bio: bio || null,
-          website: website || null,
-          location: location || null,
-          is_verified,
-          is_official,
-          is_creator,
-          is_premium,
-          is_popular,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', userId)
         .select();
 
+      console.log('🔧 Update result:', { data: data?.length, error: error?.message, count });
+
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        return res.status(404).json({ error: 'User not found or update failed' });
+      }
 
       await logAdminAction(req, 'edit_user', 'user', userId, JSON.stringify(req.body));
       res.json({ success: true, user: data?.[0] });
