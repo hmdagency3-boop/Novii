@@ -2392,18 +2392,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (oldProfile) {
-        const newlyGranted: string[] = [];
-        const newlyRevoked: string[] = [];
+        const specialBadges: Record<string, { grantType: string; revokeType: string; grantMsg: string; revokeMsg: string }> = {
+          is_verified: {
+            grantType: 'verified_granted',
+            revokeType: 'verified_removed',
+            grantMsg: 'تهانينا! تم توثيق حسابك رسمياً. أصبح حسابك الآن يحمل علامة التوثيق ✓',
+            revokeMsg: 'تم إزالة توثيق حسابك. لم يعد حسابك يحمل علامة التوثيق.',
+          },
+          is_official: {
+            grantType: 'official_granted',
+            revokeType: 'official_removed',
+            grantMsg: 'تهانينا! تم اعتماد حسابك كحساب رسمي على نوفي.',
+            revokeMsg: 'تم إزالة صفة الحساب الرسمي من حسابك.',
+          },
+        };
+
+        const otherGranted: string[] = [];
+        const otherRevoked: string[] = [];
+
         for (const [field, label] of Object.entries(badgeFields)) {
           const wasActive = oldProfile[field] === true;
           const isNowActive = updatePayload[field];
           if (isNowActive === undefined) continue;
-          if (!wasActive && isNowActive === true) newlyGranted.push(label);
-          if (wasActive && isNowActive === false) newlyRevoked.push(label);
+
+          const special = specialBadges[field];
+          if (special) {
+            if (!wasActive && isNowActive === true) {
+              const { error: e } = await adminDb.from('notifications').insert({
+                user_id: userId, type: special.grantType, content: special.grantMsg,
+              });
+              if (e) console.error(`⚠️ Failed to send ${special.grantType} notification:`, e);
+            }
+            if (wasActive && isNowActive === false) {
+              const { error: e } = await adminDb.from('notifications').insert({
+                user_id: userId, type: special.revokeType, content: special.revokeMsg,
+              });
+              if (e) console.error(`⚠️ Failed to send ${special.revokeType} notification:`, e);
+            }
+          } else {
+            if (!wasActive && isNowActive === true) otherGranted.push(label);
+            if (wasActive && isNowActive === false) otherRevoked.push(label);
+          }
         }
 
-        if (newlyGranted.length > 0) {
-          const badgeList = newlyGranted.join('، ');
+        if (otherGranted.length > 0) {
+          const badgeList = otherGranted.join('، ');
           const { error: notifErr } = await adminDb.from('notifications').insert({
             user_id: userId,
             type: 'badge_awarded',
@@ -2412,8 +2445,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (notifErr) console.error('⚠️ Failed to send badge_awarded notification:', notifErr);
         }
 
-        if (newlyRevoked.length > 0) {
-          const badgeList = newlyRevoked.join('، ');
+        if (otherRevoked.length > 0) {
+          const badgeList = otherRevoked.join('، ');
           const { error: notifErr } = await adminDb.from('notifications').insert({
             user_id: userId,
             type: 'badge_removed',

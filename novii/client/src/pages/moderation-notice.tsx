@@ -9,7 +9,7 @@ import { ar } from "date-fns/locale";
 import {
   AlertTriangle, Trash2, ShieldBan, ShieldCheck, Shield,
   ArrowLeft, ArrowRight, Clock, Info, ChevronRight,
-  Smartphone, Lock, CheckCircle2, FileText, Heart, Award, XCircle
+  Smartphone, Lock, CheckCircle2, FileText, Heart, Award, XCircle, BadgeCheck, Building2, Star
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -125,6 +125,62 @@ export default function ModerationNotice() {
           severityAr: "بلاغ",
           severityEn: "Report",
           severityColor: "text-blue-600 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400",
+        };
+      case "verified_granted":
+        return {
+          icon: <BadgeCheck className="w-8 h-8 text-white" />,
+          bg: "bg-blue-500",
+          bgLight: "bg-blue-50 dark:bg-blue-950/30",
+          border: "border-blue-200 dark:border-blue-800",
+          titleAr: "تم توثيق حسابك ✓",
+          titleEn: "Your Account is Verified ✓",
+          subtitleAr: "أصبح حسابك يحمل علامة التوثيق الرسمية",
+          subtitleEn: "Your account now carries the official verification badge",
+          severityAr: "توثيق",
+          severityEn: "Verified",
+          severityColor: "text-blue-600 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400",
+        };
+      case "verified_removed":
+        return {
+          icon: <BadgeCheck className="w-8 h-8 text-white" />,
+          bg: "bg-gray-500",
+          bgLight: "bg-gray-50 dark:bg-gray-950/30",
+          border: "border-gray-200 dark:border-gray-800",
+          titleAr: "تم إزالة توثيق حسابك",
+          titleEn: "Account Verification Removed",
+          subtitleAr: "لم يعد حسابك يحمل علامة التوثيق",
+          subtitleEn: "Your account no longer carries the verification badge",
+          severityAr: "تحديث",
+          severityEn: "Update",
+          severityColor: "text-gray-600 bg-gray-100 dark:bg-gray-900/40 dark:text-gray-400",
+        };
+      case "official_granted":
+        return {
+          icon: <Building2 className="w-8 h-8 text-white" />,
+          bg: "bg-purple-600",
+          bgLight: "bg-purple-50 dark:bg-purple-950/30",
+          border: "border-purple-200 dark:border-purple-800",
+          titleAr: "حسابك أصبح حساباً رسمياً",
+          titleEn: "Your Account is Now Official",
+          subtitleAr: "تم اعتماد حسابك كحساب رسمي على منصة نوفي",
+          subtitleEn: "Your account has been recognized as official on Novii",
+          severityAr: "رسمي",
+          severityEn: "Official",
+          severityColor: "text-purple-600 bg-purple-100 dark:bg-purple-900/40 dark:text-purple-400",
+        };
+      case "official_removed":
+        return {
+          icon: <Building2 className="w-8 h-8 text-white" />,
+          bg: "bg-gray-500",
+          bgLight: "bg-gray-50 dark:bg-gray-950/30",
+          border: "border-gray-200 dark:border-gray-800",
+          titleAr: "تم إزالة صفة الحساب الرسمي",
+          titleEn: "Official Status Removed",
+          subtitleAr: "لم يعد حسابك معتمداً كحساب رسمي",
+          subtitleEn: "Your account is no longer recognized as official",
+          severityAr: "تحديث",
+          severityEn: "Update",
+          severityColor: "text-gray-600 bg-gray-100 dark:bg-gray-900/40 dark:text-gray-400",
         };
       case "badge_awarded":
         return {
@@ -269,6 +325,10 @@ export default function ModerationNotice() {
             {type === "ban" && <BanSection isAr={isAr} />}
             {type === "unban" && <UnbanSection isAr={isAr} />}
             {type === "report_resolved" && <ReportResolvedSection isAr={isAr} />}
+            {type === "verified_granted" && <VerifiedGrantedSection isAr={isAr} />}
+            {type === "verified_removed" && <VerifiedRemovedSection isAr={isAr} />}
+            {type === "official_granted" && <OfficialGrantedSection isAr={isAr} />}
+            {type === "official_removed" && <OfficialRemovedSection isAr={isAr} />}
             {type === "badge_awarded" && <BadgeAwardedSection isAr={isAr} />}
             {type === "badge_removed" && <BadgeRemovedSection isAr={isAr} />}
             {type === "security" && <SecuritySection isAr={isAr} />}
@@ -577,6 +637,178 @@ function ReportResolvedSection({ isAr }: { isAr: boolean }) {
   );
 }
 
+function VerifiedGrantedSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <BadgeCheck className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "ماذا يعني التوثيق؟" : "What does verification mean?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "علامة التوثيق ✓ تؤكد أن حسابك حقيقي وموثوق",
+                "تظهر العلامة بجانب اسمك في كل مكان على المنصة",
+                "الحسابات الموثقة تحظى بثقة أعلى من المستخدمين",
+                "التوثيق يساعد في حمايتك من انتحال الهوية",
+              ] : [
+                "The ✓ verification mark confirms your account is authentic and trustworthy",
+                "The mark appears next to your name everywhere on the platform",
+                "Verified accounts enjoy higher trust from other users",
+                "Verification helps protect you from identity impersonation",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-blue-50 dark:bg-blue-950/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+        <div className="flex items-start gap-2.5">
+          <Star className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">
+              {isAr ? "تهانينا على التوثيق!" : "Congratulations on your verification!"}
+            </p>
+            <p className="text-xs text-blue-600 dark:text-blue-500 leading-relaxed">
+              {isAr
+                ? "حسابك أصبح موثقاً رسمياً. حافظ على نشاطك الإيجابي واحترم إرشادات المنصة للحفاظ على هذه الصفة."
+                : "Your account is now officially verified. Maintain your positive activity and respect platform guidelines to keep this status."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function VerifiedRemovedSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <BadgeCheck className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "لماذا تم إزالة التوثيق؟" : "Why was verification removed?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "قد يتم إزالة التوثيق بسبب مخالفة شروط الحصول عليه",
+                "تغيير بيانات الحساب الأساسية قد يستوجب إعادة التوثيق",
+                "لا يزال بإمكانك استخدام حسابك بشكل طبيعي",
+                "يمكنك التواصل مع الدعم لمعرفة التفاصيل",
+              ] : [
+                "Verification may be removed due to a violation of verification terms",
+                "Changing fundamental account information may require re-verification",
+                "You can still use your account normally",
+                "You can contact support for more details",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function OfficialGrantedSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <Building2 className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "ماذا يعني الحساب الرسمي؟" : "What does an official account mean?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "حسابك معتمد كحساب رسمي يمثل جهة أو شخصية معروفة",
+                "تظهر شارة الحساب الرسمي بجانب اسمك في كل مكان",
+                "الحسابات الرسمية تحظى بأولوية في الظهور والبحث",
+                "أنت مسؤول عن المحتوى الذي يُنشر باسم هذا الحساب",
+              ] : [
+                "Your account is recognized as officially representing a known entity or personality",
+                "The official badge appears next to your name everywhere",
+                "Official accounts get priority in visibility and search",
+                "You are responsible for content published under this account",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-purple-50 dark:bg-purple-950/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+        <div className="flex items-start gap-2.5">
+          <Star className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-purple-700 dark:text-purple-400 mb-1">
+              {isAr ? "مرحباً بك كحساب رسمي!" : "Welcome as an official account!"}
+            </p>
+            <p className="text-xs text-purple-600 dark:text-purple-500 leading-relaxed">
+              {isAr
+                ? "نفخر بانضمامك رسمياً إلى منصة نوفي. احرص على تقديم محتوى يليق بمكانتك ويحترم مجتمعنا."
+                : "We're proud to have you officially on Novii. Make sure to provide content worthy of your status and respectful of our community."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function OfficialRemovedSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <Building2 className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "لماذا تم إزالة صفة الحساب الرسمي؟" : "Why was official status removed?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "قد تتم إزالة الصفة الرسمية بسبب مخالفة شروط الحسابات الرسمية",
+                "قد يكون السبب تغيير في طبيعة الجهة أو الشخصية الممثلة",
+                "لا يزال بإمكانك استخدام حسابك بشكل طبيعي",
+                "يمكنك التواصل مع الدعم لمعرفة التفاصيل أو إعادة التقديم",
+              ] : [
+                "Official status may be removed due to a violation of official account terms",
+                "The removal may be due to a change in the represented entity or personality",
+                "You can still use your account normally",
+                "You can contact support for details or to reapply",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function BadgeAwardedSection({ isAr }: { isAr: boolean }) {
   return (
     <>
@@ -729,7 +961,8 @@ function SecuritySection({ isAr }: { isAr: boolean }) {
 function FooterLinks({ type, isAr }: { type: string; isAr: boolean }) {
   const isViolation = type === "warning" || type === "post_removed" || type === "ban";
   const isSecurity = type === "security";
-  const isBadge = type === "badge_awarded" || type === "badge_removed";
+  const isBadge = type === "badge_awarded" || type === "badge_removed" || type === "verified_granted" || type === "official_granted";
+  const isRemoval = type === "verified_removed" || type === "official_removed" || type === "badge_removed";
 
   return (
     <div className="pt-2 space-y-2">
@@ -760,7 +993,7 @@ function FooterLinks({ type, isAr }: { type: string; isAr: boolean }) {
           <ChevronRight className={cn("w-4 h-4 text-muted-foreground", isAr && "rotate-180")} />
         </Link>
       )}
-      {(isViolation || type === "badge_removed") && (
+      {(isViolation || isRemoval) && (
         <Link
           href="/help"
           className="flex items-center justify-between p-3 rounded-xl bg-background border border-border hover:bg-muted/50 transition-colors"
