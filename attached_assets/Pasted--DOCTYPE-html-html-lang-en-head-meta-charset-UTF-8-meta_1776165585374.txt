@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ditto Pro Admin - Supabase Cloud</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+<!-- Supabase JS Client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+/* --- Same Styles as Original --- */
+:root {
+  --primary-color: #2563eb;
+  --bg-color: #f1f5f9;
+  --sidebar-bg: #1e293b; 
+  --text-main: #334155;
+  --text-light: #64748b;
+  --border-color: #e2e8f0;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --nav-width: 260px;
+}
+
+* { box-sizing: border-box; outline: none; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'Noto Sans SC', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  min-height: 100vh;
+}
+
+/* Status Badges */
+.status-badge { padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.status-5 { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; } 
+.status-3 { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; } 
+.status-0 { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; } 
+
+/* Login Page */
+#login-page {
+  position: fixed; inset: 0; background: radial-gradient(circle at center, #1e293b, #0f172a);
+  z-index: 5000; display: flex; align-items: center; justify-content: center;
+}
+.login-card { background: white; width: 100%; max-width: 400px; padding: 40px; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; }
+.login-form-group { text-align: left; margin-bottom: 20px; }
+.login-form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--text-main); }
+.login-form-group input { width: 100%; padding: 12px 16px; border: 2px solid var(--border-color); border-radius: 8px; }
+#login-error { color: var(--danger); font-size: 12px; margin-bottom: 15px; display: none; }
+
+/* Admin UI */
+#admin-ui { display: none; min-height: 100vh; }
+.sidebar { width: var(--nav-width); background: var(--sidebar-bg); height: 100vh; position: fixed; left: 0; top: 0; display: flex; flex-direction: column; z-index: 1000; }
+.brand { height: 60px; display: flex; align-items: center; padding: 0 24px; background: rgba(0,0,0,0.2); color: white; font-weight: 800; font-size: 20px; }
+.brand span { color: #60a5fa; margin-left: 5px; }
+.menu { flex: 1; padding: 10px 0; overflow-y: auto; }
+.menu-item { display: flex; align-items: center; padding: 12px 24px; color: #94a3b8; text-decoration: none; font-size: 13px; font-weight: 500; cursor: pointer; }
+.menu-item:hover { background: rgba(255,255,255,0.05); color: white; }
+.cn-text { font-size: 11px; display: block; opacity: 0.7; font-weight: normal; }
+
+.main-wrapper { flex: 1; margin-left: var(--nav-width); display: flex; flex-direction: column; height: 100vh; }
+.tabs-bar { height: 45px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: flex-end; padding: 0 10px; overflow-x: hidden; gap: 4px; }
+.tab { height: 36px; padding: 0 15px; background: #e2e8f0; border: 1px solid var(--border-color); border-bottom: none; border-radius: 8px 8px 0 0; display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; color: var(--text-light); cursor: pointer; white-space: nowrap; max-width: 180px; overflow: hidden; }
+.tab.active { background: white; color: var(--primary-color); height: 40px; z-index: 2; border-bottom: 2px solid white; margin-bottom: -1px; }
+.tab .close-tab { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 12px; }
+.tab .close-tab:hover { background: rgba(0,0,0,0.1); color: var(--danger); }
+
+.search-toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; background: white; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); align-items: center; }
+.search-toolbar input { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; }
+.search-toolbar .search-main { flex: 1; min-width: 200px; }
+
+.main { flex: 1; padding: 25px; overflow-y: auto; }
+.page { display: none; }
+.page.active { display: block; }
+.card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border-color); margin-bottom: 20px; padding: 20px; }
+.table-wrapper { border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: white; margin-bottom: 20px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; }
+thead { background: #1e293b; color: white; }
+th, td { padding: 10px; border: 1px solid var(--border-color); }
+.clickable-row { cursor: pointer; transition: background 0.2s; }
+.clickable-row:hover { background: #f8fafc; color: var(--primary-color); }
+
+.btn { height: 32px; padding: 0 12px; border-radius: 6px; font-weight: 600; cursor: pointer; border: none; font-size: 11px; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; }
+.btn-primary { background: var(--primary-color); color: white; }
+.btn-outline { background: white; border: 1px solid var(--border-color); color: var(--text-main); }
+.btn-danger { background: #fee2e2; color: var(--danger); }
+.btn-sm { height: 26px; padding: 0 8px; font-size: 10px; width: auto; }
+.btn-add { background: var(--success); color: white; }
+.btn-sidebar-logout { margin: 20px; background: rgba(255,255,255,0.1); color: white; height: 36px; display: flex; }
+
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: none; align-items: center; justify-content: center; }
+.modal-content { background: white; width: 500px; border-radius: 12px; padding: 25px; max-height: 90vh; overflow-y: auto; }
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: 11px; color: var(--text-light); font-weight: 700; margin-bottom: 5px; text-transform: uppercase; }
+.form-group input, .form-group select { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; }
+
+/* Import Grid */
+.import-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.loader { border: 2px solid #f3f3f3; border-top: 2px solid var(--primary-color); border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; margin-right: 5px;}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- Login Page -->
+<div id="login-page">
+  <div class="login-card">
+    <div style="font-size: 32px; font-weight: 800; color: var(--primary-color); margin-bottom: 10px;">DITTO PRO</div>
+    <div style="font-size: 12px; color: var(--success); margin-bottom: 10px; font-weight: bold;">POWERED BY SUPABASE</div>
+    <h2>Admin Login</h2>
+    <p>Sign in with your email to access the cloud dashboard.</p>
+    
+    <div class="login-form-group">
+      <label>EMAIL</label>
+      <input type="email" id="email" placeholder="admin@example.com">
+    </div>
+    
+    <div class="login-form-group">
+      <label>PASSWORD</label>
+      <input type="password" id="password" placeholder="••••••••">
+    </div>
+    
+    <div id="login-error">Authentication Failed</div>
+    
+    <button class="btn btn-primary" style="height: 48px; font-size: 14px; width:100%" onclick="handleLogin()">
+      <span id="login-btn-text">Secure Login</span>
+    </button>
+  </div>
+</div>
+
+<!-- Admin UI -->
+<div id="admin-ui">
+  <!-- General Modal -->
+  <div id="general-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h3 id="modal-title" style="margin:0;">Add Record</h3>
+        <button style="background:none; border:none; font-size:24px; cursor:pointer;" onclick="closeModal()">&times;</button>
+      </div>
+      <div id="modal-form-container"></div>
+      <div style="margin-top:20px; display:flex; gap:8px; justify-content: flex-end;">
+        <button class="btn btn-outline" style="width:auto" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" style="width:auto" id="modal-save-btn">Save to Cloud</button>
+      </div>
+    </div>
+  </div>
+
+  <nav class="sidebar">
+    <div class="brand">DITTO<span>CLOUD</span></div>
+    <div class="menu">
+      <div class="menu-item" onclick="openTab('dashboard', 'Dashboard')">Dashboard <span class="cn-text">控制面板</span></div>
+      <div class="menu-item" onclick="openTab('import', 'Data Import')">Data Import <span class="cn-text">数据导入</span></div>
+      <div class="menu-item" onclick="openTab('agencies', 'Agencies')">Agencies <span class="cn-text">公会管理</span></div>
+      <div class="menu-item" onclick="openTab('supporters', 'Supporters')">Supporters <span class="cn-text">支持者</span></div>
+      <div class="menu-item" onclick="openTab('admins', 'Managed Admins')">Admins <span class="cn-text">管理员</span></div>
+      <div class="menu-item" onclick="openTab('users', 'User Search')">User Search <span class="cn-text">用户查询</span></div>
+    </div>
+    <div style="margin-top:auto; padding: 20px; color:rgba(255,255,255,0.3); font-size:10px; text-align:center">Database: Connected<br>Status: Online</div>
+    <button class="btn btn-sidebar-logout" onclick="handleLogout()">Logout</button>
+  </nav>
+
+  <div class="main-wrapper">
+    <div class="tabs-bar" id="tabs-container"></div>
+    <main class="main" id="pages-container">
+      
+      <!-- Dashboard -->
+      <div id="template-dashboard" class="page">
+          <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 24px;">
+              <div class="card"><h4>Agencies</h4><h2 id="cnt-agencies">...</h2></div>
+              <div class="card"><h4>Supporters</h4><h2 id="cnt-supporters">...</h2></div>
+              <div class="card"><h4>Managed Admins</h4><h2 id="cnt-admins">...</h2></div>
+              <div class="card"><h4>Query Hits</h4><h2 id="cnt-users">0</h2></div>
+          </div>
+          <div class="card"><h3>Cloud Status</h3><p>System is connected to Supabase PostgreSQL. Data is persisted securely.</p></div>
+      </div>
+
+      <!-- Import -->
+      <div id="template-import" class="page">
+          <h2 style="margin-bottom: 20px;">Batch Data Import (SQL)</h2>
+          <div class="import-grid">
+              <div class="card">
+                <h3>1. Import Admins</h3>
+                <p style="font-size:11px; color:var(--text-light); margin-bottom:10px;">ID	Phone	Role	Status</p>
+                <textarea id="admin-bulk-input" style="width:100%; height:120px;" placeholder="ID	Phone	Role	Status"></textarea>
+                <button class="btn btn-primary" style="margin-top:10px; width:100%" onclick="parseAdminBulk()">Fetch & Upload to Cloud</button>
+              </div>
+              <div class="card">
+                  <h3>2. Import Agencies</h3>
+                  <p style="font-size:11px; color:var(--text-light); margin-bottom:10px;">No.	Code	AgentID	Name	Region	Date	AdminName	AdminID</p>
+                  <textarea id="agency-input" style="width:100%; height:120px;" placeholder="Paste data..."></textarea>
+                  <button class="btn btn-primary" style="margin-top:10px; width:100%" onclick="parseData('agency')">Upload Agencies</button>
+              </div>
+              <div class="card">
+                  <h3>3. Import Supporters</h3>
+                  <p style="font-size:11px; color:var(--text-light); margin-bottom:10px;">No.	SID	App	AdminName	AdminID	Date</p>
+                  <textarea id="supporter-input" style="width:100%; height:120px;" placeholder="Paste data..."></textarea>
+                  <button class="btn btn-primary" style="margin-top:10px; width:100%" onclick="parseData('supporter')">Upload Supporters</button>
+              </div>
+          </div>
+      </div>
+
+      <!-- Agencies -->
+      <div id="template-agencies" class="page">
+          <div class="search-toolbar">
+              <input type="text" id="search-agency-text" class="search-main" placeholder="Search Cloud DB..." oninput="render('agency')">
+              <button class="btn btn-add" onclick="openAddModal('agency')">+ Add Agency</button>
+              <button class="btn btn-outline" onclick="loadAllData()">↻ Refresh DB</button>
+          </div>
+          <div class="table-wrapper">
+              <table>
+                  <thead><tr><th>Code</th><th>Agency Name</th><th>Agent ID</th><th>Region</th><th>Admin ID</th><th>Date</th><th>Actions</th></tr></thead>
+                  <tbody id="agency-body"></tbody>
+              </table>
+          </div>
+      </div>
+
+      <!-- Supporters -->
+      <div id="template-supporters" class="page">
+          <div class="search-toolbar">
+              <input type="text" id="search-supporter-text" class="search-main" placeholder="Search Cloud DB..." oninput="render('supporter')">
+              <button class="btn btn-add" onclick="openAddModal('supporter')">+ Add Supporter</button>
+              <button class="btn btn-outline" onclick="loadAllData()">↻ Refresh DB</button>
+          </div>
+          <div class="table-wrapper">
+              <table>
+                  <thead><tr><th>SID</th><th>App</th><th>Admin ID</th><th>Date</th><th width="150">Actions</th></tr></thead>
+                  <tbody id="supporter-body"></tbody>
+              </table>
+          </div>
+      </div>
+
+      <!-- Admins -->
+      <div id="template-admins" class="page">
+          <div class="search-toolbar">
+              <input type="text" id="search-admin-text" class="search-main" placeholder="Search Cloud DB..." oninput="render('admin')">
+              <button class="btn btn-add" onclick="openAddModal('admin')">+ Add Admin</button>
+              <button class="btn btn-outline" onclick="loadAllData()">↻ Refresh DB</button>
+          </div>
+          <div class="table-wrapper">
+              <table>
+                  <thead><tr><th>Profile</th><th>ID</th><th>UID</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                  <tbody id="admin-body"></tbody>
+              </table>
+          </div>
+      </div>
+
+      <!-- User Search (API) -->
+      <div id="template-users" class="page">
+          <div style="background:white; padding:20px; border-radius:12px; border:1px solid var(--border-color); margin-bottom:20px;">
+              <h3>Live User Search</h3>
+              <div style="display:flex; gap:10px;">
+                  <input type="text" id="user-ids-input" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px;" placeholder="Enter IDs (comma separated)">
+                  <button class="btn btn-primary" onclick="fetchUserInfo()">Search API</button>
+              </div>
+          </div>
+          <div class="table-wrapper">
+              <table>
+                  <thead><tr><th>#</th><th>User Profile</th><th>ID Number</th><th>System UID</th><th>Country</th></tr></thead>
+                  <tbody id="user-body"></tbody>
+              </table>
+          </div>
+      </div>
+
+      <!-- Details -->
+      <div id="template-details" class="page">
+          <div class="card">
+              <h3 id="det-main-title">Details</h3>
+              <div id="det-content" style="line-height:1.8;"></div>
+          </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// --- SUPABASE CONFIGURATION ---
+// IMPORTANT: REPLACE THESE WITH YOUR ACTUAL SUPABASE KEYS
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_KEY = 'YOUR_SUPABASE_KEY';
+
+let supabase;
+
+try {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch (e) {
+    console.error("Supabase init failed", e);
+}
+
+// --- STATE MANAGEMENT ---
+// We keep a local copy for fast rendering, but sync with DB
+let state = {
+    admins: [],
+    agencies: [],
+    supporters: []
+};
+let searchResults = [];
+let openTabs = [];
+let activeTabId = null;
+let currentModalState = { type: null, id: null, mode: 'add' }; 
+
+// --- AUTHENTICATION ---
+async function handleLogin() {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const btnText = document.getElementById('login-btn-text');
+    const errorMsg = document.getElementById('login-error');
+
+    if(!email || !password) {
+        errorMsg.innerText = "Please enter email and password";
+        errorMsg.style.display = 'block';
+        return;
+    }
+
+    btnText.innerText = "Authenticating...";
+    
+    // Check if keys are set
+    if(SUPABASE_URL.includes('YOUR_SUPABASE') || SUPABASE_KEY.includes('YOUR_SUPABASE')) {
+        alert("ERROR: Please edit the code to add your Supabase URL and Key in lines 515-516.");
+        btnText.innerText = "Config Error";
+        return;
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+    });
+
+    if (error) {
+        errorMsg.innerText = error.message;
+        errorMsg.style.display = 'block';
+        btnText.innerText = "Secure Login";
+    } else {
+        document.getElementById('login-page').style.display = 'none';
+        document.getElementById('admin-ui').style.display = 'flex';
+        // Initial Data Load
+        await loadAllData();
+        openTab('dashboard', 'Dashboard');
+    }
+}
+
+async function handleLogout() {
+    await supabase.auth.signOut();
+    location.reload();
+}
+
+// --- DATA FETCHING (SYNC) ---
+async function loadAllData() {
+    // 1. Fetch Admins
+    const { data: admins, error: err1 } = await supabase.from('managed_admins').select('*');
+    if(admins) state.admins = admins;
+
+    // 2. Fetch Agencies
+    const { data: agencies, error: err2 } = await supabase.from('agencies').select('*');
+    if(agencies) state.agencies = agencies;
+
+    // 3. Fetch Supporters
+    const { data: supporters, error: err3 } = await supabase.from('supporters').select('*');
+    if(supporters) state.supporters = supporters;
+
+    updateCounts();
+    // Re-render current tab if active
+    if(activeTabId) renderActivePage();
+}
+
+function updateCounts() {
+    document.getElementById('cnt-agencies').innerText = state.agencies.length;
+    document.getElementById('cnt-supporters').innerText = state.supporters.length;
+    document.getElementById('cnt-admins').innerText = state.admins.length;
+}
+
+// --- TABS SYSTEM (Unchanged) ---
+function openTab(id, title, type = 'main', dataId = null) {
+  let tabId = id;
+  if (id === 'details') tabId = 'view-' + dataId; 
+  const existingIndex = openTabs.findIndex(t => t.tabId === tabId);
+  if (existingIndex !== -1) {
+    activeTabId = tabId;
+  } else {
+    openTabs.push({ tabId, id, title, type, dataId });
+    activeTabId = tabId;
+  }
+  renderTabs();
+  renderActivePage();
+}
+
+function closeTab(e, tabId) {
+  if(e) e.stopPropagation();
+  const index = openTabs.findIndex(t => t.tabId === tabId);
+  if (index === -1) return;
+  openTabs.splice(index, 1);
+  if (activeTabId === tabId) {
+    activeTabId = openTabs.length > 0 ? openTabs[openTabs.length - 1].tabId : null;
+  }
+  renderTabs();
+  renderActivePage();
+}
+
+function renderTabs() {
+  document.getElementById('tabs-container').innerHTML = openTabs.map(tab => `
+    <div class="tab ${tab.tabId === activeTabId ? 'active' : ''}" onclick="openTab('${tab.id}', '${tab.title}', '${tab.type}', '${tab.dataId}')">
+      <span>${tab.title}</span>
+      <span class="close-tab" onclick="closeTab(event, '${tab.tabId}')">&times;</span>
+    </div>
+  `).join('');
+}
+
+function renderActivePage() {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  if (!activeTabId) return;
+  const currentTab = openTabs.find(t => t.tabId === activeTabId);
+  if (currentTab.id === 'details') {
+    document.getElementById('template-details').classList.add('active');
+    renderDetails(currentTab.type, currentTab.dataId);
+  } else {
+    const p = document.getElementById(`template-${currentTab.id}`);
+    if (p) p.classList.add('active');
+    if(['agencies', 'supporters', 'admins'].includes(currentTab.id)) render(currentTab.id.slice(0, -1)); // remove 's'
+    if(currentTab.id === 'users') render('user');
+  }
+}
+
+// --- RENDER LISTS ---
+function render(type) {
+  const tbody = document.getElementById(`${type}-body`);
+  if (!tbody) return;
+  
+  let data = type === 'agency' ? state.agencies : type === 'supporter' ? state.supporters : type === 'admin' ? state.admins : searchResults;
+  const searchText = (document.getElementById(`search-${type}-text`)?.value || '').toLowerCase();
+
+  // Simple Filter
+  if (searchText) {
+      data = data.filter(d => {
+          if (type === 'agency') return (d.code||'').toLowerCase().includes(searchText) || (d.name||'').toLowerCase().includes(searchText);
+          if (type === 'supporter') return (d.sid||'').toLowerCase().includes(searchText);
+          if (type === 'admin') return (d.erban_no||'').includes(searchText) || (d.nick||'').toLowerCase().includes(searchText);
+          return false;
+      });
+  }
+
+  tbody.innerHTML = data.map(d => {
+    const actions = `<div style="display:flex; gap:5px; justify-content:center">
+      <button class="btn btn-outline btn-sm" onclick="openTab('details', 'View', '${type}', '${d.id}')">View</button>
+      <button class="btn btn-primary btn-sm" onclick="openEditModal('${type}', '${d.id}')">Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteRecord('${type}', '${d.id}')">Del</button>
+    </div>`;
+
+    if (type === 'agency') return `<tr><td>${d.code}</td><td>${d.name}</td><td>${d.agent_id}</td><td>${d.region}</td><td>${d.admin_id||'-'}</td><td>${d.join_date}</td><td>${actions}</td></tr>`;
+    if (type === 'supporter') return `<tr><td>${d.sid}</td><td>${d.program}</td><td>${d.admin_id||'-'}</td><td>${d.join_date}</td><td>${actions}</td></tr>`;
+    if (type === 'admin') return `<tr><td><img src="${d.avatar_url}" style="width:24px;border-radius:4px;vertical-align:middle"> ${d.nick}</td><td>${d.erban_no}</td><td>${d.uid}</td><td>${d.role}</td><td><span class="status-badge status-${d.status}">${d.status}</span></td><td>${actions}</td></tr>`;
+    if (type === 'user') return `<tr><td>-</td><td><img src="${d.img}" style="width:24px;border-radius:50%"> ${d.nick}</td><td>${d.id}</td><td>${d.uid}</td><td>${d.country}</td></tr>`;
+    return '';
+  }).join('');
+}
+
+// --- CRUD OPERATIONS (SUPABASE) ---
+async function deleteRecord(type, id) {
+    if(!confirm('Delete this record permanently from Cloud?')) return;
+    const table = type === 'agency' ? 'agencies' : type === 'supporter' ? 'supporters' : 'managed_admins';
+    
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if(error) alert('Delete failed: ' + error.message);
+    else await loadAllData();
+}
+
+// --- IMPORT LOGIC ---
+async function parseData(type) {
+    const inputEl = document.getElementById(`${type}-input`);
+    const lines = inputEl.value.trim().split('\n');
+    const rowsToInsert = [];
+
+    lines.forEach(line => {
+        const p = line.split('\t').map(x => x.trim());
+        if(p.length < 3) return;
+        
+        if (type === 'agency') {
+            // Mapping text data to DB columns
+            rowsToInsert.push({ 
+                code: p[1], agent_id: p[2], name: p[3], region: p[4], 
+                join_date: sanitizeDate(p[5]), admin_name: p[6], admin_id: p[7] 
+            });
+        } else if (type === 'supporter') {
+            rowsToInsert.push({
+                sid: p[1], program: p[2], admin_name: p[3], 
+                admin_id: p[4], join_date: sanitizeDate(p[5])
+            });
+        }
+    });
+
+    if(rowsToInsert.length > 0) {
+        const table = type === 'agency' ? 'agencies' : 'supporters';
+        const { error } = await supabase.from(table).insert(rowsToInsert);
+        if(error) alert("Import Error: " + error.message);
+        else {
+            alert(`Successfully imported ${rowsToInsert.length} records.`);
+            inputEl.value = '';
+            loadAllData();
+        }
+    }
+}
+
+async function parseAdminBulk() {
+    const inputEl = document.getElementById('admin-bulk-input');
+    const lines = inputEl.value.trim().split('\n');
+    let insertedCount = 0;
+
+    for (let line of lines) {
+        const p = line.split('\t').map(x => x.trim());
+        if (p.length < 1) continue;
+        const erbanNo = p[0];
+        
+        // Fetch API
+        try {
+            const res = await fetch(`https://www.sayyouditto.com/pay/payermax/getInfo?no=${erbanNo}`);
+            const j = await res.json();
+            if (j.data) {
+                const { error } = await supabase.from('managed_admins').insert({
+                    erban_no: j.data.erbanNo,
+                    uid: j.data.uid,
+                    nick: j.data.nick,
+                    avatar_url: j.data.avatar,
+                    country: j.data.country || 'Global',
+                    phone: p[1]||'-',
+                    role: p[2]||'Admin',
+                    status: parseInt(p[3]||'5')
+                });
+                if(!error) insertedCount++;
+            }
+        } catch(e) { console.error(e); }
+    }
+    alert(`Uploaded ${insertedCount} admins.`);
+    inputEl.value = '';
+    loadAllData();
+}
+
+function sanitizeDate(dateStr) {
+    if(!dateStr) return null;
+    const match = dateStr.match(/(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : null;
+}
+
+// --- MODALS ---
+function openAddModal(type) {
+  currentModalState = { type, id: null, mode: 'add' };
+  document.getElementById('modal-title').innerText = `Add New ${type}`;
+  document.getElementById('modal-save-btn').onclick = saveModal;
+  
+  let h = '';
+  if (type === 'admin') h = `<div class="form-group"><label>Erban ID</label><input id="m-id"></div><div class="form-group"><label>Phone</label><input id="m-phone"></div><div class="form-group"><label>Role</label><input id="m-role" value="Admin"></div>`;
+  else if (type === 'agency') h = `<div class="form-group"><label>Name</label><input id="m-name"></div><div class="form-group"><label>Code</label><input id="m-code"></div><div class="form-group"><label>Agent ID</label><input id="m-agentid"></div><div class="form-group"><label>Region</label><input id="m-region"></div><div class="form-group"><label>Admin ID</label><input id="m-adminid"></div><div class="form-group"><label>Date</label><input type="date" id="m-date"></div>`;
+  else if (type === 'supporter') h = `<div class="form-group"><label>SID</label><input id="m-sid"></div><div class="form-group"><label>Program</label><input id="m-prog"></div><div class="form-group"><label>Admin ID</label><input id="m-adminid"></div><div class="form-group"><label>Date</label><input type="date" id="m-date"></div>`;
+  
+  document.getElementById('modal-form-container').innerHTML = h;
+  document.getElementById('general-modal').style.display = 'flex';
+}
+
+function openEditModal(type, id) {
+  currentModalState = { type, id, mode: 'edit' };
+  const d = (type === 'agency' ? state.agencies : type === 'supporter' ? state.supporters : state.admins).find(x => x.id === id);
+  if(!d) return;
+
+  document.getElementById('modal-title').innerText = `Edit ${type}`;
+  document.getElementById('modal-save-btn').onclick = saveModal;
+  
+  let h = '';
+  if (type === 'admin') h = `<div class="form-group"><label>Phone</label><input id="m-phone" value="${d.phone}"></div><div class="form-group"><label>Role</label><input id="m-role" value="${d.role}"></div><div class="form-group"><label>Status</label><select id="m-status"><option value="5">Active</option><option value="0">Blocked</option></select></div>`;
+  else if (type === 'agency') h = `<div class="form-group"><label>Name</label><input id="m-name" value="${d.name}"></div><div class="form-group"><label>Code</label><input id="m-code" value="${d.code}"></div><div class="form-group"><label>Agent ID</label><input id="m-agentid" value="${d.agent_id}"></div><div class="form-group"><label>Region</label><input id="m-region" value="${d.region}"></div><div class="form-group"><label>Admin ID</label><input id="m-adminid" value="${d.admin_id}"></div><div class="form-group"><label>Date</label><input type="date" id="m-date" value="${d.join_date}"></div>`;
+  else if (type === 'supporter') h = `<div class="form-group"><label>SID</label><input id="m-sid" value="${d.sid}"></div><div class="form-group"><label>Admin ID</label><input id="m-adminid" value="${d.admin_id}"></div><div class="form-group"><label>Date</label><input type="date" id="m-date" value="${d.join_date}"></div>`;
+  
+  document.getElementById('modal-form-container').innerHTML = h;
+  document.getElementById('general-modal').style.display = 'flex';
+}
+
+async function saveModal() {
+    const { type, id, mode } = currentModalState;
+    const btn = document.getElementById('modal-save-btn');
+    btn.innerText = "Saving...";
+
+    let payload = {};
+    const getVal = (id) => document.getElementById(id).value;
+
+    if(type === 'agency') {
+        payload = { name: getVal('m-name'), code: getVal('m-code'), agent_id: getVal('m-agentid'), region: getVal('m-region'), admin_id: getVal('m-adminid'), join_date: getVal('m-date') };
+    } else if (type === 'supporter') {
+        payload = { sid: getVal('m-sid'), program: getVal('m-prog'), admin_id: getVal('m-adminid'), join_date: getVal('m-date') };
+    } else if (type === 'admin') {
+        if(mode === 'add') {
+             // Fetch extra info first
+             try {
+                 const res = await fetch(`https://www.sayyouditto.com/pay/payermax/getInfo?no=${getVal('m-id')}`);
+                 const j = await res.json();
+                 if(!j.data) throw new Error("ID Not Found");
+                 payload = { erban_no: j.data.erbanNo, uid: j.data.uid, nick: j.data.nick, avatar_url: j.data.avatar, country: j.data.country, phone: getVal('m-phone'), role: getVal('m-role') };
+             } catch(e) { alert(e.message); btn.innerText="Save"; return; }
+        } else {
+            payload = { phone: getVal('m-phone'), role: getVal('m-role'), status: getVal('m-status') };
+        }
+    }
+
+    let error;
+    if(mode === 'add') {
+        const res = await supabase.from(type === 'agency' ? 'agencies' : type === 'supporter' ? 'supporters' : 'managed_admins').insert(payload);
+        error = res.error;
+    } else {
+        const res = await supabase.from(type === 'agency' ? 'agencies' : type === 'supporter' ? 'supporters' : 'managed_admins').update(payload).eq('id', id);
+        error = res.error;
+    }
+
+    if(error) alert(error.message);
+    else {
+        closeModal();
+        loadAllData();
+    }
+    btn.innerText = "Save to Cloud";
+}
+
+function closeModal() { document.getElementById('general-modal').style.display = 'none'; }
+
+// --- DETAILS ---
+function renderDetails(type, id) {
+    const d = (type === 'agency' ? state.agencies : type === 'supporter' ? state.supporters : state.admins).find(x => x.id === id);
+    if(!d) return;
+    document.getElementById('det-main-title').innerText = "Details View";
+    let html = '';
+    if(type === 'admin') html = `<img src="${d.avatar_url}" style="width:100px;border-radius:12px;margin-bottom:10px;"><br><b>Nick:</b> ${d.nick}<br><b>ID:</b> ${d.erban_no}<br><b>UID:</b> ${d.uid}<br><b>Role:</b> ${d.role}<br><b>Phone:</b> ${d.phone}`;
+    else if(type === 'agency') html = `<b>Agency:</b> ${d.name}<br><b>Code:</b> ${d.code}<br><b>Agent ID:</b> ${d.agent_id}<br><b>Admin ID:</b> ${d.admin_id}`;
+    else html = `<b>SID:</b> ${d.sid}<br><b>Program:</b> ${d.program}<br><b>Admin ID:</b> ${d.admin_id}`;
+    document.getElementById('det-content').innerHTML = html;
+}
+
+// --- USER API SEARCH ---
+async function fetchUserInfo() {
+  const ids = document.getElementById('user-ids-input').value.split(/[,\s]+/).filter(x=>x);
+  const tbody = document.getElementById('user-body');
+  tbody.innerHTML = '<tr><td colspan="5">Searching...</td></tr>';
+  searchResults = [];
+  
+  for (let cid of ids) {
+    try {
+      const res = await fetch(`https://www.sayyouditto.com/pay/payermax/getInfo?no=${cid}`);
+      const j = await res.json();
+      if (j.data) searchResults.push({ nick: j.data.nick, img: j.data.avatar, id: j.data.erbanNo, uid: j.data.uid, country: j.data.country || 'Global' });
+    } catch(e) {}
+  }
+  render('user');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/novii-admin/"
+title = "Novii Admin Panel"
+version = "1.0.0"
+id = "artifacts/novii-admin"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/novii-admin/" ]
+localPort = 18877
+
+[services.development]
+run = "pnpm --filter @workspace/novii-admin run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/novii-admin", "run", "build" ]
+publicDir = "artifacts/novii-admin/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18877"
+BASE_PATH = "/novii-admin/"
