@@ -298,7 +298,6 @@ export function useToggleReelLike() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reels'] });
-      queryClient.invalidateQueries({ queryKey: ['reels-infinite'] });
       queryClient.invalidateQueries({ queryKey: ['userReels'] });
     },
     onError: (error: any) => {
