@@ -105,6 +105,13 @@ function ExploreContent() {
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         alt="Reel"
                       />
+                    ) : reel.video_url ? (
+                      <video
+                        src={reel.video_url}
+                        className="w-full h-full object-cover"
+                        muted
+                        preload="metadata"
+                      />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
                         <Play className="w-10 h-10 text-primary/40" />
