@@ -103,6 +103,7 @@ export default function UserProfile() {
     queryKey: ['profile', userId],
     queryFn: () => api.getProfileById(userId),
     enabled: !!userId,
+    staleTime: 0,
   });
 
   // Fetch user posts

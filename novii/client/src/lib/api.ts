@@ -10,7 +10,6 @@ async function getCurrentUser() {
   const { data: { session } } = await supabase.auth.getSession();
   return session?.user ?? null;
 }
-import { getFromCache, saveToCache, invalidateCache, getOrFetch, CACHE_DURATIONS } from './cache-utils';
 import {
   PROFILE_COLUMNS,
   PROFILE_MINIMAL,
@@ -288,13 +287,6 @@ export const api = {
     const user = await getCurrentUser();
     if (!user) return null;
 
-    // Try cache first
-    const cacheKey = `profile_current_${user.id}`;
-    const cached = getFromCache<Profile>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select(PROFILE_COLUMNS)
@@ -304,20 +296,16 @@ export const api = {
     if (profileError) throw profileError;
     if (!profile) return null;
 
-    // Calculate counts using count-only queries (more efficient)
     const [followersResult, followingResult] = await Promise.all([
       supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', user.id),
       supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', user.id)
     ]);
 
-    const result = {
+    return {
       ...profile,
       followers_count: followersResult.count || 0,
       following_count: followingResult.count || 0,
     };
-
-    saveToCache(cacheKey, result);
-    return result;
   },
 
   // ── Shared Cloudinary upload helper ──────────────────────────────────────────
@@ -362,14 +350,6 @@ export const api = {
   },
 
   async getProfile(username: string): Promise<Profile | null> {
-    const cacheKey = `profile_${username}`;
-    
-    // Try cache first
-    const cached = getFromCache<Profile>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     const { data, error } = await supabase
       .from('profiles')
       .select(PROFILE_COLUMNS)
@@ -377,7 +357,6 @@ export const api = {
       .single();
 
     if (error) throw error;
-    if (data) saveToCache(cacheKey, data);
     return data;
   },
 
