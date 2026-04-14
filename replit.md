@@ -42,6 +42,15 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - **Admin page** (`/admin`): Dashboard (real stats), Users (CRUD), Badges, Content moderation (real posts), Admins management, Reports, Settings (persisted to DB), Activity Logs (audit trail)
 - **Migration SQL**: `novii/supabase/upgrade_admin_system.sql`
 
+### Standalone Admin Panel (`artifacts/novii-admin`)
+- **Separate frontend app** at `/novii-admin/` — completely independent from Novii platform codebase
+- **Tech**: React + Vite + Tailwind CSS + Supabase Auth, proxies API calls to Novii backend (port 5000)
+- **Design**: Ditto Pro-inspired dark sidebar, browser-style tab navigation, professional data tables with modals
+- **Pages**: Login (dark gradient), Dashboard (stats cards), Users (CRUD + ban/edit/delete), Content moderation, Admins management (add/edit/remove), Reports viewer, Platform Settings (key-value editor), Activity Logs
+- **Auth flow**: Supabase email/password login → verifies admin status via `/api/admin/check` → shows panel if admin
+- **API contract**: Frontend matches backend exactly — ban uses `{ ban: boolean, duration: "7d" }`, admins use flat `can_manage_*` fields, settings returns object map transformed to array
+- **Key files**: `artifacts/novii-admin/src/lib/admin-api.ts` (API client), `artifacts/novii-admin/src/lib/auth-context.tsx` (auth state), `artifacts/novii-admin/src/components/sidebar.tsx` (navigation)
+
 ### Security
 - **Auth Middleware**: JWT verification via `requireAuth` middleware in `novii/server/routes.ts`
 - **Admin Middleware**: `requireAdmin` + `checkPermission()` for all admin routes — server-side enforcement
