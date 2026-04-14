@@ -130,18 +130,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const authSupabase = createClient(supabaseUrl, supabaseAnonKey);
 
   // ===== TEMPORARY: Bootstrap first super admin (remove after use) =====
-  app.post("/api/bootstrap-admin", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/bootstrap-admin", async (req: Request, res: Response) => {
     try {
-      const { secret } = req.body;
+      const { secret, user_id } = req.body;
       if (secret !== 'NOVII_BOOTSTRAP_2026') {
         return res.status(403).json({ error: 'Invalid bootstrap secret' });
       }
-      const { data: existing } = await getDb(req).from('admins').select('id').limit(1);
+      if (!user_id) {
+        return res.status(400).json({ error: 'user_id required' });
+      }
+      const { data: existing } = await db.from('admins').select('id').limit(1);
       if (existing && existing.length > 0) {
         return res.status(400).json({ error: 'Admin already exists. Bootstrap disabled.' });
       }
-      const { data, error } = await getDb(req).from('admins').insert({
-        user_id: req.userId,
+      const { data, error } = await db.from('admins').insert({
+        user_id,
         role: 'super_admin',
         permissions: 'full',
         is_active: true,
