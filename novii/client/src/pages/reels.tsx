@@ -154,6 +154,8 @@ export default function Reels() {
     }
   }, []);
 
+  const userPausedRef = useRef<Set<string>>(new Set());
+
   const playActiveReel = useCallback((activeIdx: number, refs: React.MutableRefObject<{ [k: string]: HTMLVideoElement }>) => {
     const list = reelsRef.current;
     if (!list.length) return;
@@ -161,6 +163,7 @@ export default function Reels() {
       const vid = refs.current[reel.id];
       if (!vid) return;
       if (idx === activeIdx) {
+        if (userPausedRef.current.has(reel.id)) return;
         tryPlayVideo(vid);
         setPausedReels(p => { const n = new Set(p); n.delete(reel.id); return n; });
         if (isGuestRef.current && !guestPromptShown.current) {
@@ -173,6 +176,7 @@ export default function Reels() {
       } else {
         vid.pause();
         vid.currentTime = 0;
+        userPausedRef.current.delete(reel.id);
       }
     });
   }, [tryPlayVideo]);
@@ -254,11 +258,13 @@ export default function Reels() {
     const v = refs.current[id];
     if (!v) return;
     if (v.paused) {
+      userPausedRef.current.delete(id);
       v.muted = mutedRef.current;
       const p = v.play();
       if (p) p.catch(() => { v.muted = true; v.play().catch(() => {}); });
       setPausedReels(p => { const n = new Set(p); n.delete(id); return n; });
     } else {
+      userPausedRef.current.add(id);
       v.pause();
       setPausedReels(p => new Set([...Array.from(p), id]));
     }
