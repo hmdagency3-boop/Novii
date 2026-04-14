@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Flame } from "lucide-react";
-import { useLanguage } from "@/lib/language-context";
+import { useId } from "react";
 
 interface PopularBadgeProps {
   size?: "xs" | "sm" | "md" | "lg";
@@ -9,108 +8,51 @@ interface PopularBadgeProps {
 }
 
 export function PopularBadge({ size = "md", showLabel = false, iconOnly = false }: PopularBadgeProps) {
-  const { language } = useLanguage();
-  const isRTL = language.code === 'ar';
-  
+  const uid = useId();
+  const gradId = `ppg${uid}`;
+  const shineId = `pps${uid}`;
+
   const sizeClasses = {
     xs: "w-4 h-4",
     sm: "w-5 h-5",
     md: "w-6 h-6",
-    lg: "w-8 h-8"
+    lg: "w-8 h-8",
   };
 
-  const labelSizeClasses = {
-    sm: "text-xs px-2 py-0.5",
-    md: "text-sm px-2.5 py-1",
-    lg: "text-base px-3 py-1.5"
-  };
+  const badge = (
+    <div
+      className={cn("inline-flex items-center justify-center shrink-0", sizeClasses[size])}
+      title="Popular"
+    >
+      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#f43f5e" />
+            <stop offset="50%" stopColor="#e11d48" />
+            <stop offset="100%" stopColor="#be123c" />
+          </linearGradient>
+          <linearGradient id={shineId} x1="8" y1="4" x2="32" y2="36" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <circle cx="20" cy="20" r="18" fill={`url(#${gradId})`} />
+        <circle cx="20" cy="20" r="18" fill={`url(#${shineId})`} />
+        <circle cx="20" cy="20" r="16" stroke="white" strokeOpacity="0.25" strokeWidth="0.8" fill="none" />
+        <path d="M20 9c-5 6-8 10-8 14a8 8 0 0016 0c0-4-3-8-8-14z" fill="white" />
+        <path d="M20 14c0 0-2 3-2 5.5c0 1.1.9 2 2 2s2-.9 2-2C22 17 20 14 20 14z" fill={`url(#${gradId})`} fillOpacity="0.6" />
+      </svg>
+    </div>
+  );
 
-  const iconSizeClasses = {
-    xs: "w-2 h-2",
-    sm: "w-2.5 h-2.5",
-    md: "w-3 h-3",
-    lg: "w-4 h-4"
-  };
-
-  if (iconOnly) {
-    return (
-      <div 
-        className={cn(
-          "flex items-center justify-center rounded-full",
-          "bg-gradient-to-br from-red-400 via-orange-500 to-red-600",
-          "ring-2 ring-red-300/50 backdrop-blur-sm",
-          "shadow-lg shadow-red-500/40",
-          "hover:shadow-2xl hover:shadow-red-500/60",
-          "hover:scale-110 transition-all duration-300",
-          "relative overflow-hidden",
-          sizeClasses[size]
-        )}
-        title={language.code === 'ar' ? 'مشهور' : 'Popular'}
-      >
-        <div className="absolute inset-0 bg-gradient-to-t from-red-600 to-transparent opacity-0 hover:opacity-40 transition-opacity duration-300 animate-pulse" />
-        <div className="absolute inset-0 rounded-full border border-red-300/30 animate-pulse" />
-        <Flame className={cn(
-          "text-white fill-white relative z-10",
-          "drop-shadow-lg",
-          iconSizeClasses[size]
-        )} />
-      </div>
-    );
-  }
-
-  if (showLabel) {
-    return (
-      <div className={cn(
-        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full",
-        "bg-gradient-to-r from-red-500 via-orange-500 to-red-600",
-        "text-white font-bold text-xs shadow-lg shadow-red-500/40",
-        "ring-1 ring-white/20 backdrop-blur-sm",
-        "hover:shadow-xl hover:shadow-red-500/60 transition-all duration-300",
-        "hover:scale-105 cursor-default"
-      )}>
-        <div className={cn(
-          "relative flex items-center justify-center rounded-full",
-          "bg-white/20 backdrop-blur",
-          sizeClasses[size]
-        )}>
-          <Flame className={cn(
-            "text-white fill-white animate-bounce",
-            iconSizeClasses[size]
-          )} />
-        </div>
-        <span className={isRTL ? "font-arabic" : ""}>
-          {language.code === 'ar' ? 'مشهور' : 'Popular'}
-        </span>
-      </div>
-    );
-  }
+  if (iconOnly || !showLabel) return badge;
 
   return (
-    <div 
-      className={cn(
-        "flex items-center justify-center rounded-full",
-        "bg-gradient-to-br from-red-400 via-orange-500 to-red-600",
-        "ring-2 ring-red-300/50 backdrop-blur-sm",
-        "shadow-lg shadow-red-500/40",
-        "hover:shadow-2xl hover:shadow-red-500/60",
-        "hover:scale-110 transition-all duration-300",
-        "relative overflow-hidden",
-        sizeClasses[size]
-      )}
-      title={language.code === 'ar' ? 'مشهور' : 'Popular'}
-    >
-      {/* Animated fire effect */}
-      <div className="absolute inset-0 bg-gradient-to-t from-red-600 to-transparent opacity-0 hover:opacity-40 transition-opacity duration-300 animate-pulse" />
-      
-      {/* Outer glow ring */}
-      <div className="absolute inset-0 rounded-full border border-red-300/30 animate-pulse" />
-      
-      {/* Icon */}
-      <Flame className={cn(
-        "text-white fill-white relative z-10",
-        "drop-shadow-lg",
-        iconSizeClasses[size]
-      )} />
+    <div className="inline-flex items-center gap-1.5">
+      {badge}
+      <span className="text-xs font-semibold bg-gradient-to-r from-rose-500 to-red-600 bg-clip-text text-transparent">
+        Popular
+      </span>
     </div>
   );
 }

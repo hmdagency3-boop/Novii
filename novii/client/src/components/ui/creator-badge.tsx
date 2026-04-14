@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Star } from "lucide-react";
-import { useLanguage } from "@/lib/language-context";
+import { useId } from "react";
 
 interface CreatorBadgeProps {
   size?: "xs" | "sm" | "md" | "lg";
@@ -9,104 +8,50 @@ interface CreatorBadgeProps {
 }
 
 export function CreatorBadge({ size = "md", showLabel = false, iconOnly = false }: CreatorBadgeProps) {
-  const { language } = useLanguage();
-  const isRTL = language.code === 'ar';
-  
+  const uid = useId();
+  const gradId = `cg${uid}`;
+  const shineId = `cs${uid}`;
+
   const sizeClasses = {
     xs: "w-4 h-4",
     sm: "w-5 h-5",
     md: "w-6 h-6",
-    lg: "w-8 h-8"
+    lg: "w-8 h-8",
   };
 
-  const labelSizeClasses = {
-    sm: "text-xs px-2 py-0.5",
-    md: "text-sm px-2.5 py-1",
-    lg: "text-base px-3 py-1.5"
-  };
+  const badge = (
+    <div
+      className={cn("inline-flex items-center justify-center shrink-0", sizeClasses[size])}
+      title="Creator"
+    >
+      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#f97316" />
+            <stop offset="50%" stopColor="#ef4444" />
+            <stop offset="100%" stopColor="#ec4899" />
+          </linearGradient>
+          <linearGradient id={shineId} x1="10" y1="5" x2="30" y2="35" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <circle cx="20" cy="20" r="18" fill={`url(#${gradId})`} />
+        <circle cx="20" cy="20" r="18" fill={`url(#${shineId})`} />
+        <circle cx="20" cy="20" r="16" stroke="white" strokeOpacity="0.25" strokeWidth="0.8" fill="none" />
+        <path d="M20 10l2.94 5.96 6.58.96-4.76 4.64 1.12 6.56L20 24.84l-5.88 3.28 1.12-6.56-4.76-4.64 6.58-.96L20 10z" fill="white" />
+      </svg>
+    </div>
+  );
 
-  const iconSizeClasses = {
-    xs: "w-2 h-2",
-    sm: "w-2.5 h-2.5",
-    md: "w-3 h-3",
-    lg: "w-4 h-4"
-  };
-
-  if (iconOnly) {
-    return (
-      <div 
-        className={cn(
-          "flex items-center justify-center rounded-full",
-          "bg-gradient-to-br from-orange-300 via-red-500 to-pink-600",
-          "ring-2 ring-orange-300/50 backdrop-blur-sm",
-          "shadow-lg shadow-orange-500/40",
-          "hover:shadow-2xl hover:shadow-orange-500/60",
-          "hover:scale-110 transition-all duration-300",
-          "relative overflow-hidden",
-          sizeClasses[size]
-        )}
-        title={language.code === 'ar' ? 'منشئ محتوى' : 'Creator'}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-pink-400 opacity-0 hover:opacity-20 transition-opacity duration-300 animate-pulse" />
-        <Star className={cn(
-          "text-white fill-white relative z-10 animate-bounce",
-          "transition-transform duration-300 hover:rotate-12",
-          iconSizeClasses[size]
-        )} />
-      </div>
-    );
-  }
-
-  if (showLabel) {
-    return (
-      <div className={cn(
-        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full",
-        "bg-gradient-to-r from-orange-400 via-red-500 to-pink-500",
-        "text-white font-bold text-xs shadow-lg shadow-orange-500/40",
-        "ring-1 ring-white/20 backdrop-blur-sm",
-        "hover:shadow-xl hover:shadow-orange-500/60 transition-all duration-300",
-        "hover:scale-105 cursor-default"
-      )}>
-        <div className={cn(
-          "relative flex items-center justify-center rounded-full",
-          "bg-white/20 backdrop-blur",
-          sizeClasses[size]
-        )}>
-          <Star className={cn(
-            "text-white fill-white animate-pulse",
-            iconSizeClasses[size]
-          )} />
-        </div>
-        <span className={isRTL ? "font-arabic" : ""}>
-          {language.code === 'ar' ? 'منشئ محتوى' : 'Creator'}
-        </span>
-      </div>
-    );
-  }
+  if (iconOnly || !showLabel) return badge;
 
   return (
-    <div 
-      className={cn(
-        "flex items-center justify-center rounded-full",
-        "bg-gradient-to-br from-orange-300 via-red-500 to-pink-600",
-        "ring-2 ring-orange-300/50 backdrop-blur-sm",
-        "shadow-lg shadow-orange-500/40",
-        "hover:shadow-2xl hover:shadow-orange-500/60",
-        "hover:scale-110 transition-all duration-300",
-        "relative overflow-hidden",
-        sizeClasses[size]
-      )}
-      title={language.code === 'ar' ? 'منشئ محتوى' : 'Creator'}
-    >
-      {/* Animated background glow */}
-      <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-pink-400 opacity-0 hover:opacity-20 transition-opacity duration-300 animate-pulse" />
-      
-      {/* Icon */}
-      <Star className={cn(
-        "text-white fill-white relative z-10 animate-bounce",
-        "transition-transform duration-300 hover:rotate-12",
-        iconSizeClasses[size]
-      )} />
+    <div className="inline-flex items-center gap-1.5">
+      {badge}
+      <span className="text-xs font-semibold bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 bg-clip-text text-transparent">
+        Creator
+      </span>
     </div>
   );
 }
