@@ -2,7 +2,7 @@ import Layout from "@/components/layout";
 import {
   Heart, MessageCircle, UserPlus, Loader2, Bell,
   CheckCheck, RefreshCw, Check, X, AtSign, Film,
-  BookmarkIcon, Repeat2, AlertTriangle, Trash2, ShieldBan, ShieldCheck, Shield, ChevronRight
+  BookmarkIcon, Repeat2, AlertTriangle, Trash2, ShieldBan, ShieldCheck, Shield, ChevronRight, Award, XCircle
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { useSettings } from "@/lib/settings-context";
 
 type FilterType = 'all' | 'like' | 'comment' | 'follow' | 'follow_request' | 'mention' | 'moderation';
 
-const MODERATION_TYPES = ['warning', 'post_removed', 'post_restored', 'ban', 'unban', 'security', 'report_resolved'];
+const MODERATION_TYPES = ['warning', 'post_removed', 'post_restored', 'ban', 'unban', 'security', 'report_resolved', 'badge_awarded', 'badge_removed'];
 
 const FILTERS: { key: FilterType; labelAr: string; labelEn: string; icon: React.ReactNode; color: string }[] = [
   { key: 'all',            labelAr: 'الكل',       labelEn: 'All',      icon: <Bell className="w-3.5 h-3.5" />,          color: 'bg-foreground text-background' },
@@ -258,6 +258,8 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
     post_restored:   { icon: <ShieldCheck className="w-3 h-3 text-white" />,                bg: 'bg-green-600' },
     security:        { icon: <Shield className="w-3 h-3 text-white" />,                     bg: 'bg-slate-600' },
     report_resolved: { icon: <Shield className="w-3 h-3 text-white" />,                     bg: 'bg-blue-600' },
+    badge_awarded:   { icon: <Award className="w-3 h-3 text-white" />,                      bg: 'bg-yellow-500' },
+    badge_removed:   { icon: <XCircle className="w-3 h-3 text-white" />,                    bg: 'bg-gray-500' },
   };
   const iconInfo = iconMap[notif.type] || { icon: <Bell className="w-3 h-3 text-white" />, bg: 'bg-primary' };
   const isModeration = MODERATION_TYPES.includes(notif.type);
@@ -280,6 +282,8 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
       case 'unban':          return notif.content || (isAr ? 'تم رفع التقييد عن حسابك.' : 'Your account restriction has been lifted.');
       case 'security':        return notif.content || (isAr ? 'إشعار أمني.' : 'Security notification.');
       case 'report_resolved': return notif.content || (isAr ? 'تم اتخاذ إجراء بخصوص بلاغك. شكراً لمساهمتك.' : 'Action was taken on your report. Thank you for your contribution.');
+      case 'badge_awarded':   return notif.content || (isAr ? 'تم منحك شارة جديدة!' : 'You received a new badge!');
+      case 'badge_removed':   return notif.content || (isAr ? 'تم إزالة شارة من حسابك.' : 'A badge was removed from your account.');
       default:               return notif.content || '';
     }
   };
@@ -326,6 +330,8 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
             {notif.type === 'unban' && <ShieldCheck className="w-5 h-5 text-white" />}
             {notif.type === 'security' && <Shield className="w-5 h-5 text-white" />}
             {notif.type === 'report_resolved' && <Shield className="w-5 h-5 text-white" />}
+            {notif.type === 'badge_awarded' && <Award className="w-5 h-5 text-white" />}
+            {notif.type === 'badge_removed' && <XCircle className="w-5 h-5 text-white" />}
           </div>
         </div>
       ) : (

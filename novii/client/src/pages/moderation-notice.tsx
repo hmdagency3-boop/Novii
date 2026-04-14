@@ -9,7 +9,7 @@ import { ar } from "date-fns/locale";
 import {
   AlertTriangle, Trash2, ShieldBan, ShieldCheck, Shield,
   ArrowLeft, ArrowRight, Clock, Info, ChevronRight,
-  Smartphone, Lock, CheckCircle2, FileText, Heart
+  Smartphone, Lock, CheckCircle2, FileText, Heart, Award, XCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -126,6 +126,34 @@ export default function ModerationNotice() {
           severityEn: "Report",
           severityColor: "text-blue-600 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400",
         };
+      case "badge_awarded":
+        return {
+          icon: <Award className="w-8 h-8 text-white" />,
+          bg: "bg-yellow-500",
+          bgLight: "bg-yellow-50 dark:bg-yellow-950/30",
+          border: "border-yellow-200 dark:border-yellow-800",
+          titleAr: "تم منحك شارة جديدة!",
+          titleEn: "You Received a New Badge!",
+          subtitleAr: "تهانينا! تم تقدير مساهمتك في مجتمع نوفي",
+          subtitleEn: "Congratulations! Your contribution to the Novii community has been recognized",
+          severityAr: "شارة",
+          severityEn: "Badge",
+          severityColor: "text-yellow-600 bg-yellow-100 dark:bg-yellow-900/40 dark:text-yellow-400",
+        };
+      case "badge_removed":
+        return {
+          icon: <XCircle className="w-8 h-8 text-white" />,
+          bg: "bg-gray-500",
+          bgLight: "bg-gray-50 dark:bg-gray-950/30",
+          border: "border-gray-200 dark:border-gray-800",
+          titleAr: "تم إزالة شارة من حسابك",
+          titleEn: "A Badge Was Removed",
+          subtitleAr: "تم تحديث شارات حسابك من قبل الإدارة",
+          subtitleEn: "Your account badges were updated by administration",
+          severityAr: "تحديث",
+          severityEn: "Update",
+          severityColor: "text-gray-600 bg-gray-100 dark:bg-gray-900/40 dark:text-gray-400",
+        };
       case "security":
         return {
           icon: <Smartphone className="w-8 h-8 text-white" />,
@@ -241,6 +269,8 @@ export default function ModerationNotice() {
             {type === "ban" && <BanSection isAr={isAr} />}
             {type === "unban" && <UnbanSection isAr={isAr} />}
             {type === "report_resolved" && <ReportResolvedSection isAr={isAr} />}
+            {type === "badge_awarded" && <BadgeAwardedSection isAr={isAr} />}
+            {type === "badge_removed" && <BadgeRemovedSection isAr={isAr} />}
             {type === "security" && <SecuritySection isAr={isAr} />}
 
             <FooterLinks type={type} isAr={isAr} />
@@ -547,6 +577,104 @@ function ReportResolvedSection({ isAr }: { isAr: boolean }) {
   );
 }
 
+function BadgeAwardedSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <Award className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "ماذا تعني الشارة؟" : "What does a badge mean?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "الشارات تعكس مكانتك ومساهمتك في مجتمع نوفي",
+                "تظهر الشارة بجانب اسمك في ملفك الشخصي والمنشورات",
+                "الشارات تمنح من قبل إدارة نوفي تقديراً لنشاطك",
+              ] : [
+                "Badges reflect your status and contribution to the Novii community",
+                "The badge appears next to your name on your profile and posts",
+                "Badges are granted by Novii administration in recognition of your activity",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-xl p-4 border border-yellow-200 dark:border-yellow-800">
+        <div className="flex items-start gap-2.5">
+          <Heart className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400 mb-1">
+              {isAr ? "تهانينا!" : "Congratulations!"}
+            </p>
+            <p className="text-xs text-yellow-600 dark:text-yellow-500 leading-relaxed">
+              {isAr
+                ? "استمر في مساهمتك الإيجابية في المجتمع. يمكنك رؤية جميع شاراتك في ملفك الشخصي."
+                : "Keep up your positive contribution to the community. You can see all your badges on your profile."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function BadgeRemovedSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <XCircle className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "لماذا تم إزالة الشارة؟" : "Why was the badge removed?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "قد تتم إزالة الشارات بسبب تحديث معايير المنح",
+                "قد يكون السبب مخالفة شروط الحصول على الشارة",
+                "لا يؤثر ذلك على حسابك أو محتواك",
+              ] : [
+                "Badges may be removed due to updated eligibility criteria",
+                "The removal may be due to a violation of badge terms",
+                "This does not affect your account or content",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-gray-100 dark:bg-gray-800/30 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+        <div className="flex items-start gap-2.5">
+          <Info className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              {isAr ? "هل لديك استفسار؟" : "Have a question?"}
+            </p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+              {isAr
+                ? "إذا كنت تعتقد أن هذا القرار غير صحيح، يمكنك التواصل مع فريق الدعم من خلال مركز المساعدة."
+                : "If you believe this decision was incorrect, you can contact our support team through the Help Center."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function SecuritySection({ isAr }: { isAr: boolean }) {
   return (
     <>
@@ -601,6 +729,7 @@ function SecuritySection({ isAr }: { isAr: boolean }) {
 function FooterLinks({ type, isAr }: { type: string; isAr: boolean }) {
   const isViolation = type === "warning" || type === "post_removed" || type === "ban";
   const isSecurity = type === "security";
+  const isBadge = type === "badge_awarded" || type === "badge_removed";
 
   return (
     <div className="pt-2 space-y-2">
@@ -622,7 +751,16 @@ function FooterLinks({ type, isAr }: { type: string; isAr: boolean }) {
           <ChevronRight className={cn("w-4 h-4 text-muted-foreground", isAr && "rotate-180")} />
         </Link>
       )}
-      {(isViolation || type === "ban") && (
+      {isBadge && (
+        <Link
+          href="/profile"
+          className="flex items-center justify-between p-3 rounded-xl bg-background border border-border hover:bg-muted/50 transition-colors"
+        >
+          <span className="text-sm font-medium">{isAr ? "ملفي الشخصي" : "My Profile"}</span>
+          <ChevronRight className={cn("w-4 h-4 text-muted-foreground", isAr && "rotate-180")} />
+        </Link>
+      )}
+      {(isViolation || type === "badge_removed") && (
         <Link
           href="/help"
           className="flex items-center justify-between p-3 rounded-xl bg-background border border-border hover:bg-muted/50 transition-colors"

@@ -2358,6 +2358,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('🔧 Admin edit user:', userId, JSON.stringify(updatePayload));
 
+      const badgeFields: Record<string, string> = {
+        is_verified: 'شارة التوثيق ✓',
+        is_official: 'شارة الحساب الرسمي',
+        is_creator: 'شارة صانع المحتوى',
+        is_premium: 'شارة العضوية المميزة',
+        is_popular: 'شارة الشعبية',
+        is_gold_early_member: 'ميدالية العضو المبكر الذهبي 🥇',
+        is_silver_early_member: 'ميدالية العضو المبكر الفضي 🥈',
+        is_bronze_early_member: 'ميدالية العضو المبكر البرونزي 🥉',
+        is_beta_tester: 'شارة مختبر بيتا',
+        is_bug_hunter: 'شارة صائد الأخطاء',
+      };
+
+      const { data: oldProfile } = await adminDb
+        .from('profiles')
+        .select(Object.keys(badgeFields).join(', '))
+        .eq('id', userId)
+        .single();
+
       const { data, error, count } = await adminDb
         .from('profiles')
         .update(updatePayload)
@@ -2370,6 +2389,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!data || data.length === 0) {
         return res.status(404).json({ error: 'User not found or update failed' });
+      }
+
+      if (oldProfile) {
+        const newlyGranted: string[] = [];
+        const newlyRevoked: string[] = [];
+        for (const [field, label] of Object.entries(badgeFields)) {
+          const wasActive = oldProfile[field] === true;
+          const isNowActive = updatePayload[field];
+          if (isNowActive === undefined) continue;
+          if (!wasActive && isNowActive === true) newlyGranted.push(label);
+          if (wasActive && isNowActive === false) newlyRevoked.push(label);
+        }
+
+        if (newlyGranted.length > 0) {
+          const badgeList = newlyGranted.join('، ');
+          const { error: notifErr } = await adminDb.from('notifications').insert({
+            user_id: userId,
+            type: 'badge_awarded',
+            content: `تهانينا! تم منحك ${badgeList}`,
+          });
+          if (notifErr) console.error('⚠️ Failed to send badge_awarded notification:', notifErr);
+        }
+
+        if (newlyRevoked.length > 0) {
+          const badgeList = newlyRevoked.join('، ');
+          const { error: notifErr } = await adminDb.from('notifications').insert({
+            user_id: userId,
+            type: 'badge_removed',
+            content: `تم إزالة ${badgeList} من حسابك`,
+          });
+          if (notifErr) console.error('⚠️ Failed to send badge_removed notification:', notifErr);
+        }
       }
 
       await logAdminAction(req, 'edit_user', 'user', userId, JSON.stringify(req.body));
