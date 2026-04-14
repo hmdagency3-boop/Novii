@@ -11,6 +11,11 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const db = supabase;
 
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+export const adminDb = supabaseServiceKey
+  ? createClient(supabaseUrl!, supabaseServiceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  : supabase;
+
 export function getUserDb(accessToken: string) {
   return createClient(supabaseUrl!, supabaseAnonKey!, {
     global: {
