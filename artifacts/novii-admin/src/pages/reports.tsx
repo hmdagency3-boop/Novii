@@ -3,7 +3,7 @@ import { fetchReports, updateReport, deleteContent, banUser, type ReportRecord }
 import {
   Flag, RefreshCw, Eye, XCircle, Clock, AlertTriangle, User, CheckCircle, Ban,
   MessageSquare, Image, Trash2, Search, Shield, ExternalLink, ChevronDown,
-  BarChart3, Filter, ArrowUpDown, Hash
+  BarChart3, Filter, ArrowUpDown, Hash, AlertOctagon, EyeOff, Unlock
 } from "lucide-react";
 
 const REASON_LABELS: Record<string, string> = {
@@ -40,8 +40,12 @@ export default function ReportsPage() {
   const [reasonFilter, setReasonFilter] = useState<string>("all");
   const [adminNote, setAdminNote] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [quickUpdatingId, setQuickUpdatingId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showBanConfirm, setShowBanConfirm] = useState(false);
+  const [showUnbanConfirm, setShowUnbanConfirm] = useState(false);
+  const [showWarnConfirm, setShowWarnConfirm] = useState(false);
+  const [warnMessage, setWarnMessage] = useState("");
   const [banReason, setBanReason] = useState("");
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
@@ -144,6 +148,53 @@ export default function ReportsPage() {
       console.error(err);
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleUnbanUser = async () => {
+    if (!viewReport?.reported_user_id) return;
+    setUpdating(true);
+    try {
+      await banUser(viewReport.reported_user_id, { ban: false });
+      await updateReport(viewReport.id, { status: "resolved", admin_note: (adminNote.trim() ? adminNote.trim() + " — " : "") + "تم رفع الحظر عن المستخدم" });
+      setActionSuccess("تم رفع الحظر بنجاح");
+      setShowUnbanConfirm(false);
+      setTimeout(() => { setActionSuccess(null); setViewReport(null); setAdminNote(""); }, 1500);
+      loadReports();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleWarnUser = async () => {
+    if (!viewReport) return;
+    setUpdating(true);
+    try {
+      const note = (adminNote.trim() ? adminNote.trim() + " — " : "") + "⚠️ تحذير للمستخدم: " + (warnMessage || "مخالفة سياسة الاستخدام");
+      await updateReport(viewReport.id, { status: "resolved", admin_note: note });
+      setActionSuccess("تم إرسال التحذير وإغلاق البلاغ");
+      setShowWarnConfirm(false);
+      setWarnMessage("");
+      setTimeout(() => { setActionSuccess(null); setViewReport(null); setAdminNote(""); }, 1500);
+      loadReports();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleQuickAction = async (reportId: string, status: "resolved" | "dismissed") => {
+    setQuickUpdatingId(reportId);
+    try {
+      await updateReport(reportId, { status });
+      loadReports();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setQuickUpdatingId(null);
     }
   };
 
@@ -304,13 +355,36 @@ export default function ReportsPage() {
                         <div className="text-[10px] text-gray-300">{new Date(report.created_at).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}</div>
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-center">
-                      <button
-                        onClick={() => { setViewReport(report); setAdminNote(report.admin_note || ""); setShowDeleteConfirm(false); setShowBanConfirm(false); setActionSuccess(null); }}
-                        className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center justify-center gap-1">
+                        {report.status === "pending" ? (
+                          <>
+                            <button
+                              title="معالجة سريعة"
+                              onClick={() => handleQuickAction(report.id, "resolved")}
+                              disabled={quickUpdatingId === report.id}
+                              className="p-1.5 rounded-lg hover:bg-green-100 text-green-500 hover:text-green-700 transition-colors disabled:opacity-40"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </button>
+                            <button
+                              title="رفض سريع"
+                              onClick={() => handleQuickAction(report.id, "dismissed")}
+                              disabled={quickUpdatingId === report.id}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40"
+                            >
+                              <Ban className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : null}
+                        <button
+                          title="عرض التفاصيل وإجراءات إضافية"
+                          onClick={() => { setViewReport(report); setAdminNote(report.admin_note || ""); setShowDeleteConfirm(false); setShowBanConfirm(false); setShowUnbanConfirm(false); setShowWarnConfirm(false); setActionSuccess(null); }}
+                          className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-400 hover:text-blue-600 transition-colors"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -451,7 +525,7 @@ export default function ReportsPage() {
                     />
                   </div>
 
-                  {!showDeleteConfirm && !showBanConfirm && (
+                  {!showDeleteConfirm && !showBanConfirm && !showUnbanConfirm && !showWarnConfirm && (
                     <>
                       <div className="grid grid-cols-2 gap-2">
                         <button
@@ -469,6 +543,23 @@ export default function ReportsPage() {
                         >
                           <Ban className="w-4 h-4" />
                           رفض البلاغ
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setShowWarnConfirm(true)}
+                          className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 text-sm font-medium transition-colors border border-amber-200"
+                        >
+                          <AlertOctagon className="w-4 h-4" />
+                          تحذير المستخدم
+                        </button>
+                        <button
+                          onClick={() => setShowUnbanConfirm(true)}
+                          className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-medium transition-colors border border-blue-200"
+                        >
+                          <Unlock className="w-4 h-4" />
+                          رفع الحظر
                         </button>
                       </div>
 
@@ -540,6 +631,62 @@ export default function ReportsPage() {
                         </button>
                         <button
                           onClick={() => { setShowBanConfirm(false); setBanReason(""); }}
+                          className="flex-1 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium"
+                        >
+                          إلغاء
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {showUnbanConfirm && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Unlock className="w-5 h-5 text-blue-500" />
+                        <p className="text-sm font-bold text-blue-700">تأكيد رفع الحظر عن: {viewReport.reported_username}</p>
+                      </div>
+                      <p className="text-xs text-blue-600">سيتم رفع الحظر عن المستخدم وإغلاق البلاغ كـ "تمت المعالجة".</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleUnbanUser}
+                          disabled={updating}
+                          className="flex-1 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
+                        >
+                          {updating ? "جاري رفع الحظر..." : "تأكيد رفع الحظر"}
+                        </button>
+                        <button
+                          onClick={() => setShowUnbanConfirm(false)}
+                          className="flex-1 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium"
+                        >
+                          إلغاء
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {showWarnConfirm && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <AlertOctagon className="w-5 h-5 text-amber-500" />
+                        <p className="text-sm font-bold text-amber-700">تحذير المستخدم: {viewReport.reported_username}</p>
+                      </div>
+                      <input
+                        value={warnMessage}
+                        onChange={(e) => setWarnMessage(e.target.value)}
+                        placeholder="سبب التحذير... (اختياري)"
+                        className="w-full px-3 py-2 rounded-lg border border-amber-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 bg-white"
+                      />
+                      <p className="text-[11px] text-amber-600">سيتم تسجيل التحذير في ملاحظة البلاغ وإغلاقه كـ "تمت المعالجة".</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleWarnUser}
+                          disabled={updating}
+                          className="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium disabled:opacity-50"
+                        >
+                          {updating ? "جاري الإرسال..." : "تأكيد التحذير"}
+                        </button>
+                        <button
+                          onClick={() => { setShowWarnConfirm(false); setWarnMessage(""); }}
                           className="flex-1 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium"
                         >
                           إلغاء
