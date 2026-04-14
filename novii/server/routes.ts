@@ -2158,7 +2158,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      res.json(users || []);
+      const mapped = (users || []).map((u: any) => ({
+        ...u,
+        display_name: u.full_name || u.display_name || u.username || null,
+        ban_reason: u.banned_reason || u.ban_reason || null,
+      }));
+      res.json(mapped);
     } catch (error) {
       console.error('Admin users error:', error);
       res.status(500).json({ error: 'Failed to fetch users' });
@@ -2272,10 +2277,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { data, error } = await adminDb
         .from('admins')
-        .select('*');
+        .select('*, profiles!admins_user_id_fkey(username, full_name, avatar_url)');
 
-      if (error) throw error;
-      res.json(data || []);
+      if (error) {
+        const { data: fallback, error: fallbackErr } = await adminDb
+          .from('admins')
+          .select('*');
+        if (fallbackErr) throw fallbackErr;
+
+        const adminList = fallback || [];
+        const userIds = adminList.map((a: any) => a.user_id);
+        const { data: profiles } = await adminDb
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .in('id', userIds);
+
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+        const enriched = adminList.map((a: any) => {
+          const p = profileMap.get(a.user_id);
+          return { ...a, username: p?.username || null, display_name: p?.full_name || null, avatar_url: p?.avatar_url || null };
+        });
+        return res.json(enriched);
+      }
+
+      const flat = (data || []).map((a: any) => ({
+        ...a,
+        username: a.profiles?.username || null,
+        display_name: a.profiles?.full_name || null,
+        avatar_url: a.profiles?.avatar_url || null,
+        profiles: undefined,
+      }));
+      res.json(flat);
     } catch (error) {
       console.error('Admin list error:', error);
       res.status(500).json({ error: 'Failed to fetch admins' });
@@ -2374,8 +2406,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
-      res.json(posts || []);
+      if (error) {
+        const { data: fallbackPosts, error: fallbackErr } = await adminDb
+          .from('posts')
+          .select('*')
+          .eq('is_deleted', false)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (fallbackErr) throw fallbackErr;
+
+        const userIds = [...new Set((fallbackPosts || []).map((p: any) => p.user_id))];
+        const { data: profiles } = await adminDb
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .in('id', userIds);
+
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+        const enriched = (fallbackPosts || []).map((p: any) => {
+          const prof = profileMap.get(p.user_id);
+          return { ...p, username: prof?.username || null, display_name: prof?.full_name || null, avatar_url: prof?.avatar_url || p.avatar_url || null };
+        });
+        return res.json(enriched);
+      }
+
+      const flat = (posts || []).map((p: any) => ({
+        ...p,
+        username: p.profiles?.username || null,
+        display_name: p.profiles?.full_name || null,
+        avatar_url: p.profiles?.avatar_url || p.avatar_url || null,
+        profiles: undefined,
+      }));
+      res.json(flat);
     } catch (error) {
       console.error('Admin content error:', error);
       res.status(500).json({ error: 'Failed to fetch content' });
@@ -2437,9 +2498,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (error.code === '42P01') {
           return res.json([]);
         }
-        throw error;
+        const { data: fallbackLogs, error: fallbackErr } = await adminDb
+          .from('admin_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (fallbackErr) throw fallbackErr;
+        return res.json(fallbackLogs || []);
       }
-      res.json(logs || []);
+      const flat = (logs || []).map((l: any) => ({
+        ...l,
+        admin_username: l.profiles?.username || null,
+        profiles: undefined,
+      }));
+      res.json(flat);
     } catch (error) {
       console.error('Admin logs error:', error);
       res.json([]);
