@@ -2458,7 +2458,7 @@ export const api = {
     const sessionToken = sessionStorage.getItem('novii_device_session');
     if (!sessionToken) return;
     try {
-      const response = await fetch('/api/devices/heartbeat', {
+      const response = await communityFetch('/api/devices/heartbeat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionToken }),

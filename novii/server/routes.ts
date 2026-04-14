@@ -345,7 +345,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('📱 Device fingerprint:', fingerprint, 'for user:', userId);
 
-      const { data: existing, error: findErr } = await db
+      const userDb = getDb(req);
+
+      const { data: existing, error: findErr } = await userDb
         .from('user_devices')
         .select('*')
         .eq('user_id', userId)
@@ -356,7 +358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!findErr && existing) {
         console.log('🔄 Existing device found, updating...');
-        const { data: updated, error: upErr } = await db
+        const { data: updated, error: upErr } = await userDb
           .from('user_devices')
           .update({
             ip_address: ipAddress,
@@ -383,14 +385,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ ...formatDeviceResponse(updated, true), isNewDevice: false, sessionToken });
       }
 
-      const { count: deviceCount } = await db
+      const { count: deviceCount } = await userDb
         .from('user_devices')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
         .eq('status', 'active');
 
       if ((deviceCount || 0) >= MAX_DEVICES_PER_USER) {
-        const { data: oldest } = await db
+        const { data: oldest } = await userDb
           .from('user_devices')
           .select('id')
           .eq('user_id', userId)
@@ -401,13 +403,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .single();
 
         if (oldest) {
-          await db.from('user_devices').update({ status: 'revoked' }).eq('id', oldest.id);
+          await userDb.from('user_devices').update({ status: 'revoked' }).eq('id', oldest.id);
           console.log('🗑️ Removed oldest untrusted device to make room');
         }
       }
 
       console.log('🆕 New device, inserting...');
-      const { data: inserted, error: insertError } = await db
+      const { data: inserted, error: insertError } = await userDb
         .from('user_devices')
         .insert({
           user_id: userId,
@@ -439,7 +441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (insertError) throw insertError;
 
       try {
-        await db.from('notifications').insert({
+        await userDb.from('notifications').insert({
           user_id: userId,
           type: 'security',
           content: `تسجيل دخول من جهاز جديد: ${deviceInfo.deviceName} (${deviceInfo.browser}) - ${geoLocation.city}, ${geoLocation.country}`,
@@ -457,8 +459,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/devices/user/:userId", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.params.userId;
+      const userDb = getDb(req);
 
-      const { data, error } = await db
+      const { data, error } = await userDb
         .from('user_devices')
         .select('*')
         .eq('user_id', userId)
@@ -478,11 +481,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { deviceId } = req.params;
       const userId = req.userId;
-      const { data: device } = await db.from('user_devices').select('user_id').eq('id', deviceId).maybeSingle();
+      const userDb = getDb(req);
+      const { data: device } = await userDb.from('user_devices').select('user_id').eq('id', deviceId).maybeSingle();
       if (!device || device.user_id !== userId) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      await db.from('user_devices').update({ status: 'revoked', session_token: null }).eq('id', deviceId);
+      await userDb.from('user_devices').update({ status: 'revoked', session_token: null }).eq('id', deviceId);
       res.json({ success: true });
     } catch (error) {
       console.error("Delete device error:", error);
@@ -495,11 +499,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { deviceId } = req.params;
       const userId = req.userId;
       const { trusted } = req.body;
-      const { data: existing } = await db.from('user_devices').select('user_id').eq('id', deviceId).maybeSingle();
+      const userDb = getDb(req);
+      const { data: existing } = await userDb.from('user_devices').select('user_id').eq('id', deviceId).maybeSingle();
       if (!existing || existing.user_id !== userId) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      const { data, error } = await db
+      const { data, error } = await userDb
         .from('user_devices')
         .update({ is_trusted: trusted !== false, updated_at: new Date().toISOString() })
         .eq('id', deviceId)
@@ -518,7 +523,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.userId;
       const { exceptDeviceId } = req.body;
 
-      let query = db
+      const userDb = getDb(req);
+      let query = userDb
         .from('user_devices')
         .update({ status: 'revoked', session_token: null, updated_at: new Date().toISOString() })
         .eq('user_id', userId)
@@ -542,7 +548,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionToken) return res.status(400).json({ error: "sessionToken required" });
 
       const ipAddress = getClientIp(req);
-      const { data, error } = await db
+      const userDb = getDb(req);
+      const { data, error } = await userDb
         .from('user_devices')
         .update({ last_active_at: new Date().toISOString(), ip_address: ipAddress })
         .eq('session_token', sessionToken)

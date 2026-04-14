@@ -851,9 +851,9 @@ CREATE INDEX IF NOT EXISTS idx_posts_not_deleted    ON posts(user_id, created_at
 CREATE INDEX IF NOT EXISTS idx_comments_not_deleted ON comments(post_id)                  WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_reels_not_deleted    ON reels(user_id, created_at DESC)    WHERE is_deleted = FALSE;
 
--- User Devices fingerprint
-CREATE UNIQUE INDEX IF NOT EXISTS idx_user_devices_fingerprint
-  ON user_devices(device_fingerprint) WHERE device_fingerprint IS NOT NULL;
+-- User Devices fingerprint (unique per user, not globally)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_devices_user_fingerprint
+  ON user_devices(user_id, device_fingerprint) WHERE device_fingerprint IS NOT NULL AND status = 'active';
 
 -- Hashtags
 CREATE INDEX IF NOT EXISTS idx_hashtags_name           ON hashtags(name);
