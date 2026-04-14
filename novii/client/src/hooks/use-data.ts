@@ -89,6 +89,13 @@ export function useExplorePosts(limit = 30) {
   });
 }
 
+export function useExploreReels(limit = 20) {
+  return useQuery({
+    queryKey: ['explore-reels', limit],
+    queryFn: () => api.getExploreReels(limit),
+  });
+}
+
 export function useUserPosts(userId: string) {
   return useQuery({
     queryKey: ['posts', 'user', userId],

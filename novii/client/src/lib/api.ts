@@ -580,6 +580,18 @@ export const api = {
     return posts as unknown as Post[];
   },
 
+  async getExploreReels(limit = 20): Promise<Reel[]> {
+    const { data, error } = await supabase
+      .from('reels')
+      .select(REEL_WITH_PROFILE)
+      .eq('is_deleted', false)
+      .order('likes_count', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return (data || []) as unknown as Reel[];
+  },
+
   async getUserPosts(userId: string): Promise<Post[]> {
     const user = await getCurrentUser();
 
