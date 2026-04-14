@@ -78,9 +78,9 @@ export default function Reels() {
     return () => obs.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const handleLike = useCallback(async (reel: any, e?: React.MouseEvent) => {
-    if (!currentUser) { showPrompt(); return; }
-    try { await toggleReelLike.mutateAsync(reel.id); } catch {}
+  const handleLike = useCallback(async (reelId: string): Promise<boolean> => {
+    if (!currentUser) { showPrompt(); return false; }
+    try { await toggleReelLike.mutateAsync(reelId); return true; } catch { return false; }
   }, [currentUser, showPrompt, toggleReelLike]);
 
   const handleFollow = useCallback(async (uid: string) => {
@@ -242,7 +242,7 @@ interface CardProps {
   followed: boolean; saved: boolean;
   currentUserId?: string;
   cardHeight?: string;
-  onLike: (reel: any, e?: React.MouseEvent) => void;
+  onLike: (reelId: string) => Promise<boolean>;
   onFollow: (uid: string) => void;
   onSave: (id: string) => void;
   onShare: (reel: any) => void;
@@ -253,10 +253,11 @@ interface CardProps {
 /* ════════════════════════════════════════════════════
    ACTION COLUMN
 ════════════════════════════════════════════════════ */
-function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onFollow, onSave, onShare, onComment, size = "md" }: {
+function ActionColumn({ reel, isRTL, followed, saved, currentUserId, isLiked, likesCount, onLike, onFollow, onSave, onShare, onComment, size = "md" }: {
   reel: any; isRTL: boolean; followed: boolean; saved: boolean;
   currentUserId?: string; size?: "sm" | "md";
-  onLike: (reel: any, e?: React.MouseEvent) => void;
+  isLiked: boolean; likesCount: number;
+  onLike: () => void;
   onFollow: (uid: string) => void;
   onSave: (id: string) => void;
   onShare: (reel: any) => void;
@@ -284,10 +285,10 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, onLike, onF
           </button>
         )}
       </div>
-      <button onClick={(e) => onLike(reel, e)} className="flex flex-col items-center gap-1 group">
+      <button onClick={onLike} className="flex flex-col items-center gap-1 group">
         <Heart className={cn(ic, "transition-all drop-shadow group-active:scale-125",
-          reel.is_liked ? "fill-[#ff3b5c] text-[#ff3b5c] scale-110" : "text-white")} />
-        <span className={cn(nc, "text-white font-semibold drop-shadow")}>{fmt(reel.likes_count)}</span>
+          isLiked ? "fill-[#ff3b5c] text-[#ff3b5c] scale-110" : "text-white")} />
+        <span className={cn(nc, "text-white font-semibold drop-shadow")}>{fmt(likesCount)}</span>
       </button>
       <button onClick={() => onComment(reel.id)} className="flex flex-col items-center gap-1 group">
         <MessageCircle className={cn(ic, "text-white drop-shadow group-active:scale-125 transition-transform")} />
@@ -389,6 +390,22 @@ function MobileReelCard({
   const [holdActive, setHoldActive] = useState(false);
   const [localHearts, setLocalHearts] = useState<FloatingHeart[]>([]);
   const visibilityCalled = useRef(false);
+  const [localLiked, setLocalLiked] = useState(reel.is_liked);
+  const [localLikeCount, setLocalLikeCount] = useState(reel.likes_count);
+
+  const localLikedRef = useRef(localLiked);
+  localLikedRef.current = localLiked;
+
+  const doLike = useCallback(async () => {
+    const wasLiked = localLikedRef.current;
+    setLocalLiked(!wasLiked);
+    setLocalLikeCount((prev: number) => wasLiked ? Math.max(0, prev - 1) : prev + 1);
+    const ok = await onLike(reel.id);
+    if (!ok) {
+      setLocalLiked(wasLiked);
+      setLocalLikeCount((prev: number) => wasLiked ? prev + 1 : Math.max(0, prev - 1));
+    }
+  }, [reel.id, onLike]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -451,7 +468,7 @@ function MobileReelCard({
     if (now - lastTapTime.current < 350) {
       clearTimeout(singleTapTimer.current ?? undefined);
       lastTapTime.current = 0;
-      onLike(reel, e as any);
+      doLike();
       spawnHeart(e);
     } else {
       lastTapTime.current = now;
@@ -520,7 +537,8 @@ function MobileReelCard({
 
       <div className={cn("absolute z-30", hasNav ? "bottom-8" : "bottom-24", isRTL ? "left-3" : "right-3")}>
         <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
-          currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
+          currentUserId={currentUserId} isLiked={localLiked} likesCount={localLikeCount}
+          onLike={doLike} onFollow={onFollow}
           onSave={onSave} onShare={onShare} onComment={onComment} size="sm" />
       </div>
 
@@ -561,6 +579,22 @@ function DesktopReelCard({
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clickCount = useRef(0);
   const visibilityCalled = useRef(false);
+  const [localLiked, setLocalLiked] = useState(reel.is_liked);
+  const [localLikeCount, setLocalLikeCount] = useState(reel.likes_count);
+
+  const localLikedRef = useRef(localLiked);
+  localLikedRef.current = localLiked;
+
+  const doLike = useCallback(async () => {
+    const wasLiked = localLikedRef.current;
+    setLocalLiked(!wasLiked);
+    setLocalLikeCount((prev: number) => wasLiked ? Math.max(0, prev - 1) : prev + 1);
+    const ok = await onLike(reel.id);
+    if (!ok) {
+      setLocalLiked(wasLiked);
+      setLocalLikeCount((prev: number) => wasLiked ? prev + 1 : Math.max(0, prev - 1));
+    }
+  }, [reel.id, onLike]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -592,10 +626,10 @@ function DesktopReelCard({
     } else if (clickCount.current >= 2) {
       clearTimeout(clickTimer.current!);
       clickCount.current = 0;
-      if (!reel.is_liked) onLike(reel, e);
+      if (!localLikedRef.current) doLike();
       spawnHeart(e);
     }
-  }, [reel, togglePlay, onLike, spawnHeart]);
+  }, [togglePlay, doLike, spawnHeart]);
 
   return (
     <div
@@ -676,7 +710,8 @@ function DesktopReelCard({
 
         <div className="flex-shrink-0 pb-5">
           <ActionColumn reel={reel} isRTL={isRTL} followed={followed} saved={saved}
-            currentUserId={currentUserId} onLike={onLike} onFollow={onFollow}
+            currentUserId={currentUserId} isLiked={localLiked} likesCount={localLikeCount}
+            onLike={doLike} onFollow={onFollow}
             onSave={onSave} onShare={onShare} onComment={onComment} size="md" />
         </div>
       </div>

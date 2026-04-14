@@ -274,36 +274,19 @@ export function useToggleReelLike() {
             }
           : reel;
 
-      const applyFlat = (old: any) => {
+      queryClient.setQueriesData({ queryKey: ['userReels'] }, (old: any) => {
         if (!old) return old;
         return Array.isArray(old) ? old.map(updateReel) : old;
-      };
-
-      // Update flat reels queries (useReels)
-      queryClient.setQueriesData({ queryKey: ['reels'] }, applyFlat);
-      // Update infinite reels query (useInfiniteReels) — pages structure
-      queryClient.setQueriesData({ queryKey: ['reels-infinite'] }, (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map((page: any[]) => page.map(updateReel)),
-        };
       });
-      // Update profile reels
-      queryClient.setQueriesData({ queryKey: ['userReels'] }, applyFlat);
-      // Update single reel
       queryClient.setQueriesData({ queryKey: ['reel', reelId] }, (old: any) =>
         old ? updateReel(old) : old
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reels'] });
       queryClient.invalidateQueries({ queryKey: ['userReels'] });
     },
     onError: (error: any) => {
       console.error('Reel like toggle error:', error);
-      queryClient.invalidateQueries({ queryKey: ['reels'] });
-      queryClient.invalidateQueries({ queryKey: ['reels-infinite'] });
       queryClient.invalidateQueries({ queryKey: ['userReels'] });
       queryClient.invalidateQueries({ queryKey: ['reel'] });
     },
