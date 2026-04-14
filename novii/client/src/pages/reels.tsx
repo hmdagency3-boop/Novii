@@ -142,18 +142,15 @@ export default function Reels() {
   }, [computeDesktopIdx]);
 
   const tryPlayVideo = useCallback((vid: HTMLVideoElement) => {
-    vid.muted = mutedRef.current;
-    const attempt = () => vid.play().catch(() => {
-      vid.muted = true;
-      mutedRef.current = true;
-      vid.play().catch(() => {});
-    });
+    vid.muted = true;
+    const attempt = () => {
+      const p = vid.play();
+      if (p) p.catch(() => {});
+    };
     if (vid.readyState >= 2) {
       attempt();
     } else {
-      vid.addEventListener('loadeddata', () => attempt(), { once: true });
-      if (!vid.src && !vid.currentSrc) return;
-      vid.load();
+      vid.addEventListener('canplay', () => attempt(), { once: true });
     }
   }, []);
 
@@ -256,8 +253,15 @@ export default function Reels() {
   const handleTap = useCallback((id: string, refs: VideoRefMap) => {
     const v = refs.current[id];
     if (!v) return;
-    if (v.paused) { v.play().catch(() => {}); setPausedReels(p => { const n = new Set(p); n.delete(id); return n; }); }
-    else          { v.pause();                 setPausedReels(p => new Set([...Array.from(p), id])); }
+    if (v.paused) {
+      v.muted = mutedRef.current;
+      const p = v.play();
+      if (p) p.catch(() => { v.muted = true; v.play().catch(() => {}); });
+      setPausedReels(p => { const n = new Set(p); n.delete(id); return n; });
+    } else {
+      v.pause();
+      setPausedReels(p => new Set([...Array.from(p), id]));
+    }
   }, []);
 
   const handleShare = useCallback((reel: any) => {
@@ -599,10 +603,16 @@ function MobileReelCard({
     >
       {/* Video */}
       <video
-        ref={el => { if (el) videoRefs.current[reel.id] = el; }}
+        ref={el => {
+          if (el) {
+            videoRefs.current[reel.id] = el;
+            el.muted = true;
+          }
+        }}
         src={reel.video_url}
         className="absolute inset-0 w-full h-full object-cover"
-        loop playsInline muted={muted}
+        loop playsInline muted
+        autoPlay={idx === 0}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -715,11 +725,17 @@ function DesktopReelCard({
           onDoubleClick={e => onDoubleTap(reel, e)}
         >
           <video
-            ref={el => { if (el) videoRefs.current[reel.id] = el; }}
+            ref={el => {
+              if (el) {
+                videoRefs.current[reel.id] = el;
+                el.muted = true;
+              }
+            }}
             src={reel.video_url}
             className="w-full h-full object-cover"
-            loop playsInline muted={muted}
+            loop playsInline muted
             preload="auto"
+            autoPlay={idx === 0}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/70 pointer-events-none" />
 
