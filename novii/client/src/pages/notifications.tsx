@@ -21,7 +21,7 @@ import { useSettings } from "@/lib/settings-context";
 
 type FilterType = 'all' | 'like' | 'comment' | 'follow' | 'follow_request' | 'mention' | 'moderation';
 
-const MODERATION_TYPES = ['warning', 'post_removed', 'ban', 'unban', 'security', 'report_resolved'];
+const MODERATION_TYPES = ['warning', 'post_removed', 'post_restored', 'ban', 'unban', 'security', 'report_resolved'];
 
 const FILTERS: { key: FilterType; labelAr: string; labelEn: string; icon: React.ReactNode; color: string }[] = [
   { key: 'all',            labelAr: 'الكل',       labelEn: 'All',      icon: <Bell className="w-3.5 h-3.5" />,          color: 'bg-foreground text-background' },
@@ -255,6 +255,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
     post_removed:    { icon: <Trash2 className="w-3 h-3 text-white" />,                     bg: 'bg-red-600' },
     ban:             { icon: <ShieldBan className="w-3 h-3 text-white" />,                  bg: 'bg-red-700' },
     unban:           { icon: <ShieldCheck className="w-3 h-3 text-white" />,                bg: 'bg-green-600' },
+    post_restored:   { icon: <ShieldCheck className="w-3 h-3 text-white" />,                bg: 'bg-green-600' },
     security:        { icon: <Shield className="w-3 h-3 text-white" />,                     bg: 'bg-slate-600' },
     report_resolved: { icon: <Shield className="w-3 h-3 text-white" />,                     bg: 'bg-blue-600' },
   };
@@ -274,6 +275,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
       case 'save':           return isAr ? 'حفظ منشورك.' : 'saved your post.';
       case 'warning':        return notif.content || (isAr ? 'تم تحذيرك بسبب مخالفة سياسة الاستخدام.' : 'You have been warned for violating community guidelines.');
       case 'post_removed':   return notif.content || (isAr ? 'تم إزالة منشورك لمخالفته سياسة الاستخدام.' : 'Your post was removed for violating community guidelines.');
+      case 'post_restored':  return notif.content || (isAr ? 'تم استعادة منشورك وأصبح مرئياً مجدداً.' : 'Your post has been restored and is visible again.');
       case 'ban':            return notif.content || (isAr ? 'تم تقييد حسابك.' : 'Your account has been restricted.');
       case 'unban':          return notif.content || (isAr ? 'تم رفع التقييد عن حسابك.' : 'Your account restriction has been lifted.');
       case 'security':        return notif.content || (isAr ? 'إشعار أمني.' : 'Security notification.');
@@ -319,6 +321,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
           <div className={cn("w-11 h-11 rounded-full flex items-center justify-center", iconInfo.bg)}>
             {notif.type === 'warning' && <AlertTriangle className="w-5 h-5 text-white" />}
             {notif.type === 'post_removed' && <Trash2 className="w-5 h-5 text-white" />}
+            {notif.type === 'post_restored' && <ShieldCheck className="w-5 h-5 text-white" />}
             {notif.type === 'ban' && <ShieldBan className="w-5 h-5 text-white" />}
             {notif.type === 'unban' && <ShieldCheck className="w-5 h-5 text-white" />}
             {notif.type === 'security' && <Shield className="w-5 h-5 text-white" />}

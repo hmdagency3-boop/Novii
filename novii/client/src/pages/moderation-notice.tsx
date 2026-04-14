@@ -98,6 +98,20 @@ export default function ModerationNotice() {
           severityEn: "Restriction Lifted",
           severityColor: "text-green-600 bg-green-100 dark:bg-green-900/40 dark:text-green-400",
         };
+      case "post_restored":
+        return {
+          icon: <CheckCircle2 className="w-8 h-8 text-white" />,
+          bg: "bg-green-600",
+          bgLight: "bg-green-50 dark:bg-green-950/30",
+          border: "border-green-200 dark:border-green-800",
+          titleAr: "تم استعادة منشورك",
+          titleEn: "Your Post Was Restored",
+          subtitleAr: "منشورك أصبح مرئياً مجدداً لجميع المستخدمين",
+          subtitleEn: "Your post is now visible again to all users",
+          severityAr: "استعادة",
+          severityEn: "Restored",
+          severityColor: "text-green-600 bg-green-100 dark:bg-green-900/40 dark:text-green-400",
+        };
       case "report_resolved":
         return {
           icon: <CheckCircle2 className="w-8 h-8 text-white" />,
@@ -223,6 +237,7 @@ export default function ModerationNotice() {
 
             {type === "warning" && <WarningSection isAr={isAr} />}
             {type === "post_removed" && <PostRemovedSection isAr={isAr} />}
+            {type === "post_restored" && <PostRestoredSection isAr={isAr} />}
             {type === "ban" && <BanSection isAr={isAr} />}
             {type === "unban" && <UnbanSection isAr={isAr} />}
             {type === "report_resolved" && <ReportResolvedSection isAr={isAr} />}
@@ -326,6 +341,55 @@ function PostRemovedSection({ isAr }: { isAr: boolean }) {
               {isAr
                 ? "تكرار نشر محتوى مخالف قد يؤدي إلى تحذير رسمي أو تقييد حسابك. يرجى الالتزام بسياسة المحتوى."
                 : "Repeatedly posting violating content may lead to a formal warning or account restriction. Please follow our content policy."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function PostRestoredSection({ isAr }: { isAr: boolean }) {
+  return (
+    <>
+      <div className="bg-background rounded-xl p-4 border border-border">
+        <div className="flex items-start gap-2.5">
+          <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">
+              {isAr ? "ماذا يعني ذلك؟" : "What does this mean?"}
+            </p>
+            <ul className="space-y-2">
+              {(isAr ? [
+                "تمت مراجعة منشورك من قبل فريق الإدارة",
+                "تقرر إعادة المنشور ليكون مرئياً لجميع المستخدمين",
+                "يمكن للآخرين رؤية منشورك والتفاعل معه بشكل طبيعي",
+              ] : [
+                "Your post was reviewed by our moderation team",
+                "It was decided to restore your post and make it visible to all users",
+                "Others can now see and interact with your post normally",
+              ]).map((text, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 mt-1.5 flex-shrink-0" />
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-green-50 dark:bg-green-950/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+        <div className="flex items-start gap-2.5">
+          <Heart className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">
+              {isAr ? "شكراً لصبرك" : "Thank you for your patience"}
+            </p>
+            <p className="text-xs text-green-600 dark:text-green-500 leading-relaxed">
+              {isAr
+                ? "نعتذر عن أي إزعاج. نحرص على مراجعة المحتوى بعناية لضمان تجربة عادلة للجميع."
+                : "We apologize for any inconvenience. We carefully review content to ensure a fair experience for everyone."}
             </p>
           </div>
         </div>

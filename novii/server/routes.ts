@@ -2641,7 +2641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (post.user_id) {
         const { error: notifErr } = await adminDb.from('notifications').insert({
           user_id: post.user_id,
-          type: 'security',
+          type: 'post_restored',
           content: 'تم استعادة منشورك وأصبح مرئياً مجدداً.',
           post_id: postId,
         });
