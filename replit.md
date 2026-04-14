@@ -33,8 +33,18 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - **Settings UI**: `ConnectedDevicesSection` shows current device badge, device details (OS, browser, location, login count, timezone), trust toggle, remove button, "Log out all" action
 - **Migration SQL**: `novii/supabase/upgrade_device_tracking.sql`
 
+### Admin System
+- **Database tables**: `admins` (with role + granular permissions), `admin_logs` (activity audit trail), `platform_settings` (key-value config)
+- **Server middleware**: `requireAdmin` (checks admins table), `checkPermission(perm)` (granular permission gating), `logAdminAction()` (auto-logs all admin actions)
+- **Roles**: `super_admin` (full access), `admin`, `moderator` — super_admin bypasses all permission checks
+- **Permissions**: `can_manage_users`, `can_manage_content`, `can_manage_admins`, `can_manage_reports`, `can_view_analytics`, `can_manage_settings`
+- **Server endpoints**: `/api/admin/check`, `/api/admin/stats`, `/api/admin/users`, `/api/admin/users/:id/ban`, `/api/admin/users/:id` (DELETE/PATCH), `/api/admin/admins` (GET/POST), `/api/admin/admins/:id` (PATCH/DELETE), `/api/admin/content` (GET), `/api/admin/content/:id` (DELETE), `/api/admin/reports`, `/api/admin/logs`, `/api/admin/settings` (GET/PATCH)
+- **Admin page** (`/admin`): Dashboard (real stats), Users (CRUD), Badges, Content moderation (real posts), Admins management, Reports, Settings (persisted to DB), Activity Logs (audit trail)
+- **Migration SQL**: `novii/supabase/upgrade_admin_system.sql`
+
 ### Security
 - **Auth Middleware**: JWT verification via `requireAuth` middleware in `novii/server/routes.ts`
+- **Admin Middleware**: `requireAdmin` + `checkPermission()` for all admin routes — server-side enforcement
 - Upload endpoint protected with: auth check, MIME validation (images/video/audio only), rate limiting (10/min per user)
 - `x-user-token` header used for JWT verification, `x-user-id` as fallback
 - Device management endpoints enforce ownership checks (IDOR protection)

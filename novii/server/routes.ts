@@ -54,30 +54,24 @@ declare global {
 
 async function requireAuth(req: Request, res: Response, next: Function) {
   const token = req.headers['x-user-token'] as string;
-  const userId = req.headers['x-user-id'] as string;
 
-  if (token) {
-    try {
-      const supabaseUrl = process.env.SUPABASE_URL!;
-      const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
-      const verifier = createClient(supabaseUrl, supabaseAnonKey);
-      const { data: { user }, error } = await verifier.auth.getUser(token);
-      if (error || !user) {
-        return res.status(401).json({ error: 'Invalid or expired token' });
-      }
-      req.userId = user.id;
-      return next();
-    } catch {
-      return res.status(401).json({ error: 'Token verification failed' });
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication required — token missing' });
+  }
+
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL!;
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+    const verifier = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: { user }, error } = await verifier.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
     }
-  }
-
-  if (userId) {
-    req.userId = userId;
+    req.userId = user.id;
     return next();
+  } catch {
+    return res.status(401).json({ error: 'Token verification failed' });
   }
-
-  return res.status(401).json({ error: 'Authentication required' });
 }
 
 const uploadRateLimit = new Map<string, { count: number; resetAt: number }>();
@@ -2032,6 +2026,460 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Update community error:", error);
       res.status(500).json({ error: 'Failed to update community' });
+    }
+  });
+
+  // ===================================================================
+  // ADMIN SYSTEM ROUTES
+  // ===================================================================
+
+  async function requireAdmin(req: Request, res: Response, next: Function) {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+    try {
+      const { data: admin, error } = await getDb(req)
+        .from('admins')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (error || !admin) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      (req as any).adminData = admin;
+      return next();
+    } catch {
+      return res.status(403).json({ error: 'Admin verification failed' });
+    }
+  }
+
+  function checkPermission(permission: string) {
+    return (req: Request, res: Response, next: Function) => {
+      const admin = (req as any).adminData;
+      if (!admin) return res.status(403).json({ error: 'Admin data missing' });
+      if (admin.role === 'super_admin' || admin[permission] === true) {
+        return next();
+      }
+      return res.status(403).json({ error: `Permission denied: ${permission}` });
+    };
+  }
+
+  async function logAdminAction(req: Request, action: string, targetType?: string, targetId?: string, details?: string) {
+    try {
+      await getDb(req)
+        .from('admin_logs')
+        .insert({
+          admin_user_id: req.userId,
+          action,
+          target_type: targetType || null,
+          target_id: targetId || null,
+          details: details || null,
+          ip_address: getClientIp(req),
+        });
+    } catch (err) {
+      console.error('Failed to log admin action:', err);
+    }
+  }
+
+  // GET /api/admin/check — check if current user is admin
+  app.get("/api/admin/check", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { data: admin } = await getDb(req)
+        .from('admins')
+        .select('*')
+        .eq('user_id', req.userId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      res.json({ isAdmin: !!admin, admin: admin || null });
+    } catch {
+      res.json({ isAdmin: false, admin: null });
+    }
+  });
+
+  // GET /api/admin/stats — platform statistics
+  app.get("/api/admin/stats", requireAuth, requireAdmin, checkPermission('can_view_analytics'), async (req: Request, res: Response) => {
+    try {
+      const { data: profiles } = await getDb(req)
+        .from('profiles')
+        .select('posts_count, is_banned, created_at');
+
+      const { count: totalPosts } = await getDb(req)
+        .from('posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_deleted', false);
+
+      const { count: totalReports } = await getDb(req)
+        .from('reports')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: totalCommunities } = await getDb(req)
+        .from('communities')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: totalAdmins } = await getDb(req)
+        .from('admins')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const { count: newUsersThisWeek } = await getDb(req)
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', weekAgo.toISOString());
+
+      res.json({
+        totalUsers: profiles?.length || 0,
+        totalPosts: totalPosts || 0,
+        activeUsers: profiles?.filter((p: any) => !p.is_banned).length || 0,
+        bannedUsers: profiles?.filter((p: any) => p.is_banned).length || 0,
+        totalReports: totalReports || 0,
+        totalCommunities: totalCommunities || 0,
+        totalAdmins: totalAdmins || 0,
+        newUsersThisWeek: newUsersThisWeek || 0,
+      });
+    } catch (error) {
+      console.error('Admin stats error:', error);
+      res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+  });
+
+  // GET /api/admin/users — list all users
+  app.get("/api/admin/users", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { data: users, error } = await getDb(req)
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      res.json(users || []);
+    } catch (error) {
+      console.error('Admin users error:', error);
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
+  });
+
+  // POST /api/admin/users/:userId/ban — ban/unban user
+  app.post("/api/admin/users/:userId/ban", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { ban, reason, duration } = req.body;
+
+      let banUntil = null;
+      if (ban && duration && duration !== 'permanent') {
+        const now = new Date();
+        const dur = parseInt(duration);
+        const unit = duration.slice(-1);
+        switch (unit) {
+          case 'h': now.setHours(now.getHours() + dur); break;
+          case 'd': now.setDate(now.getDate() + dur); break;
+          case 'm': now.setMonth(now.getMonth() + dur); break;
+          case 'y': now.setFullYear(now.getFullYear() + dur); break;
+        }
+        banUntil = now.toISOString();
+      }
+
+      const { error } = await getDb(req)
+        .from('profiles')
+        .update({
+          is_banned: ban,
+          banned_reason: ban ? (reason || null) : null,
+          ban_until: ban ? banUntil : null,
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, ban ? 'ban_user' : 'unban_user', 'user', userId, reason || undefined);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin ban error:', error);
+      res.status(500).json({ error: 'Failed to ban/unban user' });
+    }
+  });
+
+  // DELETE /api/admin/users/:userId — delete user
+  app.delete("/api/admin/users/:userId", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+
+      const { error } = await getDb(req)
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'delete_user', 'user', userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin delete error:', error);
+      res.status(500).json({ error: 'Failed to delete user' });
+    }
+  });
+
+  // PATCH /api/admin/users/:userId — edit user profile
+  app.patch("/api/admin/users/:userId", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { full_name, bio, website, location, is_verified, is_official, is_creator, is_premium, is_popular } = req.body;
+
+      const { data, error } = await getDb(req)
+        .from('profiles')
+        .update({
+          full_name: full_name || null,
+          bio: bio || null,
+          website: website || null,
+          location: location || null,
+          is_verified,
+          is_official,
+          is_creator,
+          is_premium,
+          is_popular,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId)
+        .select();
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'edit_user', 'user', userId, JSON.stringify(req.body));
+      res.json({ success: true, user: data?.[0] });
+    } catch (error) {
+      console.error('Admin edit user error:', error);
+      res.status(500).json({ error: 'Failed to edit user' });
+    }
+  });
+
+  // GET /api/admin/admins — list admins
+  app.get("/api/admin/admins", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { data, error } = await getDb(req)
+        .from('admins')
+        .select('*');
+
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Admin list error:', error);
+      res.status(500).json({ error: 'Failed to fetch admins' });
+    }
+  });
+
+  // POST /api/admin/admins — add new admin
+  app.post("/api/admin/admins", requireAuth, requireAdmin, checkPermission('can_manage_admins'), async (req: Request, res: Response) => {
+    try {
+      const { user_id, role, is_active, can_manage_users, can_manage_content, can_manage_admins, can_manage_reports, can_view_analytics, can_manage_settings } = req.body;
+
+      const { data, error } = await getDb(req)
+        .from('admins')
+        .insert({
+          user_id,
+          role: role || 'moderator',
+          is_active: is_active ?? true,
+          can_manage_users: can_manage_users ?? false,
+          can_manage_content: can_manage_content ?? false,
+          can_manage_admins: can_manage_admins ?? false,
+          can_manage_reports: can_manage_reports ?? false,
+          can_view_analytics: can_view_analytics ?? false,
+          can_manage_settings: can_manage_settings ?? false,
+        })
+        .select();
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'add_admin', 'admin', user_id, `Role: ${role}`);
+      res.json({ success: true, admin: data?.[0] });
+    } catch (error) {
+      console.error('Add admin error:', error);
+      res.status(500).json({ error: 'Failed to add admin' });
+    }
+  });
+
+  // PATCH /api/admin/admins/:userId — update admin permissions
+  app.patch("/api/admin/admins/:userId", requireAuth, requireAdmin, checkPermission('can_manage_admins'), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { role, is_active, can_manage_users, can_manage_content, can_manage_admins, can_manage_reports, can_view_analytics, can_manage_settings } = req.body;
+
+      const { data, error } = await getDb(req)
+        .from('admins')
+        .update({
+          role,
+          is_active,
+          can_manage_users,
+          can_manage_content,
+          can_manage_admins,
+          can_manage_reports,
+          can_view_analytics,
+          can_manage_settings,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId)
+        .select();
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'edit_admin', 'admin', userId, `Role: ${role}`);
+      res.json({ success: true, admin: data?.[0] });
+    } catch (error) {
+      console.error('Edit admin error:', error);
+      res.status(500).json({ error: 'Failed to edit admin' });
+    }
+  });
+
+  // DELETE /api/admin/admins/:userId — remove admin
+  app.delete("/api/admin/admins/:userId", requireAuth, requireAdmin, checkPermission('can_manage_admins'), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+
+      const { error } = await getDb(req)
+        .from('admins')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'remove_admin', 'admin', userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Remove admin error:', error);
+      res.status(500).json({ error: 'Failed to remove admin' });
+    }
+  });
+
+  // GET /api/admin/content — get posts for moderation
+  app.get("/api/admin/content", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { data: posts, error } = await getDb(req)
+        .from('posts')
+        .select('*, profiles!posts_user_id_fkey(username, full_name, avatar_url)')
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      res.json(posts || []);
+    } catch (error) {
+      console.error('Admin content error:', error);
+      res.status(500).json({ error: 'Failed to fetch content' });
+    }
+  });
+
+  // DELETE /api/admin/content/:postId — soft-delete a post
+  app.delete("/api/admin/content/:postId", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { postId } = req.params;
+
+      const { error } = await getDb(req)
+        .from('posts')
+        .update({ is_deleted: true })
+        .eq('id', postId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'delete_post', 'post', postId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin delete post error:', error);
+      res.status(500).json({ error: 'Failed to delete post' });
+    }
+  });
+
+  // GET /api/admin/reports — get reports
+  app.get("/api/admin/reports", requireAuth, requireAdmin, checkPermission('can_manage_reports'), async (req: Request, res: Response) => {
+    try {
+      const { data: reports, error } = await getDb(req)
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        if (error.code === '42P01') {
+          return res.json([]);
+        }
+        throw error;
+      }
+      res.json(reports || []);
+    } catch (error) {
+      console.error('Admin reports error:', error);
+      res.json([]);
+    }
+  });
+
+  // GET /api/admin/logs — get admin activity logs
+  app.get("/api/admin/logs", requireAuth, requireAdmin, checkPermission('can_view_analytics'), async (req: Request, res: Response) => {
+    try {
+      const { data: logs, error } = await getDb(req)
+        .from('admin_logs')
+        .select('*, profiles!admin_logs_admin_user_id_fkey(username, full_name, avatar_url)')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        if (error.code === '42P01') {
+          return res.json([]);
+        }
+        throw error;
+      }
+      res.json(logs || []);
+    } catch (error) {
+      console.error('Admin logs error:', error);
+      res.json([]);
+    }
+  });
+
+  // GET /api/admin/settings — get platform settings
+  app.get("/api/admin/settings", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { data, error } = await getDb(req)
+        .from('platform_settings')
+        .select('*');
+
+      if (error) {
+        if (error.code === '42P01') {
+          return res.json({});
+        }
+        throw error;
+      }
+
+      const settings: Record<string, string> = {};
+      (data || []).forEach((s: any) => { settings[s.key] = s.value; });
+      res.json(settings);
+    } catch (error) {
+      console.error('Admin settings error:', error);
+      res.json({});
+    }
+  });
+
+  // PATCH /api/admin/settings — update platform setting
+  app.patch("/api/admin/settings", requireAuth, requireAdmin, checkPermission('can_manage_settings'), async (req: Request, res: Response) => {
+    try {
+      const { key, value } = req.body;
+
+      const { error } = await getDb(req)
+        .from('platform_settings')
+        .upsert({
+          key,
+          value: String(value),
+          updated_by: req.userId,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'update_setting', 'setting', undefined, `${key} = ${value}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin update setting error:', error);
+      res.status(500).json({ error: 'Failed to update setting' });
     }
   });
 

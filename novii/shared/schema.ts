@@ -202,9 +202,37 @@ export const userStatistics = pgTable("user_statistics", {
 export const admins = pgTable("admins", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().unique().references(() => profiles.id, { onDelete: "cascade" }),
-  permissions: text("permissions").default("full"), // 'full', 'moderate', 'view'
+  role: text("role").default("moderator"),
+  permissions: text("permissions").default("full"),
   isActive: boolean("is_active").default(true),
+  canManageUsers: boolean("can_manage_users").default(false),
+  canManageContent: boolean("can_manage_content").default(false),
+  canManageAdmins: boolean("can_manage_admins").default(false),
+  canManageReports: boolean("can_manage_reports").default(false),
+  canViewAnalytics: boolean("can_view_analytics").default(false),
+  canManageSettings: boolean("can_manage_settings").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Admin activity logs table (سجل نشاط الأدمن)
+export const adminLogs = pgTable("admin_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  adminUserId: uuid("admin_user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  targetType: text("target_type"),
+  targetId: uuid("target_id"),
+  details: text("details"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Platform settings table (إعدادات المنصة)
+export const platformSettings = pgTable("platform_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: text("key").notNull().unique(),
+  value: text("value"),
+  updatedBy: uuid("updated_by").references(() => profiles.id),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

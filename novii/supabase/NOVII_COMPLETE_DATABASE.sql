@@ -341,11 +341,43 @@ CREATE TABLE IF NOT EXISTS user_statistics (
 -- 2.17 ADMINS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS admins (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
+  role                TEXT DEFAULT 'moderator' CHECK (role IN ('super_admin', 'admin', 'moderator')),
+  permissions         TEXT DEFAULT 'full' CHECK (permissions IN ('full', 'moderate', 'view')),
+  is_active           BOOLEAN DEFAULT TRUE,
+  can_manage_users    BOOLEAN DEFAULT FALSE,
+  can_manage_content  BOOLEAN DEFAULT FALSE,
+  can_manage_admins   BOOLEAN DEFAULT FALSE,
+  can_manage_reports  BOOLEAN DEFAULT FALSE,
+  can_view_analytics  BOOLEAN DEFAULT FALSE,
+  can_manage_settings BOOLEAN DEFAULT FALSE,
+  created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- -----------------------------------------------------------------------
+-- 2.17b ADMIN ACTIVITY LOGS
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin_logs (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_user_id  UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  action         TEXT NOT NULL,
+  target_type    TEXT,
+  target_id      UUID,
+  details        TEXT,
+  ip_address     TEXT,
+  created_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- -----------------------------------------------------------------------
+-- 2.17c PLATFORM SETTINGS
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS platform_settings (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     UUID NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
-  permissions TEXT DEFAULT 'full' CHECK (permissions IN ('full', 'moderate', 'view')),
-  is_active   BOOLEAN DEFAULT TRUE,
-  created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  key         TEXT NOT NULL UNIQUE,
+  value       TEXT,
+  updated_by  UUID REFERENCES profiles(id),
   updated_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -893,6 +925,8 @@ ALTER TABLE post_views         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE post_insights      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_statistics    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admins             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_logs         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_settings  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE badges             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_badges        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE communities        ENABLE ROW LEVEL SECURITY;
@@ -918,6 +952,40 @@ ALTER TABLE reel_hashtags      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_warnings      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feed_scores        ENABLE ROW LEVEL SECURITY;
 
+
+-- ============================================================================
+-- 4.b ADMIN SYSTEM RLS POLICIES
+-- ============================================================================
+
+CREATE POLICY "Admins can insert logs"
+  ON admin_logs FOR INSERT
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE)
+  );
+
+CREATE POLICY "Admins can view logs"
+  ON admin_logs FOR SELECT
+  USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE)
+  );
+
+CREATE POLICY "Admins can view settings"
+  ON platform_settings FOR SELECT
+  USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE)
+  );
+
+CREATE POLICY "Admins with settings permission can update"
+  ON platform_settings FOR UPDATE
+  USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE AND admins.can_manage_settings = TRUE)
+  );
+
+CREATE POLICY "Admins with settings permission can insert"
+  ON platform_settings FOR INSERT
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE AND admins.can_manage_settings = TRUE)
+  );
 
 -- ============================================================================
 -- 5. HELPER FUNCTIONS FOR RLS (SECURITY DEFINER - تكسر حلقة التكرار)

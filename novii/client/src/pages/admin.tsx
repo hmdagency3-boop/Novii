@@ -4,14 +4,15 @@ import { Card } from "@/components/ui/card";
 import { 
   Users, BarChart3, AlertCircle, Trash2, Shield, Ban, LogOut, CheckCircle, Star, 
   Edit2, Lock, Unlock, TrendingUp, Activity, Award, Zap, FileText, Settings, 
-  Database, Clock, Flag, Eye, Crown, Trash, History, Search, Filter, Plus, X, Mail
+  Database, Clock, Flag, Eye, Crown, Trash, History, Search, Filter, Plus, X, Mail,
+  Image, MessageCircle, UserPlus, Globe
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/lib/language-context";
 import { useLocation } from "wouter";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 
 type AdminTab = 'dashboard' | 'users' | 'badges' | 'content' | 'admins' | 'reports' | 'settings' | 'logs';
+
+async function adminFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const authHeaders: Record<string, string> = {};
+  if (session?.user?.id) authHeaders['x-user-id'] = session.user.id;
+  if (session?.access_token) authHeaders['x-user-token'] = session.access_token;
+  return fetch(url, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...authHeaders, ...(options.headers as Record<string, string> || {}) },
+  });
+}
 
 const translations = {
   en: {
@@ -68,7 +80,7 @@ const translations = {
     save: 'Save',
     selectUser: 'Select a user to manage',
     updatedSuccessfully: 'Updated successfully!',
-    errorUpdating: 'Error updating user',
+    errorUpdating: 'Error updating',
     location: 'Location',
     website: 'Website',
     makeAdmin: 'Make Admin',
@@ -105,6 +117,14 @@ const translations = {
     viewAnalytics: 'View Analytics',
     isActive: 'Is Active',
     editAdmin: 'Edit Admin',
+    totalReports: 'Total Reports',
+    totalCommunities: 'Communities',
+    newUsersThisWeek: 'New This Week',
+    contentModeration: 'Content Moderation',
+    caption: 'Caption',
+    postedBy: 'Posted by',
+    date: 'Date',
+    noPermission: 'You do not have permission for this action',
   },
   ar: {
     adminPanel: 'لوحة التحكم الإدارية',
@@ -189,7 +209,27 @@ const translations = {
     viewAnalytics: 'عرض التحليلات',
     isActive: 'نشط',
     editAdmin: 'تعديل المسؤول',
+    totalReports: 'إجمالي البلاغات',
+    totalCommunities: 'المجتمعات',
+    newUsersThisWeek: 'جدد هذا الأسبوع',
+    contentModeration: 'إدارة المحتوى',
+    caption: 'التعليق',
+    postedBy: 'نشر بواسطة',
+    date: 'التاريخ',
+    noPermission: 'ليس لديك صلاحية لهذا الإجراء',
   }
+};
+
+const actionLabels: Record<string, { en: string; ar: string }> = {
+  ban_user: { en: 'Banned user', ar: 'حظر مستخدم' },
+  unban_user: { en: 'Unbanned user', ar: 'إلغاء حظر مستخدم' },
+  delete_user: { en: 'Deleted user', ar: 'حذف مستخدم' },
+  edit_user: { en: 'Edited user', ar: 'تعديل مستخدم' },
+  add_admin: { en: 'Added admin', ar: 'إضافة مسؤول' },
+  remove_admin: { en: 'Removed admin', ar: 'إزالة مسؤول' },
+  edit_admin: { en: 'Edited admin', ar: 'تعديل مسؤول' },
+  delete_post: { en: 'Deleted post', ar: 'حذف منشور' },
+  update_setting: { en: 'Updated setting', ar: 'تحديث إعداد' },
 };
 
 export default function Admin() {
@@ -212,8 +252,6 @@ export default function Admin() {
   const [banReason, setBanReason] = useState("");
   const [banDuration, setBanDuration] = useState("1h");
   const [searchQuery, setSearchQuery] = useState("");
-  const [autoMod, setAutoMod] = useState(false);
-  const [maintenance, setMaintenance] = useState(false);
   
   const [editData, setEditData] = useState({
     fullName: '',
@@ -238,35 +276,34 @@ export default function Admin() {
     can_manage_settings: false,
   });
 
-  // Check if user is admin
-  const { data: isAdmin = false, isLoading: adminLoading } = useQuery({
-    queryKey: ['isAdmin', user?.id],
+  const { data: adminCheck, isLoading: adminLoading } = useQuery({
+    queryKey: ['admin/check', user?.id],
     queryFn: async () => {
-      if (!user?.id) return false;
-      try {
-        const { data, error } = await supabase
-          .from('admins')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        return !!data;
-      } catch (err) {
-        console.error('❌ Admin query error:', err);
-        return false;
-      }
+      const res = await adminFetch('/api/admin/check');
+      return res.json();
     },
     enabled: !!user?.id,
   });
 
-  const profileLoading = adminLoading;
+  const isAdmin = adminCheck?.isAdmin || false;
+  const myAdminData = adminCheck?.admin;
 
-  const { data: allUsers = [], isLoading: usersLoading, refetch } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['admin/stats'],
+    queryFn: async () => {
+      const res = await adminFetch('/api/admin/stats');
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: allUsers = [], isLoading: usersLoading, refetch: refetchUsers } = useQuery({
     queryKey: ['admin/users'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*');
-      return data || [];
+      const res = await adminFetch('/api/admin/users');
+      if (!res.ok) return [];
+      return res.json();
     },
     enabled: isAdmin,
   });
@@ -274,31 +311,199 @@ export default function Admin() {
   const { data: adminUsers = [], refetch: refetchAdmins } = useQuery({
     queryKey: ['admin/admins'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('admins')
-        .select('*');
-      return data || [];
+      const res = await adminFetch('/api/admin/admins');
+      if (!res.ok) return [];
+      return res.json();
     },
     enabled: isAdmin,
   });
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['admin/stats'],
+  const { data: posts = [] } = useQuery({
+    queryKey: ['admin/content'],
     queryFn: async () => {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('posts_count, is_banned');
-      
-      if (!profiles) return { totalUsers: 0, totalPosts: 0, activeUsers: 0, bannedUsers: 0 };
-      
-      return {
-        totalUsers: profiles.length,
-        totalPosts: profiles.reduce((sum: number, p: any) => sum + (p.posts_count || 0), 0),
-        activeUsers: profiles.filter((p: any) => !p.is_banned).length,
-        bannedUsers: profiles.filter((p: any) => p.is_banned).length,
-      };
+      const res = await adminFetch('/api/admin/content');
+      if (!res.ok) return [];
+      return res.json();
     },
-    enabled: isAdmin,
+    enabled: isAdmin && activeTab === 'content',
+  });
+
+  const { data: reports = [] } = useQuery({
+    queryKey: ['admin/reports'],
+    queryFn: async () => {
+      const res = await adminFetch('/api/admin/reports');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin && activeTab === 'reports',
+  });
+
+  const { data: adminLogs = [] } = useQuery({
+    queryKey: ['admin/logs'],
+    queryFn: async () => {
+      const res = await adminFetch('/api/admin/logs');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin && activeTab === 'logs',
+  });
+
+  const { data: platformSettings = {} } = useQuery({
+    queryKey: ['admin/settings'],
+    queryFn: async () => {
+      const res = await adminFetch('/api/admin/settings');
+      if (!res.ok) return {};
+      return res.json();
+    },
+    enabled: isAdmin && activeTab === 'settings',
+  });
+
+  const banMutation = useMutation({
+    mutationFn: async ({ userId, ban, reason, duration }: { userId: string; ban: boolean; reason?: string; duration?: string }) => {
+      const res = await adminFetch(`/api/admin/users/${userId}/ban`, {
+        method: 'POST',
+        body: JSON.stringify({ ban, reason, duration }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/logs'] });
+      setShowBanDialog(false);
+      setBanReason("");
+      setBanDuration("1h");
+      setSelectedUser(null);
+      toast.success(t.updatedSuccessfully);
+    },
+    onError: () => toast.error(t.errorUpdating),
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await adminFetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/logs'] });
+      setShowDeleteDialog(false);
+      setSelectedUser(null);
+      toast.success(t.updatedSuccessfully);
+    },
+    onError: () => toast.error(t.errorUpdating),
+  });
+
+  const editUserMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: any }) => {
+      const res = await adminFetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/logs'] });
+      setShowEditDialog(false);
+      setSelectedUser(null);
+      toast.success(t.updatedSuccessfully);
+    },
+    onError: () => toast.error(t.errorUpdating),
+  });
+
+  const addAdminMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await adminFetch('/api/admin/admins', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin/admins'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/logs'] });
+      setShowMakeAdminDialog(false);
+      setShowAdminPermissionsDialog(false);
+      setSelectedUser(null);
+      resetAdminPermissions();
+      toast.success(t.updatedSuccessfully);
+    },
+    onError: () => toast.error(t.errorUpdating),
+  });
+
+  const editAdminMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: any }) => {
+      const res = await adminFetch(`/api/admin/admins/${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin/admins'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/logs'] });
+      setShowAdminPermissionsDialog(false);
+      setSelectedAdmin(null);
+      toast.success(t.updatedSuccessfully);
+    },
+    onError: () => toast.error(t.errorUpdating),
+  });
+
+  const removeAdminMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await adminFetch(`/api/admin/admins/${userId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin/admins'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/logs'] });
+      setShowMakeAdminDialog(false);
+      setSelectedUser(null);
+      toast.success(t.updatedSuccessfully);
+    },
+    onError: () => toast.error(t.errorUpdating),
+  });
+
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const res = await adminFetch(`/api/admin/content/${postId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin/content'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/logs'] });
+      toast.success(t.updatedSuccessfully);
+    },
+    onError: () => toast.error(t.errorUpdating),
+  });
+
+  const updateSettingMutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: string }) => {
+      const res = await adminFetch('/api/admin/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ key, value }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin/settings'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/logs'] });
+      toast.success(t.updatedSuccessfully);
+    },
+    onError: () => toast.error(t.errorUpdating),
   });
 
   const filteredUsers = allUsers.filter((u: any) => 
@@ -307,7 +512,62 @@ export default function Admin() {
     u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (profileLoading) {
+  function resetAdminPermissions() {
+    setAdminPermissions({
+      role: 'moderator',
+      is_active: true,
+      can_manage_users: false,
+      can_manage_content: false,
+      can_manage_admins: false,
+      can_manage_reports: false,
+      can_view_analytics: false,
+      can_manage_settings: false,
+    });
+  }
+
+  const openEditDialog = (user: any) => {
+    setSelectedUser(user);
+    setEditData({
+      fullName: user.full_name || '',
+      bio: user.bio || '',
+      website: user.website || '',
+      location: user.location || '',
+      isVerified: user.is_verified || false,
+      isOfficial: user.is_official || false,
+      isCreator: user.is_creator || false,
+      isPremium: user.is_premium || false,
+      isPopular: user.is_popular || false,
+    });
+    setShowEditDialog(true);
+  };
+
+  const openAdminPermissionsDialog = (admin: any, isNew: boolean = false) => {
+    setSelectedAdmin(isNew ? null : admin);
+    if (isNew) {
+      resetAdminPermissions();
+    } else {
+      setAdminPermissions({
+        role: admin.role || 'moderator',
+        is_active: admin.is_active ?? true,
+        can_manage_users: admin.can_manage_users ?? false,
+        can_manage_content: admin.can_manage_content ?? false,
+        can_manage_admins: admin.can_manage_admins ?? false,
+        can_manage_reports: admin.can_manage_reports ?? false,
+        can_view_analytics: admin.can_view_analytics ?? false,
+        can_manage_settings: admin.can_manage_settings ?? false,
+      });
+    }
+    setShowAdminPermissionsDialog(true);
+  };
+
+  function formatDate(d: string) {
+    if (!d) return '-';
+    return new Date(d).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US', {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  if (adminLoading) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-screen">
@@ -334,309 +594,6 @@ export default function Admin() {
     );
   }
 
-  const handleBanUser = async () => {
-    if (!selectedUser) return;
-    try {
-      let banUntil = null;
-      
-      if (!selectedUser.is_banned) {
-        if (banDuration !== 'permanent') {
-          const now = new Date();
-          const durationStr = banDuration;
-          const duration = parseInt(durationStr);
-          const unit = durationStr.slice(-1);
-          
-          switch (unit) {
-            case 'h': 
-              now.setHours(now.getHours() + duration);
-              break;
-            case 'd': 
-              now.setDate(now.getDate() + duration);
-              break;
-            case 'm': 
-              now.setMonth(now.getMonth() + duration);
-              break;
-            case 'y': 
-              now.setFullYear(now.getFullYear() + duration);
-              break;
-          }
-          banUntil = now.toISOString();
-        }
-      }
-      
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          is_banned: !selectedUser.is_banned,
-          banned_reason: !selectedUser.is_banned ? (banReason || null) : null,
-          ban_until: !selectedUser.is_banned ? banUntil : null,
-        })
-        .eq('id', selectedUser.id);
-      
-      if (error) {
-        console.error('❌ Ban error:', error);
-        toast.error(`${t.errorUpdating}: ${error.message}`);
-        return;
-      }
-
-      console.log('✅ User banned/unbanned successfully');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await queryClient.invalidateQueries({ queryKey: ['admin/users'] });
-      await refetch();
-      
-      setShowBanDialog(false);
-      setBanReason("");
-      setBanDuration("1h");
-      setSelectedUser(null);
-      toast.success(t.updatedSuccessfully);
-    } catch (error) {
-      console.error('Error banning user:', error);
-      toast.error(t.errorUpdating);
-    }
-  };
-
-  const handleDeleteUser = async () => {
-    if (!selectedUser) return;
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', selectedUser.id);
-      
-      if (error) {
-        console.error('❌ Delete error:', error);
-        toast.error(`${t.errorUpdating}: ${error.message}`);
-        return;
-      }
-
-      console.log('✅ User deleted successfully');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await queryClient.invalidateQueries({ queryKey: ['admin/users'] });
-      await refetch();
-      
-      setShowDeleteDialog(false);
-      setSelectedUser(null);
-      toast.success(t.updatedSuccessfully);
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      toast.error(t.errorUpdating);
-    }
-  };
-
-  const handleEditUser = async () => {
-    if (!selectedUser) return;
-    try {
-      console.log('🔄 Updating user:', selectedUser.id, editData);
-      
-      const { error, data } = await supabase
-        .from('profiles')
-        .update({
-          full_name: editData.fullName || null,
-          bio: editData.bio || null,
-          website: editData.website || null,
-          location: editData.location || null,
-          is_verified: editData.isVerified,
-          is_official: editData.isOfficial,
-          is_creator: editData.isCreator,
-          is_premium: editData.isPremium,
-          is_popular: editData.isPopular,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', selectedUser.id)
-        .select();
-
-      console.log('📊 Update response - Data:', data, 'Error:', error);
-
-      if (error) {
-        console.error('❌ Update error:', error);
-        toast.error(`${t.errorUpdating}: ${error.message}`);
-        return;
-      }
-
-      console.log('✅ User updated successfully');
-      
-      // Wait and refetch
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await queryClient.invalidateQueries({ queryKey: ['admin/users'] });
-      await refetch();
-      
-      setShowEditDialog(false);
-      setSelectedUser(null);
-      setEditData({
-        fullName: '',
-        bio: '',
-        website: '',
-        location: '',
-        isVerified: false,
-        isOfficial: false,
-        isCreator: false,
-        isPremium: false,
-        isPopular: false,
-      });
-      
-      toast.success(t.updatedSuccessfully);
-    } catch (error) {
-      console.error('❌ Error updating user:', error);
-      toast.error(t.errorUpdating);
-    }
-  };
-
-  const handleMakeAdmin = async () => {
-    if (!selectedUser) return;
-    try {
-      const isCurrentlyAdmin = adminUsers.some((a: any) => a.user_id === selectedUser.id);
-      
-      console.log('👤 User:', selectedUser.username, 'Is admin:', isCurrentlyAdmin);
-      
-      if (isCurrentlyAdmin) {
-        // Remove admin
-        const { error } = await supabase
-          .from('admins')
-          .delete()
-          .eq('user_id', selectedUser.id);
-        
-        if (error) {
-          console.error('❌ Remove admin error:', error);
-          toast.error(`${t.errorUpdating}: ${error.message}`);
-          return;
-        }
-        console.log('✅ Admin removed');
-      } else {
-        // Add admin with permissions
-        const { error } = await supabase
-          .from('admins')
-          .insert({
-            user_id: selectedUser.id,
-            role: adminPermissions.role,
-            is_active: adminPermissions.is_active,
-            can_manage_users: adminPermissions.can_manage_users,
-            can_manage_content: adminPermissions.can_manage_content,
-            can_manage_admins: adminPermissions.can_manage_admins,
-            can_manage_reports: adminPermissions.can_manage_reports,
-            can_view_analytics: adminPermissions.can_view_analytics,
-            can_manage_settings: adminPermissions.can_manage_settings,
-          });
-        
-        if (error) {
-          console.error('❌ Add admin error:', error);
-          toast.error(`${t.errorUpdating}: ${error.message}`);
-          return;
-        }
-        console.log('✅ Admin added with permissions');
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await queryClient.invalidateQueries({ queryKey: ['admin/admins'] });
-      await refetchAdmins();
-      
-      setShowMakeAdminDialog(false);
-      setShowAdminPermissionsDialog(false);
-      setSelectedUser(null);
-      
-      // Reset permissions
-      setAdminPermissions({
-        role: 'moderator',
-        is_active: true,
-        can_manage_users: false,
-        can_manage_content: false,
-        can_manage_admins: false,
-        can_manage_reports: false,
-        can_view_analytics: false,
-        can_manage_settings: false,
-      });
-      
-      toast.success(t.updatedSuccessfully);
-    } catch (error) {
-      console.error('Error managing admin:', error);
-      toast.error(t.errorUpdating);
-    }
-  };
-
-  const handleEditAdmin = async () => {
-    if (!selectedAdmin) return;
-    try {
-      console.log('🔧 Editing admin:', selectedAdmin.user_id, adminPermissions);
-      
-      const { error } = await supabase
-        .from('admins')
-        .update({
-          role: adminPermissions.role,
-          is_active: adminPermissions.is_active,
-          can_manage_users: adminPermissions.can_manage_users,
-          can_manage_content: adminPermissions.can_manage_content,
-          can_manage_admins: adminPermissions.can_manage_admins,
-          can_manage_reports: adminPermissions.can_manage_reports,
-          can_view_analytics: adminPermissions.can_view_analytics,
-          can_manage_settings: adminPermissions.can_manage_settings,
-        })
-        .eq('user_id', selectedAdmin.user_id);
-
-      if (error) {
-        console.error('❌ Edit admin error:', error);
-        toast.error(`${t.errorUpdating}: ${error.message}`);
-        return;
-      }
-
-      console.log('✅ Admin updated successfully');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await queryClient.invalidateQueries({ queryKey: ['admin/admins'] });
-      await refetchAdmins();
-      
-      setShowAdminPermissionsDialog(false);
-      setSelectedAdmin(null);
-      toast.success(t.updatedSuccessfully);
-    } catch (error) {
-      console.error('Error updating admin:', error);
-      toast.error(t.errorUpdating);
-    }
-  };
-
-  const openEditDialog = (user: any) => {
-    setSelectedUser(user);
-    setEditData({
-      fullName: user.full_name || '',
-      bio: user.bio || '',
-      website: user.website || '',
-      location: user.location || '',
-      isVerified: user.is_verified || false,
-      isOfficial: user.is_official || false,
-      isCreator: user.is_creator || false,
-      isPremium: user.is_premium || false,
-      isPopular: user.is_popular || false,
-    });
-    setShowEditDialog(true);
-  };
-
-  const openAdminPermissionsDialog = (admin: any, isNewAdmin: boolean = false) => {
-    setSelectedAdmin(admin);
-    if (isNewAdmin) {
-      // Reset to defaults for new admin
-      setAdminPermissions({
-        role: 'moderator',
-        is_active: true,
-        can_manage_users: false,
-        can_manage_content: false,
-        can_manage_admins: false,
-        can_manage_reports: false,
-        can_view_analytics: false,
-        can_manage_settings: false,
-      });
-    } else {
-      // Load existing admin permissions
-      setAdminPermissions({
-        role: admin.role || 'moderator',
-        is_active: admin.is_active ?? true,
-        can_manage_users: admin.can_manage_users ?? false,
-        can_manage_content: admin.can_manage_content ?? false,
-        can_manage_admins: admin.can_manage_admins ?? false,
-        can_manage_reports: admin.can_manage_reports ?? false,
-        can_view_analytics: admin.can_view_analytics ?? false,
-        can_manage_settings: admin.can_manage_settings ?? false,
-      });
-    }
-    setShowAdminPermissionsDialog(true);
-  };
-
   return (
     <Layout>
       <div className={`min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 ${isRTL ? 'rtl' : 'ltr'}`}>
@@ -650,22 +607,22 @@ export default function Admin() {
                 </div>
                 <div>
                   <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">{t.adminPanel}</h1>
-                  <p className="text-sm text-gray-400 mt-1">{lang === 'ar' ? 'إدارة شاملة للمنصة' : 'Complete Platform Management'}</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    {myAdminData?.role === 'super_admin' ? (lang === 'ar' ? 'مسؤول أعلى' : 'Super Admin') : myAdminData?.role === 'admin' ? 'Admin' : (lang === 'ar' ? 'مراقب' : 'Moderator')}
+                  </p>
                 </div>
               </div>
               <Button
                 variant="outline"
-                onClick={() => {
-                  supabase.auth.signOut().then(() => setLocation('/auth'));
-                }}
-                className="bg-red-500/10 border-red-500/30 hover:bg-red-500/20 text-red-400"
+                onClick={() => setLocation('/')}
+                className="bg-slate-800/50 border-slate-700 hover:bg-slate-700/50 text-gray-300"
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                {lang === 'ar' ? 'تسجيل الخروج' : 'Logout'}
+                <X className="w-4 h-4 mr-2" />
+                {lang === 'ar' ? 'إغلاق' : 'Close'}
               </Button>
             </div>
 
-            {/* Tabs - Modern Style */}
+            {/* Tabs */}
             <div className="flex gap-2 p-1 bg-slate-800/50 rounded-lg backdrop-blur border border-slate-700/50 overflow-x-auto">
               {(['dashboard', 'users', 'badges', 'content', 'admins', 'reports', 'settings', 'logs'] as const).map(tab => (
                 <button
@@ -688,89 +645,48 @@ export default function Admin() {
             <div className="space-y-8 animate-in fade-in duration-500">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {statsLoading ? (
-                  <Spinner className="w-8 h-8" />
+                  <div className="col-span-4 flex justify-center py-8"><Spinner className="w-8 h-8" /></div>
                 ) : (
                   <>
-                    <Card className="p-6 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 transform hover:-translate-y-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-400 font-medium">{t.totalUsers}</p>
-                          <p className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent mt-2">{stats?.totalUsers || 0}</p>
+                    {[
+                      { label: t.totalUsers, value: stats?.totalUsers || 0, icon: Users, color: 'blue' },
+                      { label: t.totalPosts, value: stats?.totalPosts || 0, icon: TrendingUp, color: 'green' },
+                      { label: t.activeUsers, value: stats?.activeUsers || 0, icon: Activity, color: 'yellow' },
+                      { label: t.bannedUsers, value: stats?.bannedUsers || 0, icon: Ban, color: 'red' },
+                    ].map(({ label, value, icon: Icon, color }) => (
+                      <Card key={label} className={`p-6 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 hover:border-${color}-500/50 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1`}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-gray-400 font-medium">{label}</p>
+                            <p className={`text-3xl font-bold bg-gradient-to-r from-${color}-400 to-${color}-400 bg-clip-text text-transparent mt-2`}>{value}</p>
+                          </div>
+                          <Icon className={`w-8 h-8 text-${color}-400 opacity-50`} />
                         </div>
-                        <Users className="w-8 h-8 text-blue-400 opacity-50" />
-                      </div>
-                    </Card>
-
-                    <Card className="p-6 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 hover:border-green-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20 transform hover:-translate-y-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-400 font-medium">{t.totalPosts}</p>
-                          <p className="text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent mt-2">{stats?.totalPosts || 0}</p>
-                        </div>
-                        <TrendingUp className="w-8 h-8 text-green-400 opacity-50" />
-                      </div>
-                    </Card>
-
-                    <Card className="p-6 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/20 transform hover:-translate-y-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-400 font-medium">{t.activeUsers}</p>
-                          <p className="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent mt-2">{stats?.activeUsers || 0}</p>
-                        </div>
-                        <Activity className="w-8 h-8 text-yellow-400 opacity-50" />
-                      </div>
-                    </Card>
-
-                    <Card className="p-6 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 hover:border-red-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/20 transform hover:-translate-y-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-400 font-medium">{t.bannedUsers}</p>
-                          <p className="text-3xl font-bold bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent mt-2">{stats?.bannedUsers || 0}</p>
-                        </div>
-                        <Ban className="w-8 h-8 text-red-400 opacity-50" />
-                      </div>
-                    </Card>
+                      </Card>
+                    ))}
                   </>
                 )}
               </div>
 
-              {/* Quick Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="p-6 bg-slate-800/50 border-slate-700">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-purple-500/20 rounded-lg">
-                      <Crown className="w-6 h-6 text-purple-400" />
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {[
+                  { label: t.adminsList, value: stats?.totalAdmins || 0, icon: Crown, color: 'purple' },
+                  { label: t.totalReports, value: stats?.totalReports || 0, icon: Flag, color: 'orange' },
+                  { label: t.totalCommunities, value: stats?.totalCommunities || 0, icon: Globe, color: 'cyan' },
+                  { label: t.newUsersThisWeek, value: stats?.newUsersThisWeek || 0, icon: UserPlus, color: 'emerald' },
+                ].map(({ label, value, icon: Icon, color }) => (
+                  <Card key={label} className="p-6 bg-slate-800/50 border-slate-700">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 bg-${color}-500/20 rounded-lg`}>
+                        <Icon className={`w-6 h-6 text-${color}-400`} />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400">{label}</p>
+                        <p className="text-2xl font-bold text-white">{value}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-400">{t.adminsList}</p>
-                      <p className="text-2xl font-bold text-white">{adminUsers.length}</p>
-                    </div>
-                  </div>
-                </Card>
-                
-                <Card className="p-6 bg-slate-800/50 border-slate-700">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-green-500/20 rounded-lg">
-                      <Database className="w-6 h-6 text-green-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-400">{t.databaseStatus}</p>
-                      <p className="text-lg font-bold text-green-400">{t.healthy}</p>
-                    </div>
-                  </div>
-                </Card>
-
-                <Card className="p-6 bg-slate-800/50 border-slate-700">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-orange-500/20 rounded-lg">
-                      <Zap className="w-6 h-6 text-orange-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-400">{lang === 'ar' ? 'حالة النظام' : 'System Status'}</p>
-                      <p className="text-lg font-bold text-orange-400">{lang === 'ar' ? 'تشغيل' : 'Running'}</p>
-                    </div>
-                  </div>
-                </Card>
+                  </Card>
+                ))}
               </div>
             </div>
           )}
@@ -780,16 +696,14 @@ export default function Admin() {
             <div className="space-y-6 animate-in fade-in duration-500">
               <div className="flex justify-between items-center gap-4">
                 <h2 className="text-2xl font-bold text-white">{t.userManagement}</h2>
-                <div className="flex gap-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                    <Input 
-                      placeholder={t.search} 
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 bg-slate-800 border-slate-700 text-white w-48"
-                    />
-                  </div>
+                <div className="relative">
+                  <Search className={`absolute ${isRTL ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-gray-400`} />
+                  <Input 
+                    placeholder={t.search} 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className={`${isRTL ? 'pr-10' : 'pl-10'} bg-slate-800 border-slate-700 text-white w-48`}
+                  />
                 </div>
               </div>
 
@@ -798,10 +712,10 @@ export default function Admin() {
                   <table className="w-full">
                     <thead>
                       <tr className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-b border-slate-700">
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">{t.username}</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">{t.fullName}</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">{t.status}</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">{t.actions}</th>
+                        <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>{t.username}</th>
+                        <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>{t.fullName}</th>
+                        <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>{t.status}</th>
+                        <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>{t.actions}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -814,11 +728,13 @@ export default function Admin() {
                       ) : (
                         filteredUsers.map((u: any, idx: number) => (
                           <tr key={u.id} className={`border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors ${idx % 2 === 0 ? 'bg-slate-800/30' : 'bg-slate-900/20'}`}>
-                            <td className="px-6 py-4 text-sm font-medium text-white flex items-center gap-2">
-                              {adminUsers.some((a: any) => a.user_id === u.id) && (
-                                <Crown className="w-4 h-4 text-yellow-400" />
-                              )}
-                              {u.username}
+                            <td className="px-6 py-4 text-sm font-medium text-white">
+                              <div className="flex items-center gap-2">
+                                {adminUsers.some((a: any) => a.user_id === u.id) && (
+                                  <Crown className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                                )}
+                                <span>{u.username}</span>
+                              </div>
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-300">{u.full_name || '-'}</td>
                             <td className="px-6 py-4 text-sm">
@@ -831,50 +747,21 @@ export default function Admin() {
                                 {u.is_banned ? t.banned : t.active}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-sm flex gap-1 flex-wrap">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedUser(u);
-                                  openAdminPermissionsDialog(u, true);
-                                  setShowMakeAdminDialog(true);
-                                }}
-                                className="text-xs"
-                                title={adminUsers.some((a: any) => a.user_id === u.id) ? 'Remove Admin' : 'Make Admin'}
-                              >
-                                <Crown className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={u.is_banned ? "outline" : "destructive"}
-                                onClick={() => {
-                                  setSelectedUser(u);
-                                  setShowBanDialog(true);
-                                }}
-                                className="text-xs"
-                              >
-                                <Ban className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openEditDialog(u)}
-                                className="text-xs"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => {
-                                  setSelectedUser(u);
-                                  setShowDeleteDialog(true);
-                                }}
-                                className="text-xs"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
+                            <td className="px-6 py-4 text-sm">
+                              <div className="flex gap-1 flex-wrap">
+                                <Button size="sm" variant="outline" onClick={() => { setSelectedUser(u); openAdminPermissionsDialog(u, true); setShowMakeAdminDialog(true); }} className="text-xs" title={adminUsers.some((a: any) => a.user_id === u.id) ? t.removeAdmin : t.makeAdmin}>
+                                  <Crown className="w-3 h-3" />
+                                </Button>
+                                <Button size="sm" variant={u.is_banned ? "outline" : "destructive"} onClick={() => { setSelectedUser(u); setShowBanDialog(true); }} className="text-xs">
+                                  <Ban className="w-3 h-3" />
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => openEditDialog(u)} className="text-xs">
+                                  <Edit2 className="w-3 h-3" />
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => { setSelectedUser(u); setShowDeleteDialog(true); }} className="text-xs">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -894,35 +781,45 @@ export default function Admin() {
                 {selectedUser ? (
                   <Card className="lg:col-span-1 p-6 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
                     <div className="space-y-4">
-                      <div>
-                        <p className="text-lg font-bold text-white mb-4">{selectedUser.username}</p>
-                        <div className="space-y-3">
-                          {[
-                            { key: 'isVerified', label: t.verified, icon: CheckCircle, color: 'blue' },
-                            { key: 'isOfficial', label: t.official, icon: Shield, color: 'red' },
-                            { key: 'isCreator', label: t.creator, icon: Star, color: 'yellow' },
-                            { key: 'isPremium', label: t.premium, icon: Lock, color: 'purple' },
-                            { key: 'isPopular', label: t.popular, icon: Award, color: 'orange' },
-                          ].map(({ key, label }) => (
-                            <label key={key} className="flex items-center gap-3 p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 cursor-pointer transition">
-                              <Checkbox
-                                checked={(editData as any)[key]}
-                                onCheckedChange={(checked) =>
-                                  setEditData({ ...editData, [key]: !!checked })
-                                }
-                              />
-                              <span className="text-sm font-medium text-white">{label}</span>
-                            </label>
-                          ))}
-                        </div>
-                        <Button
-                          className="mt-6 w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-                          onClick={handleEditUser}
-                        >
-                          <Zap className="w-4 h-4 mr-2" />
-                          {t.save}
-                        </Button>
+                      <p className="text-lg font-bold text-white mb-4">{selectedUser.username}</p>
+                      <div className="space-y-3">
+                        {[
+                          { key: 'isVerified', label: t.verified, icon: CheckCircle },
+                          { key: 'isOfficial', label: t.official, icon: Shield },
+                          { key: 'isCreator', label: t.creator, icon: Star },
+                          { key: 'isPremium', label: t.premium, icon: Lock },
+                          { key: 'isPopular', label: t.popular, icon: Award },
+                        ].map(({ key, label }) => (
+                          <label key={key} className="flex items-center gap-3 p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 cursor-pointer transition">
+                            <Checkbox
+                              checked={(editData as any)[key]}
+                              onCheckedChange={(checked) => setEditData({ ...editData, [key]: !!checked })}
+                            />
+                            <span className="text-sm font-medium text-white">{label}</span>
+                          </label>
+                        ))}
                       </div>
+                      <Button
+                        className="mt-6 w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                        onClick={() => editUserMutation.mutate({
+                          userId: selectedUser.id,
+                          data: {
+                            full_name: editData.fullName || null,
+                            bio: editData.bio || null,
+                            website: editData.website || null,
+                            location: editData.location || null,
+                            is_verified: editData.isVerified,
+                            is_official: editData.isOfficial,
+                            is_creator: editData.isCreator,
+                            is_premium: editData.isPremium,
+                            is_popular: editData.isPopular,
+                          }
+                        })}
+                        disabled={editUserMutation.isPending}
+                      >
+                        <Zap className="w-4 h-4 mr-2" />
+                        {t.save}
+                      </Button>
                     </div>
                   </Card>
                 ) : (
@@ -935,27 +832,19 @@ export default function Admin() {
                   <Card className="p-6 bg-slate-800/50 border-slate-700 h-full max-h-96 overflow-y-auto">
                     <h3 className="font-bold text-white mb-4">{t.userManagement}</h3>
                     <div className="space-y-2">
-                      {filteredUsers.slice(0, 10).map((u: any) => (
+                      {filteredUsers.slice(0, 20).map((u: any) => (
                         <button
                           key={u.id}
                           onClick={() => {
                             setSelectedUser(u);
                             setEditData({
-                              fullName: u.full_name || '',
-                              bio: u.bio || '',
-                              website: u.website || '',
-                              location: u.location || '',
-                              isVerified: u.is_verified || false,
-                              isOfficial: u.is_official || false,
-                              isCreator: u.is_creator || false,
-                              isPremium: u.is_premium || false,
-                              isPopular: u.is_popular || false,
+                              fullName: u.full_name || '', bio: u.bio || '', website: u.website || '', location: u.location || '',
+                              isVerified: u.is_verified || false, isOfficial: u.is_official || false, isCreator: u.is_creator || false,
+                              isPremium: u.is_premium || false, isPopular: u.is_popular || false,
                             });
                           }}
-                          className={`w-full p-3 rounded-lg text-left transition-all ${
-                            selectedUser?.id === u.id
-                              ? 'border-2 border-purple-500 bg-purple-500/20'
-                              : 'border border-slate-700 bg-slate-700/20 hover:bg-slate-700/40'
+                          className={`w-full p-3 rounded-lg ${isRTL ? 'text-right' : 'text-left'} transition-all ${
+                            selectedUser?.id === u.id ? 'border-2 border-purple-500 bg-purple-500/20' : 'border border-slate-700 bg-slate-700/20 hover:bg-slate-700/40'
                           }`}
                         >
                           <p className="font-medium text-white">{u.username}</p>
@@ -972,11 +861,53 @@ export default function Admin() {
           {/* Content Moderation Tab */}
           {activeTab === 'content' && (
             <div className="space-y-6 animate-in fade-in duration-500">
-              <h2 className="text-2xl font-bold text-white">{t.content}</h2>
-              <Card className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 text-center">
-                <Eye className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-400">{t.noPosts}</p>
-              </Card>
+              <h2 className="text-2xl font-bold text-white">{t.contentModeration}</h2>
+              {posts.length === 0 ? (
+                <Card className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 text-center">
+                  <Eye className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-400">{t.noPosts}</p>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {posts.map((post: any) => (
+                    <Card key={post.id} className="bg-slate-800/50 border-slate-700 overflow-hidden">
+                      {post.image_url && (
+                        <div className="h-48 bg-slate-700">
+                          <img src={post.image_url} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
+                            {(post.profiles?.username || '?')[0]?.toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-white">{post.profiles?.username || 'Unknown'}</p>
+                            <p className="text-xs text-gray-400">{formatDate(post.created_at)}</p>
+                          </div>
+                        </div>
+                        {post.caption && (
+                          <p className="text-sm text-gray-300 line-clamp-3">{post.caption}</p>
+                        )}
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <span className="flex items-center gap-1">❤️ {post.likes_count || 0}</span>
+                          <span className="flex items-center gap-1">💬 {post.comments_count || 0}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="w-full text-xs"
+                          onClick={() => deletePostMutation.mutate(post.id)}
+                          disabled={deletePostMutation.isPending}
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          {t.deletePost}
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1000,58 +931,39 @@ export default function Admin() {
                           </div>
                         </div>
 
-                        {/* Role Badge */}
                         <div className="flex items-center justify-between p-2 rounded-lg bg-slate-700/30">
                           <span className="text-xs font-medium text-gray-300">{t.adminRole}</span>
                           <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                            admin.role === 'super_admin'
-                              ? 'bg-red-500/30 text-red-300'
-                              : 'bg-blue-500/30 text-blue-300'
+                            admin.role === 'super_admin' ? 'bg-red-500/30 text-red-300' : admin.role === 'admin' ? 'bg-purple-500/30 text-purple-300' : 'bg-blue-500/30 text-blue-300'
                           }`}>
-                            {admin.role === 'super_admin' ? t.superAdmin : t.moderator}
+                            {admin.role === 'super_admin' ? t.superAdmin : admin.role === 'admin' ? 'Admin' : t.moderator}
                           </span>
                         </div>
 
-                        {/* Status Badge */}
                         <div className="flex items-center justify-between p-2 rounded-lg bg-slate-700/30">
                           <span className="text-xs font-medium text-gray-300">{t.status}</span>
                           <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                            admin.is_active
-                              ? 'bg-green-500/30 text-green-300'
-                              : 'bg-red-500/30 text-red-300'
+                            admin.is_active ? 'bg-green-500/30 text-green-300' : 'bg-red-500/30 text-red-300'
                           }`}>
                             {admin.is_active ? t.active : 'Inactive'}
                           </span>
                         </div>
 
-                        {/* Permissions Summary */}
                         <div className="space-y-1 text-xs text-gray-400">
                           {admin.can_manage_users && <p>✓ {t.manageUsers}</p>}
                           {admin.can_manage_content && <p>✓ {t.manageContent}</p>}
-                          {admin.can_manage_admins && <p>✓ {t.manageUsers} & Admins</p>}
+                          {admin.can_manage_admins && <p>✓ {lang === 'ar' ? 'إدارة المسؤولين' : 'Manage Admins'}</p>}
                           {admin.can_manage_reports && <p>✓ {t.manageReports}</p>}
                           {admin.can_view_analytics && <p>✓ {t.viewAnalytics}</p>}
+                          {admin.can_manage_settings && <p>✓ {lang === 'ar' ? 'إدارة الإعدادات' : 'Manage Settings'}</p>}
                         </div>
 
-                        {/* Action Buttons */}
                         <div className="flex gap-2 pt-4 border-t border-slate-700">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openAdminPermissionsDialog(admin, false)}
-                            className="flex-1 text-xs"
-                          >
+                          <Button size="sm" variant="outline" onClick={() => openAdminPermissionsDialog(admin, false)} className="flex-1 text-xs">
                             <Edit2 className="w-3 h-3 mr-1" />
                             {t.editAdmin}
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              setSelectedUser(adminProfile);
-                              setShowMakeAdminDialog(true);
-                            }}
-                          >
+                          <Button size="sm" variant="destructive" onClick={() => { setSelectedUser(adminProfile); removeAdminMutation.mutate(admin.user_id); }}>
                             <X className="w-4 h-4" />
                           </Button>
                         </div>
@@ -1067,10 +979,41 @@ export default function Admin() {
           {activeTab === 'reports' && (
             <div className="space-y-6 animate-in fade-in duration-500">
               <h2 className="text-2xl font-bold text-white">{t.reportedPosts}</h2>
-              <Card className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 text-center">
-                <Flag className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-400">{t.noReports}</p>
-              </Card>
+              {reports.length === 0 ? (
+                <Card className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 text-center">
+                  <Flag className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-400">{t.noReports}</p>
+                </Card>
+              ) : (
+                <Card className="bg-slate-800/50 border-slate-700 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gradient-to-r from-red-500/20 to-orange-500/20 border-b border-slate-700">
+                          <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>ID</th>
+                          <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>{t.reason}</th>
+                          <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>{t.status}</th>
+                          <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>{t.date}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reports.map((r: any, idx: number) => (
+                          <tr key={r.id} className={`border-b border-slate-700/50 ${idx % 2 === 0 ? 'bg-slate-800/30' : 'bg-slate-900/20'}`}>
+                            <td className="px-6 py-4 text-sm text-gray-300 font-mono">{r.id?.slice(0, 8)}</td>
+                            <td className="px-6 py-4 text-sm text-gray-300">{r.reason || '-'}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                r.status === 'resolved' ? 'bg-green-500/30 text-green-300' : 'bg-yellow-500/30 text-yellow-300'
+                              }`}>{r.status || 'pending'}</span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-400">{formatDate(r.created_at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              )}
             </div>
           )}
 
@@ -1087,7 +1030,10 @@ export default function Admin() {
                       <p className="text-xs text-gray-400">{t.enableAutoMod}</p>
                     </div>
                   </div>
-                  <Checkbox checked={autoMod} onCheckedChange={(checked) => setAutoMod(checked === true)} />
+                  <Checkbox
+                    checked={platformSettings?.auto_moderation === 'true'}
+                    onCheckedChange={(checked) => updateSettingMutation.mutate({ key: 'auto_moderation', value: String(!!checked) })}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between p-4 rounded-lg bg-slate-700/30">
@@ -1098,18 +1044,25 @@ export default function Admin() {
                       <p className="text-xs text-gray-400">{t.enableMaintenance}</p>
                     </div>
                   </div>
-                  <Checkbox checked={maintenance} onCheckedChange={(checked) => setMaintenance(checked === true)} />
+                  <Checkbox
+                    checked={platformSettings?.maintenance_mode === 'true'}
+                    onCheckedChange={(checked) => updateSettingMutation.mutate({ key: 'maintenance_mode', value: String(!!checked) })}
+                  />
                 </div>
 
                 <div className="pt-4 border-t border-slate-700">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="p-4 rounded-lg bg-slate-700/30">
-                      <p className="text-xs text-gray-400 mb-1">{t.apiUsage}</p>
-                      <p className="text-lg font-bold text-blue-400">842 / 1000</p>
+                      <p className="text-xs text-gray-400 mb-1">{t.totalUsers}</p>
+                      <p className="text-lg font-bold text-blue-400">{stats?.totalUsers || 0}</p>
                     </div>
                     <div className="p-4 rounded-lg bg-slate-700/30">
-                      <p className="text-xs text-gray-400 mb-1">{lang === 'ar' ? 'الطلبات اليومية' : 'Daily Requests'}</p>
-                      <p className="text-lg font-bold text-green-400">2,354</p>
+                      <p className="text-xs text-gray-400 mb-1">{t.totalPosts}</p>
+                      <p className="text-lg font-bold text-green-400">{stats?.totalPosts || 0}</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-slate-700/30">
+                      <p className="text-xs text-gray-400 mb-1">{t.databaseStatus}</p>
+                      <p className="text-lg font-bold text-green-400">{t.healthy}</p>
                     </div>
                   </div>
                 </div>
@@ -1121,10 +1074,41 @@ export default function Admin() {
           {activeTab === 'logs' && (
             <div className="space-y-6 animate-in fade-in duration-500">
               <h2 className="text-2xl font-bold text-white">{t.recentActivity}</h2>
-              <Card className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 text-center">
-                <History className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-400">{t.noActivity}</p>
-              </Card>
+              {adminLogs.length === 0 ? (
+                <Card className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 text-center">
+                  <History className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-400">{t.noActivity}</p>
+                </Card>
+              ) : (
+                <Card className="bg-slate-800/50 border-slate-700 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-b border-slate-700">
+                          <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>{lang === 'ar' ? 'المسؤول' : 'Admin'}</th>
+                          <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>{t.action}</th>
+                          <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>{lang === 'ar' ? 'التفاصيل' : 'Details'}</th>
+                          <th className={`px-6 py-4 ${isRTL ? 'text-right' : 'text-left'} text-sm font-semibold text-gray-300`}>{t.timestamp}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminLogs.map((log: any, idx: number) => (
+                          <tr key={log.id} className={`border-b border-slate-700/50 ${idx % 2 === 0 ? 'bg-slate-800/30' : 'bg-slate-900/20'}`}>
+                            <td className="px-6 py-4 text-sm text-white font-medium">{log.profiles?.username || log.admin_user_id?.slice(0, 8)}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className="px-2 py-1 rounded bg-slate-700/50 text-gray-300 text-xs font-medium">
+                                {actionLabels[log.action]?.[lang] || log.action}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-400 max-w-xs truncate">{log.details || '-'}</td>
+                            <td className="px-6 py-4 text-sm text-gray-400">{formatDate(log.created_at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              )}
             </div>
           )}
         </div>
@@ -1135,25 +1119,15 @@ export default function Admin() {
           <DialogContent className="bg-slate-900 border-slate-700">
             <DialogHeader>
               <DialogTitle className="text-white">{t.confirmBan}</DialogTitle>
-              <DialogDescription className="text-gray-400">{t.areYouSure}</DialogDescription>
+              <DialogDescription className="text-gray-400">{selectedUser?.username} — {t.areYouSure}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <Input
-                type="text"
-                placeholder={t.reason}
-                value={banReason}
-                onChange={(e) => setBanReason(e.target.value)}
-                className="bg-slate-800 border-slate-700 text-white"
-              />
+              <Input type="text" placeholder={t.reason} value={banReason} onChange={(e) => setBanReason(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
               {!selectedUser?.is_banned && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">
-                    {lang === 'ar' ? 'مدة الحظر' : 'Ban Duration'}
-                  </label>
+                  <label className="text-sm font-medium text-gray-300">{lang === 'ar' ? 'مدة الحظر' : 'Ban Duration'}</label>
                   <Select value={banDuration} onValueChange={setBanDuration}>
-                    <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="bg-slate-800 border-slate-700 text-white"><SelectValue /></SelectTrigger>
                     <SelectContent className="bg-slate-800 border-slate-700">
                       <SelectItem value="1h">{lang === 'ar' ? '1 ساعة' : '1 Hour'}</SelectItem>
                       <SelectItem value="3h">{lang === 'ar' ? '3 ساعات' : '3 Hours'}</SelectItem>
@@ -1169,11 +1143,9 @@ export default function Admin() {
                 </div>
               )}
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setShowBanDialog(false)}>
-                  {t.cancel}
-                </Button>
-                <Button variant="destructive" onClick={handleBanUser}>
-                  {t.confirm}
+                <Button variant="outline" onClick={() => setShowBanDialog(false)}>{t.cancel}</Button>
+                <Button variant="destructive" onClick={() => { if (selectedUser) banMutation.mutate({ userId: selectedUser.id, ban: !selectedUser.is_banned, reason: banReason, duration: banDuration }); }} disabled={banMutation.isPending}>
+                  {banMutation.isPending ? <Spinner className="w-4 h-4" /> : t.confirm}
                 </Button>
               </div>
             </div>
@@ -1185,14 +1157,12 @@ export default function Admin() {
           <DialogContent className="bg-slate-900 border-slate-700">
             <DialogHeader>
               <DialogTitle className="text-white">{t.confirmDelete}</DialogTitle>
-              <DialogDescription className="text-gray-400">{t.areYouSure}</DialogDescription>
+              <DialogDescription className="text-gray-400">{selectedUser?.username} — {t.areYouSure}</DialogDescription>
             </DialogHeader>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-                {t.cancel}
-              </Button>
-              <Button variant="destructive" onClick={handleDeleteUser}>
-                {t.confirm}
+              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>{t.cancel}</Button>
+              <Button variant="destructive" onClick={() => { if (selectedUser) deleteUserMutation.mutate(selectedUser.id); }} disabled={deleteUserMutation.isPending}>
+                {deleteUserMutation.isPending ? <Spinner className="w-4 h-4" /> : t.confirm}
               </Button>
             </div>
           </DialogContent>
@@ -1205,20 +1175,17 @@ export default function Admin() {
               <DialogTitle className="text-white">
                 {adminUsers.some((a: any) => a.user_id === selectedUser?.id) ? t.removeAdmin : t.makeAdmin}
               </DialogTitle>
+              <DialogDescription className="text-gray-400">{selectedUser?.username}</DialogDescription>
             </DialogHeader>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setShowMakeAdminDialog(false)}>
-                {t.cancel}
-              </Button>
-              <Button 
+              <Button variant="outline" onClick={() => setShowMakeAdminDialog(false)}>{t.cancel}</Button>
+              <Button
                 className={`${adminUsers.some((a: any) => a.user_id === selectedUser?.id) ? 'bg-red-600 hover:bg-red-700' : 'bg-purple-600 hover:bg-purple-700'}`}
                 onClick={() => {
-                  if (!adminUsers.some((a: any) => a.user_id === selectedUser?.id)) {
-                    // Show permissions dialog for new admin
-                    setShowAdminPermissionsDialog(true);
+                  if (adminUsers.some((a: any) => a.user_id === selectedUser?.id)) {
+                    removeAdminMutation.mutate(selectedUser.id);
                   } else {
-                    // Just remove admin
-                    handleMakeAdmin();
+                    setShowAdminPermissionsDialog(true);
                   }
                 }}
               >
@@ -1230,20 +1197,15 @@ export default function Admin() {
 
         {/* Admin Permissions Dialog */}
         <Dialog open={showAdminPermissionsDialog} onOpenChange={setShowAdminPermissionsDialog}>
-          <DialogContent className="bg-slate-900 border-slate-700 max-h-96 overflow-y-auto">
+          <DialogContent className="bg-slate-900 border-slate-700 max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-white">{t.managePermissions}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              {/* Admin Role */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-300">{t.adminRole}</label>
-                <Select value={adminPermissions.role} onValueChange={(value) => 
-                  setAdminPermissions({ ...adminPermissions, role: value as any })
-                }>
-                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={adminPermissions.role} onValueChange={(value) => setAdminPermissions({ ...adminPermissions, role: value })}>
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white"><SelectValue /></SelectTrigger>
                   <SelectContent className="bg-slate-800 border-slate-700">
                     <SelectItem value="moderator">{t.moderator}</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
@@ -1252,18 +1214,11 @@ export default function Admin() {
                 </Select>
               </div>
 
-              {/* Is Active */}
               <label className="flex items-center gap-3 p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 cursor-pointer transition">
-                <Checkbox
-                  checked={adminPermissions.is_active}
-                  onCheckedChange={(checked) =>
-                    setAdminPermissions({ ...adminPermissions, is_active: !!checked })
-                  }
-                />
+                <Checkbox checked={adminPermissions.is_active} onCheckedChange={(checked) => setAdminPermissions({ ...adminPermissions, is_active: !!checked })} />
                 <span className="text-sm font-medium text-white">{t.isActive}</span>
               </label>
 
-              {/* Permissions */}
               <div className="space-y-3 pt-2 border-t border-slate-700">
                 <p className="text-xs font-semibold text-gray-400 uppercase">{lang === 'ar' ? 'الصلاحيات' : 'Permissions'}</p>
                 {[
@@ -1275,34 +1230,26 @@ export default function Admin() {
                   { key: 'can_manage_settings', label: lang === 'ar' ? 'إدارة الإعدادات' : 'Manage Settings' },
                 ].map(({ key, label }) => (
                   <label key={key} className="flex items-center gap-3 p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 cursor-pointer transition">
-                    <Checkbox
-                      checked={(adminPermissions as any)[key]}
-                      onCheckedChange={(checked) =>
-                        setAdminPermissions({ ...adminPermissions, [key]: !!checked })
-                      }
-                    />
+                    <Checkbox checked={(adminPermissions as any)[key]} onCheckedChange={(checked) => setAdminPermissions({ ...adminPermissions, [key]: !!checked })} />
                     <span className="text-sm font-medium text-white">{label}</span>
                   </label>
                 ))}
               </div>
 
               <div className="flex gap-2 justify-end pt-4 border-t border-slate-700">
-                <Button variant="outline" onClick={() => setShowAdminPermissionsDialog(false)}>
-                  {t.cancel}
-                </Button>
+                <Button variant="outline" onClick={() => setShowAdminPermissionsDialog(false)}>{t.cancel}</Button>
                 <Button
                   className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
                   onClick={() => {
                     if (selectedAdmin) {
-                      // Editing existing admin
-                      handleEditAdmin();
-                    } else {
-                      // Creating new admin
-                      handleMakeAdmin();
+                      editAdminMutation.mutate({ userId: selectedAdmin.user_id, data: adminPermissions });
+                    } else if (selectedUser) {
+                      addAdminMutation.mutate({ user_id: selectedUser.id, ...adminPermissions });
                     }
                   }}
+                  disabled={addAdminMutation.isPending || editAdminMutation.isPending}
                 >
-                  {t.save}
+                  {(addAdminMutation.isPending || editAdminMutation.isPending) ? <Spinner className="w-4 h-4" /> : t.save}
                 </Button>
               </div>
             </div>
@@ -1311,52 +1258,33 @@ export default function Admin() {
 
         {/* Edit Dialog */}
         <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-          <DialogContent className="bg-slate-900 border-slate-700 max-h-96 overflow-y-auto">
+          <DialogContent className="bg-slate-900 border-slate-700 max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-white">{t.editUser}</DialogTitle>
+              <DialogTitle className="text-white">{t.editUser} — {selectedUser?.username}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <Input
-                placeholder={t.fullName}
-                value={editData.fullName}
-                onChange={(e) =>
-                  setEditData({ ...editData, fullName: e.target.value })
-                }
-                className="bg-slate-800 border-slate-700 text-white"
-              />
-              <Input
-                placeholder={t.bio}
-                value={editData.bio}
-                onChange={(e) =>
-                  setEditData({ ...editData, bio: e.target.value })
-                }
-                className="bg-slate-800 border-slate-700 text-white"
-              />
-              <Input
-                placeholder={t.website}
-                value={editData.website}
-                onChange={(e) =>
-                  setEditData({ ...editData, website: e.target.value })
-                }
-                className="bg-slate-800 border-slate-700 text-white"
-              />
-              <Input
-                placeholder={t.location}
-                value={editData.location}
-                onChange={(e) =>
-                  setEditData({ ...editData, location: e.target.value })
-                }
-                className="bg-slate-800 border-slate-700 text-white"
-              />
+              <Input placeholder={t.fullName} value={editData.fullName} onChange={(e) => setEditData({ ...editData, fullName: e.target.value })} className="bg-slate-800 border-slate-700 text-white" />
+              <Input placeholder={t.bio} value={editData.bio} onChange={(e) => setEditData({ ...editData, bio: e.target.value })} className="bg-slate-800 border-slate-700 text-white" />
+              <Input placeholder={t.website} value={editData.website} onChange={(e) => setEditData({ ...editData, website: e.target.value })} className="bg-slate-800 border-slate-700 text-white" />
+              <Input placeholder={t.location} value={editData.location} onChange={(e) => setEditData({ ...editData, location: e.target.value })} className="bg-slate-800 border-slate-700 text-white" />
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-                  {t.cancel}
-                </Button>
+                <Button variant="outline" onClick={() => setShowEditDialog(false)}>{t.cancel}</Button>
                 <Button
                   className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-                  onClick={handleEditUser}
+                  onClick={() => {
+                    if (selectedUser) editUserMutation.mutate({
+                      userId: selectedUser.id,
+                      data: {
+                        full_name: editData.fullName || null, bio: editData.bio || null,
+                        website: editData.website || null, location: editData.location || null,
+                        is_verified: editData.isVerified, is_official: editData.isOfficial,
+                        is_creator: editData.isCreator, is_premium: editData.isPremium, is_popular: editData.isPopular,
+                      }
+                    });
+                  }}
+                  disabled={editUserMutation.isPending}
                 >
-                  {t.save}
+                  {editUserMutation.isPending ? <Spinner className="w-4 h-4" /> : t.save}
                 </Button>
               </div>
             </div>
