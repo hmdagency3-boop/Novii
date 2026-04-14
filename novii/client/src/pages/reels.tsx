@@ -141,6 +141,22 @@ export default function Reels() {
     return () => { c.removeEventListener("scroll", onScroll); clearTimeout(t); };
   }, [computeDesktopIdx]);
 
+  const tryPlayVideo = useCallback((vid: HTMLVideoElement) => {
+    vid.muted = mutedRef.current;
+    const attempt = () => vid.play().catch(() => {
+      vid.muted = true;
+      mutedRef.current = true;
+      vid.play().catch(() => {});
+    });
+    if (vid.readyState >= 2) {
+      attempt();
+    } else {
+      vid.addEventListener('loadeddata', () => attempt(), { once: true });
+      if (!vid.src && !vid.currentSrc) return;
+      vid.load();
+    }
+  }, []);
+
   const playActiveReel = useCallback((activeIdx: number, refs: React.MutableRefObject<{ [k: string]: HTMLVideoElement }>) => {
     const list = reelsRef.current;
     if (!list.length) return;
@@ -148,8 +164,7 @@ export default function Reels() {
       const vid = refs.current[reel.id];
       if (!vid) return;
       if (idx === activeIdx) {
-        vid.muted = mutedRef.current;
-        vid.play().catch(() => {});
+        tryPlayVideo(vid);
         setPausedReels(p => { const n = new Set(p); n.delete(reel.id); return n; });
         if (isGuestRef.current && !guestPromptShown.current) {
           guestViewCount.current += 1;
@@ -163,7 +178,7 @@ export default function Reels() {
         vid.currentTime = 0;
       }
     });
-  }, []);
+  }, [tryPlayVideo]);
 
   /* ── Auto-play first reel once videos load ── */
   useEffect(() => {
@@ -175,11 +190,15 @@ export default function Reels() {
         initialPlayDone.current = true;
         playActiveReel(0, mobileRefs);
         playActiveReel(0, desktopRefs);
+        return true;
       }
+      return false;
     };
-    tryPlay();
-    const t = setTimeout(tryPlay, 300);
-    return () => clearTimeout(t);
+    if (tryPlay()) return;
+    const timers = [300, 600, 1200].map(ms => setTimeout(() => {
+      if (!initialPlayDone.current) tryPlay();
+    }, ms));
+    return () => timers.forEach(clearTimeout);
   }, [reels, playActiveReel]);
 
   /* ── Play active reel, pause all others — MOBILE ── */
@@ -700,6 +719,7 @@ function DesktopReelCard({
             src={reel.video_url}
             className="w-full h-full object-cover"
             loop playsInline muted={muted}
+            preload="auto"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/70 pointer-events-none" />
 
