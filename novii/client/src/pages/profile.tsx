@@ -1,6 +1,6 @@
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Settings, Grid3X3, Bookmark, UserSquare2, Heart, MessageCircle, Lock, Shield, QrCode, Pin } from "lucide-react";
+import { Settings, Grid3X3, Bookmark, UserSquare2, Heart, MessageCircle, Lock, QrCode, Pin } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
@@ -115,20 +115,6 @@ export default function Profile() {
     return () => { supabase.removeChannel(channel); };
   }, [user?.id, queryClient]);
 
-  // Check if user is admin
-  const { data: isAdmin = false } = useQuery({
-    queryKey: ['isAdmin', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return false;
-      const { data } = await supabase
-        .from('admins')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      return !!data;
-    },
-    enabled: !!user?.id,
-  });
 
   // Fetch user posts
   const { data: userPosts = [], isLoading: postsLoading } = useQuery({
@@ -391,20 +377,6 @@ export default function Profile() {
                       <Settings className={isMobile ? "w-4 h-4" : "w-5 h-5"} />
                     </Button>
                   </Link>
-                  {isAdmin && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className={cn(
-                        "hover:bg-purple-500/20 text-purple-500",
-                        isMobile ? "h-8 w-8" : "h-9 w-9"
-                      )}
-                      onClick={() => setLocation("/admin")}
-                      title={isRTL ? "لوحة التحكم" : "Admin Panel"}
-                    >
-                      <Shield className={isMobile ? "w-4 h-4" : "w-5 h-5"} />
-                    </Button>
-                  )}
                 </div>
               </div>
 

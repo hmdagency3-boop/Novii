@@ -28,7 +28,6 @@ import Notifications from "@/pages/notifications";
 import Mentions from "@/pages/mentions";
 import AuthPage from "@/pages/auth";
 import PostPage from "@/pages/post";
-import Admin from "@/pages/admin";
 import FollowersDetail from "@/pages/followers-detail";
 import ResetPassword from "@/pages/reset-password";
 import Features from "@/pages/features";
@@ -199,11 +198,6 @@ function Router() {
       <Route path="/post/:id">
         <ProtectedLayout>
           <PostPage />
-        </ProtectedLayout>
-      </Route>
-      <Route path="/admin">
-        <ProtectedLayout>
-          <Admin />
         </ProtectedLayout>
       </Route>
       <Route path="/followers-detail">
