@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 
-const NOVII_API_BASE = "/api";
+const NOVII_API_BASE = `${import.meta.env.BASE_URL}api`;
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
