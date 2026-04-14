@@ -2233,20 +2233,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/users/:userId", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;
-      const { full_name, bio, website, location, is_verified, is_official, is_creator, is_premium, is_popular } = req.body;
+      const { full_name, bio, website, location, is_verified, is_official, is_creator, is_premium, is_popular, is_active, is_gold_early_member, is_silver_early_member, is_bronze_early_member, is_beta_tester } = req.body;
 
-      const updatePayload = {
-        full_name: full_name || null,
-        bio: bio || null,
-        website: website || null,
-        location: location || null,
-        is_verified: is_verified === true,
-        is_official: is_official === true,
-        is_creator: is_creator === true,
-        is_premium: is_premium === true,
-        is_popular: is_popular === true,
+      const updatePayload: Record<string, any> = {
         updated_at: new Date().toISOString(),
       };
+      if (full_name !== undefined) updatePayload.full_name = full_name || null;
+      if (bio !== undefined) updatePayload.bio = bio || null;
+      if (website !== undefined) updatePayload.website = website || null;
+      if (location !== undefined) updatePayload.location = location || null;
+      if (is_verified !== undefined) updatePayload.is_verified = is_verified === true;
+      if (is_official !== undefined) updatePayload.is_official = is_official === true;
+      if (is_creator !== undefined) updatePayload.is_creator = is_creator === true;
+      if (is_premium !== undefined) updatePayload.is_premium = is_premium === true;
+      if (is_popular !== undefined) updatePayload.is_popular = is_popular === true;
+      if (is_active !== undefined) updatePayload.is_active = is_active === true;
+      if (is_gold_early_member !== undefined) {
+        updatePayload.is_gold_early_member = is_gold_early_member === true;
+        updatePayload.gold_early_member_at = is_gold_early_member ? new Date().toISOString() : null;
+      }
+      if (is_silver_early_member !== undefined) {
+        updatePayload.is_silver_early_member = is_silver_early_member === true;
+        updatePayload.silver_early_member_at = is_silver_early_member ? new Date().toISOString() : null;
+      }
+      if (is_bronze_early_member !== undefined) {
+        updatePayload.is_bronze_early_member = is_bronze_early_member === true;
+        updatePayload.bronze_early_member_at = is_bronze_early_member ? new Date().toISOString() : null;
+      }
+      if (is_beta_tester !== undefined) {
+        updatePayload.is_beta_tester = is_beta_tester === true;
+        updatePayload.beta_tester_at = is_beta_tester ? new Date().toISOString() : null;
+      }
 
       console.log('🔧 Admin edit user:', userId, JSON.stringify(updatePayload));
 

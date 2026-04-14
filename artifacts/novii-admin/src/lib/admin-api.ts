@@ -171,6 +171,11 @@ export interface UserProfile {
   is_creator: boolean;
   is_premium: boolean;
   is_popular: boolean;
+  is_active: boolean;
+  is_gold_early_member: boolean;
+  is_silver_early_member: boolean;
+  is_bronze_early_member: boolean;
+  is_beta_tester: boolean;
   is_banned: boolean;
   ban_reason: string;
   banned_reason?: string;

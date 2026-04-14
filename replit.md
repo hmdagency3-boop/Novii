@@ -39,14 +39,15 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - **Roles**: `super_admin` (full access), `admin`, `moderator` — super_admin bypasses all permission checks
 - **Permissions**: `can_manage_users`, `can_manage_content`, `can_manage_admins`, `can_manage_reports`, `can_view_analytics`, `can_manage_settings`
 - **Server endpoints**: `/api/admin/check`, `/api/admin/stats`, `/api/admin/users`, `/api/admin/users/:id/ban`, `/api/admin/users/:id` (DELETE/PATCH), `/api/admin/admins` (GET/POST), `/api/admin/admins/:id` (PATCH/DELETE), `/api/admin/content` (GET), `/api/admin/content/:id` (DELETE), `/api/admin/reports`, `/api/admin/logs`, `/api/admin/settings` (GET/PATCH)
-- **Admin page** (`/admin`): Dashboard (real stats), Users (CRUD), Badges, Content moderation (real posts), Admins management, Reports, Settings (persisted to DB), Activity Logs (audit trail)
+- **Admin page removed from main platform** — all admin UI is now exclusively in the standalone admin panel (`artifacts/novii-admin`)
 - **Migration SQL**: `novii/supabase/upgrade_admin_system.sql`
 
 ### Standalone Admin Panel (`artifacts/novii-admin`)
 - **Separate frontend app** at `/novii-admin/` — completely independent from Novii platform codebase
 - **Tech**: React + Vite + Tailwind CSS + Supabase Auth, proxies API calls to Novii backend (port 5000)
 - **Design**: Ditto Pro-inspired dark sidebar, browser-style tab navigation, professional data tables with modals
-- **Pages**: Login (dark gradient), Dashboard (stats cards), Users (CRUD + ban/edit/delete), Content moderation, Admins management (add/edit/remove), Reports viewer, Platform Settings (key-value editor), Activity Logs
+- **Pages**: Login (dark gradient), Dashboard (stats cards), Users (CRUD + ban/edit/delete with full badge management), Content moderation, Admins management (add/edit/remove), Reports viewer, Platform Settings (key-value editor), Activity Logs
+- **All 10 badges**: verified, official, creator, premium, popular, active, gold early member, silver early member, bronze early member, beta tester — all viewable/editable from admin panel
 - **Auth flow**: Supabase email/password login → verifies admin status via `/api/admin/check` → shows panel if admin
 - **API contract**: Frontend matches backend exactly — ban uses `{ ban: boolean, duration: "7d" }`, admins use flat `can_manage_*` fields, settings returns object map transformed to array
 - **Key files**: `artifacts/novii-admin/src/lib/admin-api.ts` (API client), `artifacts/novii-admin/src/lib/auth-context.tsx` (auth state), `artifacts/novii-admin/src/components/sidebar.tsx` (navigation)

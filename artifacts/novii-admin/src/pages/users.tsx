@@ -20,6 +20,12 @@ import {
   UserCog,
   Shield,
   RefreshCw,
+  Flame,
+  Zap,
+  Award,
+  Medal,
+  Trophy,
+  FlaskConical,
 } from "lucide-react";
 
 export default function UsersPage() {
@@ -145,12 +151,17 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <div className="flex gap-1.5">
-                        {user.is_verified && <CheckCircle className="w-4 h-4 text-blue-500" title="Verified" />}
-                        {user.is_official && <Shield className="w-4 h-4 text-purple-500" title="Official" />}
-                        {user.is_creator && <Sparkles className="w-4 h-4 text-amber-500" title="Creator" />}
-                        {user.is_premium && <Crown className="w-4 h-4 text-yellow-500" title="Premium" />}
-                        {user.is_popular && <Star className="w-4 h-4 text-pink-500" title="Popular" />}
+                      <div className="flex gap-1 flex-wrap">
+                        {user.is_verified && <CheckCircle className="w-4 h-4 text-blue-500" title="موثق" />}
+                        {user.is_official && <Shield className="w-4 h-4 text-purple-500" title="رسمي" />}
+                        {user.is_creator && <Sparkles className="w-4 h-4 text-amber-500" title="صانع محتوى" />}
+                        {user.is_premium && <Crown className="w-4 h-4 text-yellow-500" title="مميز" />}
+                        {user.is_popular && <Flame className="w-4 h-4 text-pink-500" title="مشهور" />}
+                        {user.is_active && <Zap className="w-4 h-4 text-green-500" title="نشط" />}
+                        {user.is_gold_early_member && <Trophy className="w-4 h-4 text-yellow-400" title="عضو ذهبي مبكر" />}
+                        {user.is_silver_early_member && <Medal className="w-4 h-4 text-slate-400" title="عضو فضي مبكر" />}
+                        {user.is_bronze_early_member && <Award className="w-4 h-4 text-orange-600" title="عضو برونزي مبكر" />}
+                        {user.is_beta_tester && <FlaskConical className="w-4 h-4 text-violet-500" title="مختبر بيتا" />}
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
@@ -225,6 +236,11 @@ function ViewUserModal({ user, onClose }: { user: UserProfile; onClose: () => vo
           {user.is_creator && <Badge color="amber">صانع محتوى</Badge>}
           {user.is_premium && <Badge color="yellow">مميز</Badge>}
           {user.is_popular && <Badge color="pink">مشهور</Badge>}
+          {user.is_active && <Badge color="green">نشط</Badge>}
+          {user.is_gold_early_member && <Badge color="yellow">عضو ذهبي مبكر</Badge>}
+          {user.is_silver_early_member && <Badge color="slate">عضو فضي مبكر</Badge>}
+          {user.is_bronze_early_member && <Badge color="orange">عضو برونزي مبكر</Badge>}
+          {user.is_beta_tester && <Badge color="violet">مختبر بيتا</Badge>}
           {user.is_banned && <Badge color="red">محظور</Badge>}
         </div>
         {user.is_banned && (user.ban_reason || user.banned_reason) && (
@@ -380,6 +396,11 @@ function EditModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =
     is_creator: user.is_creator,
     is_premium: user.is_premium,
     is_popular: user.is_popular,
+    is_active: user.is_active,
+    is_gold_early_member: user.is_gold_early_member,
+    is_silver_early_member: user.is_silver_early_member,
+    is_bronze_early_member: user.is_bronze_early_member,
+    is_beta_tester: user.is_beta_tester,
   });
   const [bio, setBio] = useState(user.bio || "");
   const [busy, setBusy] = useState(false);
@@ -412,7 +433,7 @@ function EditModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">الشارات</label>
           <div className="space-y-2">
-            {Object.entries({ is_verified: "موثق ✓", is_official: "رسمي 🛡", is_creator: "صانع محتوى ✨", is_premium: "مميز 👑", is_popular: "مشهور ⭐" }).map(([key, label]) => (
+            {Object.entries({ is_verified: "موثق ✓", is_official: "رسمي 🛡", is_creator: "صانع محتوى ✨", is_premium: "مميز 👑", is_popular: "مشهور 🔥", is_active: "نشط ⚡", is_gold_early_member: "عضو ذهبي مبكر 🏆", is_silver_early_member: "عضو فضي مبكر 🥈", is_bronze_early_member: "عضو برونزي مبكر 🥉", is_beta_tester: "مختبر بيتا 🧪" }).map(([key, label]) => (
               <label key={key} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
                 <input
                   type="checkbox"
@@ -470,6 +491,9 @@ function Badge({ children, color }: { children: React.ReactNode; color: string }
     pink: "bg-pink-50 text-pink-600",
     red: "bg-red-50 text-red-600",
     green: "bg-green-50 text-green-600",
+    slate: "bg-slate-100 text-slate-600",
+    orange: "bg-orange-50 text-orange-600",
+    violet: "bg-violet-50 text-violet-600",
   };
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${colors[color] || colors.blue}`}>
