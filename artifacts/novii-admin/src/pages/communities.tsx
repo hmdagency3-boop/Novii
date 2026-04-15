@@ -712,8 +712,8 @@ function ChatTab({ community }: { community: CommunityRecord }) {
             }`}
           >
             {msg.is_system_message ? (
-              <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center shrink-0">
-                <Settings className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-white border border-purple-100">
+                <img src={`${import.meta.env.BASE_URL}novii_logo_transparent.png`} alt="النظام" className="w-full h-full object-contain" />
               </div>
             ) : (
               <Avatar url={msg.sender_avatar} name={msg.sender_username || "?"} size="sm" />
@@ -721,7 +721,7 @@ function ChatTab({ community }: { community: CommunityRecord }) {
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
                 {msg.is_system_message ? (
-                  <span className="text-xs font-bold text-purple-700">⚙️ النظام</span>
+                  <span className="text-xs font-bold text-purple-700">النظام</span>
                 ) : (
                   <span className="text-xs font-semibold text-gray-700">
                     {msg.sender_display_name || msg.sender_username || "مجهول"}

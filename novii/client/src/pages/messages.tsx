@@ -1878,17 +1878,22 @@ export default function Messages() {
                               const isAdmin = currentUserMember?.role === 'admin';
                               const isDeleted = msg.is_deleted;
 
-                              // System messages render as a centered notice banner
+                              // System messages render like normal messages with platform logo avatar
                               if (isSystem && !isDeleted) {
                                 return (
-                                  <div key={msg.id} className="flex justify-center my-2">
-                                    <div className="flex items-start gap-2 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-2xl px-4 py-2.5 max-w-[85%] shadow-sm">
-                                      <span className="text-purple-600 dark:text-purple-400 text-base leading-none mt-0.5">⚙️</span>
-                                      <div>
-                                        <p className="text-[10px] font-bold text-purple-600 dark:text-purple-400 mb-0.5">
+                                  <div key={msg.id} className="flex gap-2 group">
+                                    <Avatar className="w-8 h-8 flex-shrink-0">
+                                      <AvatarImage src="/assets/novii_logo_transparent.png" alt="النظام" />
+                                      <AvatarFallback>N</AvatarFallback>
+                                    </Avatar>
+                                    <div className="max-w-[70%] flex flex-col gap-1">
+                                      <div className="flex items-center gap-1 mb-1 px-2 py-1 rounded-lg">
+                                        <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
                                           {isRTL ? "النظام" : "System"}
-                                        </p>
-                                        <p className="text-xs text-purple-800 dark:text-purple-200 leading-relaxed">{msg.content}</p>
+                                        </span>
+                                      </div>
+                                      <div className="rounded-xl px-4 py-2 bg-muted text-foreground">
+                                        {msg.content}
                                       </div>
                                     </div>
                                   </div>
