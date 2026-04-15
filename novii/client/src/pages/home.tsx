@@ -249,6 +249,7 @@ export default function Home() {
           onOpenChange={setIsStoryViewerOpen}
           isRTL={isRTL}
           currentUserId={currentUser?.id}
+          onAddStory={() => setIsCreateStoryModalOpen(true)}
         />
       )}
     </Layout>

@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { StoryViewerModal } from "./story-viewer-modal";
+import { CreateStoryModal } from "./create-story-modal";
 import { useStories, useCurrentProfile } from "@/hooks/use-data";
 import { useLanguage } from "@/lib/language-context";
 import { cn } from "@/lib/utils";
@@ -14,11 +15,8 @@ interface StoryAwareAvatarProps {
   userId: string;
   avatarUrl?: string | null;
   username?: string;
-  /** Tailwind size class for the image wrapper, e.g. "w-12 h-12" */
   sizeClass?: string;
-  /** Extra classes on the outer ring wrapper */
   className?: string;
-  /** Called when user has no story and clicks (fallback); usually handled by parent Link */
   onNoStoryClick?: (e: React.MouseEvent) => void;
 }
 
@@ -31,11 +29,11 @@ export function StoryAwareAvatar({
   onNoStoryClick,
 }: StoryAwareAvatarProps) {
   const [showStories, setShowStories] = useState(false);
+  const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
   const { data: allStories = [] } = useStories();
   const { data: currentProfile } = useCurrentProfile();
   const { direction } = useLanguage();
 
-  /* Stories for this specific user that are still active */
   const userStories = allStories.filter((s) => s.user_id === userId);
   const hasStory    = userStories.length > 0;
   const allViewed   = hasStory && userStories.every((s) => s.is_viewed);
@@ -53,7 +51,6 @@ export function StoryAwareAvatar({
 
   return (
     <>
-      {/* Wrapper — either a clickable div (story) or a Link (profile) */}
       {hasStory ? (
         <button
           type="button"
@@ -90,7 +87,6 @@ export function StoryAwareAvatar({
         </Link>
       )}
 
-      {/* Story viewer */}
       {showStories && userStories.length > 0 && (
         <StoryViewerModal
           stories={userStories}
@@ -99,8 +95,15 @@ export function StoryAwareAvatar({
           onOpenChange={setShowStories}
           isRTL={direction === "rtl"}
           currentUserId={currentProfile?.id}
+          onAddStory={() => setIsCreateStoryOpen(true)}
         />
       )}
+
+      <CreateStoryModal
+        open={isCreateStoryOpen}
+        onOpenChange={setIsCreateStoryOpen}
+        isRTL={direction === "rtl"}
+      />
     </>
   );
 }

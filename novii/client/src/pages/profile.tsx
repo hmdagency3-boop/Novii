@@ -24,6 +24,7 @@ import { FollowersDialog } from "@/components/followers-dialog";
 import { PostViewerModal } from "@/components/post-viewer-modal";
 import { ReelViewerModal } from "@/components/reel-viewer-modal";
 import { StoryViewerModal } from "@/components/story-viewer-modal";
+import { CreateStoryModal } from "@/components/create-story-modal";
 import { Link, useLocation } from "wouter";
 import { useState, useEffect, useMemo } from "react";
 import { useLanguage } from "@/lib/language-context";
@@ -50,6 +51,7 @@ export default function Profile() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [isCreateStoryModalOpen, setIsCreateStoryModalOpen] = useState(false);
   const isRTL = direction === "rtl";
   const queryClient = useQueryClient();
   
@@ -582,6 +584,7 @@ export default function Profile() {
           onOpenChange={setStoryViewerOpen}
           isRTL={isRTL}
           currentUserId={user?.id}
+          onAddStory={() => setIsCreateStoryModalOpen(true)}
         />
       )}
 
@@ -596,6 +599,12 @@ export default function Profile() {
           fullName={profile.full_name ?? undefined}
         />
       )}
+
+      <CreateStoryModal
+        open={isCreateStoryModalOpen}
+        onOpenChange={setIsCreateStoryModalOpen}
+        isRTL={isRTL}
+      />
     </Layout>
   );
 }

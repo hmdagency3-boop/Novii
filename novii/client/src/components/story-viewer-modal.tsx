@@ -1,6 +1,6 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { X, Heart, Send, Pause, Play, Eye, Trash2, Music2, VolumeX, Volume2, MoreHorizontal, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Heart, Send, Pause, Play, Eye, Trash2, Music2, VolumeX, Volume2, MoreHorizontal, ChevronDown, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
@@ -18,9 +18,10 @@ interface StoryViewerModalProps {
   onOpenChange: (open: boolean) => void;
   isRTL?: boolean;
   currentUserId?: string | null;
+  onAddStory?: () => void;
 }
 
-export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, isRTL, currentUserId: propUserId }: StoryViewerModalProps) {
+export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, isRTL, currentUserId: propUserId, onAddStory }: StoryViewerModalProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -351,7 +352,13 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
             <div className="flex items-center justify-between px-1">
               {/* Left: avatar + name + time */}
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full p-[2px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-primary flex-shrink-0">
+                <div
+                  className={cn(
+                    "w-9 h-9 rounded-full p-[2px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-primary flex-shrink-0 relative",
+                    isOwnStory && onAddStory && "cursor-pointer"
+                  )}
+                  onClick={isOwnStory && onAddStory ? () => { onOpenChange(false); setTimeout(() => onAddStory(), 200); } : undefined}
+                >
                   <div className="w-full h-full rounded-full border-[1.5px] border-black overflow-hidden">
                     <img
                       src={currentStory.profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentStory.user_id}`}
@@ -359,6 +366,11 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
                       className="w-full h-full object-cover"
                     />
                   </div>
+                  {isOwnStory && onAddStory && (
+                    <div className="absolute -bottom-0.5 -right-0.5 bg-primary rounded-full w-4 h-4 flex items-center justify-center border-[1.5px] border-black z-20">
+                      <Plus className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <div className="flex items-baseline gap-1.5">
