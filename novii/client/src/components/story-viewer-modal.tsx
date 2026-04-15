@@ -360,11 +360,21 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
                     />
                   </div>
                 </div>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-white font-semibold text-[13px] leading-none drop-shadow">
-                    {currentStory.profile?.username}
-                  </span>
-                  <span className="text-white/60 text-[11px]">{formatTime(currentStory.created_at)}</span>
+                <div className="flex flex-col">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-white font-semibold text-[13px] leading-none drop-shadow">
+                      {currentStory.profile?.username}
+                    </span>
+                    <span className="text-white/60 text-[11px]">{formatTime(currentStory.created_at)}</span>
+                  </div>
+                  {currentStory.music_title && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Music2 className="w-3 h-3 text-white/70 flex-shrink-0 animate-pulse" />
+                      <span className="text-white/70 text-[11px] truncate max-w-[180px] drop-shadow">
+                        {currentStory.music_title}{currentStory.music_artist ? ` — ${currentStory.music_artist}` : ''}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
