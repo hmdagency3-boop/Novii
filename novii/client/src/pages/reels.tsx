@@ -148,29 +148,25 @@ export default function Reels() {
     onVisible,
   });
 
-  const Wrap = ({ children }: { children: React.ReactNode }) =>
-    isGuest ? <>{children}</> : <Layout>{children}</Layout>;
+  const wrapContent = (content: React.ReactNode) =>
+    isGuest ? content : <Layout>{content}</Layout>;
 
-  if (isLoading) return (
-    <Wrap>
-      <div className="fixed inset-0 lg:left-20 flex items-center justify-center bg-background">
-        <Spinner />
-      </div>
-    </Wrap>
+  if (isLoading) return wrapContent(
+    <div className="fixed inset-0 lg:left-20 flex items-center justify-center bg-background">
+      <Spinner />
+    </div>
   );
 
-  if (!reels?.length) return (
-    <Wrap>
-      <div className="fixed inset-0 lg:left-20 flex flex-col items-center justify-center bg-background gap-4">
-        <div className="text-6xl">🎬</div>
-        <h2 className="text-2xl font-bold text-foreground">{isRTL ? "لا توجد ريلز" : "No Reels Yet"}</h2>
-        <p className="text-muted-foreground">{isRTL ? "كن أول من ينشر!" : "Be the first to post!"}</p>
-      </div>
-    </Wrap>
+  if (!reels?.length) return wrapContent(
+    <div className="fixed inset-0 lg:left-20 flex flex-col items-center justify-center bg-background gap-4">
+      <div className="text-6xl">🎬</div>
+      <h2 className="text-2xl font-bold text-foreground">{isRTL ? "لا توجد ريلز" : "No Reels Yet"}</h2>
+      <p className="text-muted-foreground">{isRTL ? "كن أول من ينشر!" : "Be the first to post!"}</p>
+    </div>
   );
 
-  return (
-    <Wrap>
+  return wrapContent(
+    <>
       {/* MOBILE */}
       <div
         className={cn(
@@ -240,7 +236,7 @@ export default function Reels() {
         .animate-marquee   { display:flex; width:max-content; animation: marquee 7s linear infinite; }
         .animate-spin-slow { animation: spinSlow 4s linear infinite; }
       `}</style>
-    </Wrap>
+    </>
   );
 }
 
