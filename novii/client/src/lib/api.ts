@@ -254,31 +254,20 @@ async function saveHashtags(
   contentType: 'post' | 'reel',
   caption: string
 ): Promise<void> {
-  const tags = Array.from(new Set(
-    (caption.match(/#(\w+)/g) || []).map(t => t.slice(1).toLowerCase())
-  ));
-  if (tags.length === 0) return;
-
-  // Upsert hashtag rows and get their ids
-  const { data: hashtagRows, error: upsertError } = await supabase
-    .from('hashtags')
-    .upsert(
-      tags.map(name => ({ name })),
-      { onConflict: 'name', ignoreDuplicates: false }
-    )
-    .select('id, name');
-
-  if (upsertError || !hashtagRows) return;
-
-  const linkTable = contentType === 'post' ? 'post_hashtags' : 'reel_hashtags';
-  const fkCol    = contentType === 'post' ? 'post_id' : 'reel_id';
-
-  await supabase
-    .from(linkTable)
-    .upsert(
-      hashtagRows.map(h => ({ [fkCol]: contentId, hashtag_id: h.id })),
-      { onConflict: `${fkCol},hashtag_id`, ignoreDuplicates: true }
-    );
+  if (!caption || !caption.includes('#')) return;
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    const token = session?.session?.access_token;
+    if (!token) return;
+    const body: Record<string, string> = { caption };
+    if (contentType === 'post') body.post_id = contentId;
+    else body.reel_id = contentId;
+    await fetch('/api/hashtags/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-token': token },
+      body: JSON.stringify(body),
+    });
+  } catch {}
 }
 
 export const api = {

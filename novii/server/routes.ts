@@ -3854,6 +3854,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // HASHTAG SYSTEM
   // ========================================
 
+  app.post("/api/hashtags/extract", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const { post_id, reel_id, caption } = req.body;
+      if (!caption || (!post_id && !reel_id)) return res.status(400).json({ error: 'Missing fields' });
+
+      const tags = Array.from(new Set(
+        (caption.match(/#(\w+)/g) || []).map((t: string) => t.slice(1).toLowerCase())
+      ));
+      if (tags.length === 0) return res.json({ saved: 0 });
+
+      const saveDb = adminDb || db;
+      const { data: hashtagRows } = await saveDb
+        .from('hashtags')
+        .upsert(tags.map((name: string) => ({ name })), { onConflict: 'name', ignoreDuplicates: false })
+        .select('id, name');
+
+      if (!hashtagRows?.length) return res.json({ saved: 0 });
+
+      const linkTable = reel_id ? 'reel_hashtags' : 'post_hashtags';
+      const fkCol = reel_id ? 'reel_id' : 'post_id';
+      const contentId = reel_id || post_id;
+
+      await saveDb
+        .from(linkTable)
+        .upsert(
+          hashtagRows.map((h: any) => ({ [fkCol]: contentId, hashtag_id: h.id })),
+          { onConflict: `${fkCol},hashtag_id`, ignoreDuplicates: true }
+        );
+
+      res.json({ saved: hashtagRows.length });
+    } catch (error) {
+      console.error('Extract hashtags error:', error);
+      res.status(500).json({ error: 'Failed to extract hashtags' });
+    }
+  });
+
   app.get("/api/hashtags/trending", async (_req: Request, res: Response) => {
     try {
       const { data, error } = await db
@@ -3870,21 +3906,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/hashtags/:name", async (req: Request, res: Response) => {
+  app.get("/api/hashtags/search/:query", async (req: Request, res: Response) => {
     try {
-      const { name } = req.params;
-      const tag = name.toLowerCase().replace(/^#/, '');
-      const { data: hashtag, error } = await db
+      const q = req.params.query.toLowerCase().replace(/^#/, '');
+      const { data, error } = await db
         .from('hashtags')
         .select('*')
-        .eq('name', tag)
         .eq('is_banned', false)
-        .single();
-      if (error || !hashtag) return res.status(404).json({ error: 'Hashtag not found' });
-      res.json(hashtag);
+        .ilike('name', `${q}%`)
+        .order('posts_count', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      res.json(data || []);
     } catch (error) {
-      console.error('Get hashtag error:', error);
-      res.status(500).json({ error: 'Failed to fetch hashtag' });
+      console.error('Search hashtags error:', error);
+      res.status(500).json({ error: 'Failed to search hashtags' });
     }
   });
 
@@ -3918,7 +3954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from('posts')
         .select('*, profiles!posts_user_id_fkey(id, username, full_name, avatar_url, is_verified, is_official)')
         .in('id', postIds)
-        .eq('is_archived', false)
+        .neq('is_deleted', true)
         .order('created_at', { ascending: false });
 
       res.json(posts || []);
@@ -3928,21 +3964,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/hashtags/search/:query", async (req: Request, res: Response) => {
+  app.get("/api/hashtags/:name", async (req: Request, res: Response) => {
     try {
-      const q = req.params.query.toLowerCase().replace(/^#/, '');
-      const { data, error } = await db
+      const { name } = req.params;
+      const tag = name.toLowerCase().replace(/^#/, '');
+      const { data: hashtag, error } = await db
         .from('hashtags')
         .select('*')
+        .eq('name', tag)
         .eq('is_banned', false)
-        .ilike('name', `${q}%`)
-        .order('posts_count', { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      res.json(data || []);
+        .single();
+      if (error || !hashtag) return res.status(404).json({ error: 'Hashtag not found' });
+      res.json(hashtag);
     } catch (error) {
-      console.error('Search hashtags error:', error);
-      res.status(500).json({ error: 'Failed to search hashtags' });
+      console.error('Get hashtag error:', error);
+      res.status(500).json({ error: 'Failed to fetch hashtag' });
     }
   });
 
