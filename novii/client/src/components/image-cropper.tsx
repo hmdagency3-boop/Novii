@@ -25,7 +25,6 @@ export function ImageCropper({
   onCropComplete,
   cropShape = "rect",
   isRTL = false,
-  filterClass,
 }: ImageCropperProps) {
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -38,26 +37,24 @@ export function ImageCropper({
   );
 
   return (
-    <div className="relative w-full h-full flex flex-col">
-      <div className="relative flex-1 min-h-0 bg-black">
-        <div className={cn("absolute inset-0", filterClass)}>
-          <Cropper
-            image={imageSrc}
-            crop={crop}
-            zoom={zoom}
-            aspect={aspectRatio}
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
-            onCropComplete={handleCropComplete}
-            cropShape={cropShape}
-            showGrid={true}
-            objectFit="contain"
-          />
-        </div>
+    <div className="absolute inset-0 flex flex-col">
+      <div className="relative flex-1 min-h-0">
+        <Cropper
+          image={imageSrc}
+          crop={crop}
+          zoom={zoom}
+          aspect={aspectRatio}
+          onCropChange={setCrop}
+          onZoomChange={setZoom}
+          onCropComplete={handleCropComplete}
+          cropShape={cropShape}
+          showGrid={true}
+          objectFit="contain"
+        />
       </div>
 
       {aspectRatioOptions && aspectRatioOptions.length > 1 && (
-        <div className="flex items-center justify-center gap-1 py-2.5 px-3 bg-black/90 border-t border-white/10">
+        <div className="flex items-center justify-center gap-1 py-2.5 px-3 bg-black/90 border-t border-white/10 flex-shrink-0">
           {aspectRatioOptions.map((option) => (
             <button
               key={option.id}
@@ -76,7 +73,7 @@ export function ImageCropper({
         </div>
       )}
 
-      <div className="flex items-center gap-3 px-4 py-2 bg-black/90 border-t border-white/10">
+      <div className="flex items-center gap-3 px-4 py-2 bg-black/90 border-t border-white/10 flex-shrink-0">
         <span className="text-white/50 text-xs">-</span>
         <input
           type="range"

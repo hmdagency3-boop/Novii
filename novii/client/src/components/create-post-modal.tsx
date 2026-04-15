@@ -364,7 +364,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
           "p-0 gap-0 overflow-hidden border-0 shadow-2xl bg-background",
           "max-w-[95vw] sm:max-w-lg md:max-w-2xl lg:max-w-4xl",
           "rounded-2xl",
-          "h-[90vh] sm:h-auto sm:max-h-[85vh]",
+          "h-[90vh] sm:h-[85vh]",
           "flex flex-col"
         )}
       >
@@ -480,8 +480,8 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
           )}
 
           {currentStep === 'crop' && selectedImages.length > 0 && (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 min-h-0">
+            <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+              <div className="flex-1 min-h-0 relative">
                 <ImageCropper
                   imageSrc={selectedImages[currentImageIndex].url}
                   aspectRatio={selectedAspect.ratio}
