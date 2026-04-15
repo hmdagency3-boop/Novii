@@ -7,6 +7,7 @@ const tabLabels: Record<TabId, string> = {
   content: "المحتوى",
   admins: "المشرفين",
   reports: "البلاغات",
+  verification: "طلبات التوثيق",
   settings: "الإعدادات",
   logs: "السجلات",
 };

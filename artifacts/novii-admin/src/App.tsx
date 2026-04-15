@@ -8,6 +8,7 @@ import UsersPage from "@/pages/users";
 import ContentPage from "@/pages/content";
 import AdminsPage from "@/pages/admins";
 import ReportsPage from "@/pages/reports";
+import VerificationPage from "@/pages/verification";
 import SettingsPage from "@/pages/settings";
 import LogsPage from "@/pages/logs";
 
@@ -17,6 +18,7 @@ const pageComponents: Record<TabId, React.FC> = {
   content: ContentPage,
   admins: AdminsPage,
   reports: ReportsPage,
+  verification: VerificationPage,
   settings: SettingsPage,
   logs: LogsPage,
 };

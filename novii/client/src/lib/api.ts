@@ -2827,4 +2827,24 @@ export const api = {
   saveHashtags(contentId: string, contentType: 'post' | 'reel', caption: string) {
     return saveHashtags(contentId, contentType, caption);
   },
+
+  async submitVerificationRequest(data: { full_name: string; reason: string; category: string; social_links?: Record<string, string> }) {
+    const res = await communityFetch('/api/verification/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to submit request');
+    }
+    return res.json();
+  },
+
+  async getVerificationStatus() {
+    const res = await communityFetch('/api/verification/status');
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.request;
+  },
 };

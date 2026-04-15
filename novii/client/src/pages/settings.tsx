@@ -517,6 +517,121 @@ const settingsMenuStructure: MenuSection[] = [
   }
 ];
 
+function VerificationSection({ profile, direction }: { profile: any; direction: string }) {
+  const isRTL = direction === 'rtl';
+  const [reason, setReason] = useState('');
+  const [category, setCategory] = useState('personal');
+  const [fullName, setFullName] = useState('');
+  const [socialLinks, setSocialLinks] = useState({ website: '', twitter: '', instagram: '' });
+  const [submitting, setSubmitting] = useState(false);
+
+  const { data: existingRequest, refetch } = useQuery({
+    queryKey: ['verification-status'],
+    queryFn: () => api.getVerificationStatus(),
+  });
+
+  const handleSubmit = async () => {
+    if (!reason.trim()) {
+      toast.error(isRTL ? 'يرجى كتابة سبب طلب التوثيق' : 'Please provide a reason for verification');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.submitVerificationRequest({
+        full_name: fullName || profile?.full_name || profile?.username || '',
+        reason,
+        category,
+        social_links: Object.fromEntries(Object.entries(socialLinks).filter(([, v]) => v.trim())),
+      });
+      toast.success(isRTL ? 'تم إرسال طلب التوثيق بنجاح!' : 'Verification request submitted!');
+      refetch();
+    } catch (err: any) {
+      toast.error(err.message || (isRTL ? 'فشل إرسال الطلب' : 'Failed to submit'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      <h2 className="text-2xl font-bold mb-4">{isRTL ? 'التوثيق' : 'Verification'}</h2>
+      {profile?.is_verified ? (
+        <div className="text-center py-12 border border-green-500/30 rounded-2xl bg-green-500/5">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h3 className="text-xl font-bold mb-2">{isRTL ? 'حسابك موثّق' : 'Your Account is Verified'}</h3>
+          <p className="text-sm text-muted-foreground">{isRTL ? 'تم توثيق حسابك بنجاح' : 'Your account has been verified successfully'}</p>
+        </div>
+      ) : existingRequest?.status === 'pending' ? (
+        <div className="text-center py-12 border border-yellow-500/30 rounded-2xl bg-yellow-500/5">
+          <Clock className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+          <h3 className="text-xl font-bold mb-2">{isRTL ? 'طلبك قيد المراجعة' : 'Request Under Review'}</h3>
+          <p className="text-sm text-muted-foreground">{isRTL ? 'تم إرسال طلبك وسيتم مراجعته قريباً' : 'Your request has been submitted and will be reviewed soon'}</p>
+          <p className="text-xs text-muted-foreground mt-2">{isRTL ? 'تاريخ الإرسال:' : 'Submitted:'} {new Date(existingRequest.created_at).toLocaleDateString()}</p>
+        </div>
+      ) : existingRequest?.status === 'rejected' ? (
+        <div className="space-y-6">
+          <div className="text-center py-8 border border-red-500/30 rounded-2xl bg-red-500/5">
+            <X className="w-12 h-12 text-red-500 mx-auto mb-3" />
+            <h3 className="text-lg font-bold mb-1">{isRTL ? 'تم رفض طلبك السابق' : 'Previous Request Rejected'}</h3>
+            {existingRequest.admin_note && <p className="text-sm text-muted-foreground px-6">{isRTL ? 'السبب:' : 'Reason:'} {existingRequest.admin_note}</p>}
+          </div>
+          {renderVerificationForm()}
+        </div>
+      ) : (
+        <div className="space-y-6">{renderVerificationForm()}</div>
+      )}
+    </div>
+  );
+
+  function renderVerificationForm() {
+    return (
+      <div className="border border-border rounded-2xl p-6 bg-card">
+        <div className="flex items-center gap-3 mb-4"><BadgeCheck className="w-8 h-8 text-primary" /><h3 className="font-bold text-lg">{isRTL ? 'طلب التوثيق' : 'Request Verification'}</h3></div>
+        <p className="text-sm text-muted-foreground mb-6">{isRTL ? 'التوثيق متاح للحسابات التي تستوفي شروط معينة' : 'Verification is available for accounts meeting certain criteria'}</p>
+        <div className="space-y-3 mb-6">
+          <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", (profile?.followers_count || 0) >= 100 ? "text-green-500" : "text-muted-foreground")} /><span>{isRTL ? '100+ متابع' : '100+ followers'}</span></div>
+          <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", profile?.bio ? "text-green-500" : "text-muted-foreground")} /><span>{isRTL ? 'بايو مكتمل' : 'Complete bio'}</span></div>
+          <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", profile?.avatar_url ? "text-green-500" : "text-muted-foreground")} /><span>{isRTL ? 'صورة شخصية' : 'Profile photo'}</span></div>
+        </div>
+        <div className="space-y-4 mb-6">
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">{isRTL ? 'الاسم الكامل' : 'Full Name'}</label>
+            <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder={profile?.full_name || profile?.username || ''} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">{isRTL ? 'الفئة' : 'Category'}</label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="personal">{isRTL ? 'شخصي' : 'Personal'}</SelectItem>
+                <SelectItem value="creator">{isRTL ? 'صانع محتوى' : 'Content Creator'}</SelectItem>
+                <SelectItem value="business">{isRTL ? 'نشاط تجاري' : 'Business'}</SelectItem>
+                <SelectItem value="public_figure">{isRTL ? 'شخصية عامة' : 'Public Figure'}</SelectItem>
+                <SelectItem value="organization">{isRTL ? 'مؤسسة / منظمة' : 'Organization'}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">{isRTL ? 'لماذا تستحق التوثيق؟' : 'Why should you be verified?'}</label>
+            <Textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} placeholder={isRTL ? 'اشرح لماذا تريد التوثيق...' : 'Explain why you want verification...'} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">{isRTL ? 'روابط حسابات أخرى (اختياري)' : 'Social Links (optional)'}</label>
+            <div className="space-y-2">
+              <Input value={socialLinks.website} onChange={e => setSocialLinks(p => ({ ...p, website: e.target.value }))} placeholder={isRTL ? 'الموقع الإلكتروني' : 'Website URL'} />
+              <Input value={socialLinks.twitter} onChange={e => setSocialLinks(p => ({ ...p, twitter: e.target.value }))} placeholder="Twitter / X" />
+              <Input value={socialLinks.instagram} onChange={e => setSocialLinks(p => ({ ...p, instagram: e.target.value }))} placeholder="Instagram" />
+            </div>
+          </div>
+        </div>
+        <Button className="w-full" onClick={handleSubmit} disabled={submitting || !reason.trim()}>
+          {submitting ? <Spinner className="w-4 h-4" /> : (isRTL ? 'إرسال طلب التوثيق' : 'Submit Verification Request')}
+        </Button>
+      </div>
+    );
+  }
+}
+
 export default function SettingsPage() {
   const { language, setLanguage, direction } = useLanguage();
   const t = getTranslation(language.code).settings;
@@ -1246,33 +1361,7 @@ export default function SettingsPage() {
         );
 
       case "verified":
-        return (
-          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-            <h2 className="text-2xl font-bold mb-4">{direction === 'rtl' ? 'التوثيق' : 'Verification'}</h2>
-            {profile?.is_verified ? (
-              <div className="text-center py-12 border border-green-500/30 rounded-2xl bg-green-500/5">
-                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                <h3 className="text-xl font-bold mb-2">{direction === 'rtl' ? 'حسابك موثّق' : 'Your Account is Verified'}</h3>
-                <p className="text-sm text-muted-foreground">{direction === 'rtl' ? 'تم توثيق حسابك بنجاح' : 'Your account has been verified successfully'}</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="border border-border rounded-2xl p-6 bg-card">
-                  <div className="flex items-center gap-3 mb-4"><BadgeCheck className="w-8 h-8 text-primary" /><h3 className="font-bold text-lg">{direction === 'rtl' ? 'طلب التوثيق' : 'Request Verification'}</h3></div>
-                  <p className="text-sm text-muted-foreground mb-6">{direction === 'rtl' ? 'التوثيق متاح للحسابات التي تستوفي شروط معينة مثل عدد المتابعين والنشاط' : 'Verification is available for accounts that meet specific criteria like follower count and activity'}</p>
-                  <div className="space-y-3 mb-6">
-                    <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", (profile?.followers_count || 0) >= 100 ? "text-green-500" : "text-muted-foreground")} /><span>{direction === 'rtl' ? '100+ متابع' : '100+ followers'}</span></div>
-                    <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", profile?.bio ? "text-green-500" : "text-muted-foreground")} /><span>{direction === 'rtl' ? 'بايو مكتمل' : 'Complete bio'}</span></div>
-                    <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", profile?.avatar_url ? "text-green-500" : "text-muted-foreground")} /><span>{direction === 'rtl' ? 'صورة شخصية' : 'Profile photo'}</span></div>
-                  </div>
-                  <Button className="w-full" onClick={() => toast.success(direction === 'rtl' ? 'تم إرسال طلب التوثيق! سنراجعه قريباً' : 'Verification request sent! We\'ll review it soon')}>
-                    {direction === 'rtl' ? 'إرسال طلب التوثيق' : 'Submit Verification Request'}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        );
+        return <VerificationSection profile={profile} direction={direction} />;
 
       case "password":
         return (

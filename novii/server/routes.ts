@@ -2971,5 +2971,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ═══════════════════════════════════════════════════
+  // VERIFICATION REQUESTS
+  // ═══════════════════════════════════════════════════
+
+  (async () => {
+    try {
+      await adminDb!.rpc('exec_sql', { query: `
+        CREATE TABLE IF NOT EXISTS verification_requests (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          full_name TEXT NOT NULL DEFAULT '',
+          reason TEXT NOT NULL DEFAULT '',
+          category TEXT NOT NULL DEFAULT 'personal',
+          social_links JSONB DEFAULT '{}',
+          status TEXT NOT NULL DEFAULT 'pending',
+          admin_note TEXT,
+          reviewed_by UUID,
+          reviewed_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_vr_user ON verification_requests(user_id);
+        CREATE INDEX IF NOT EXISTS idx_vr_status ON verification_requests(status);
+      `}).then(() => console.log('✅ verification_requests table ready'))
+        .catch(async () => {
+          const { error } = await adminDb!.from('verification_requests').select('id').limit(1);
+          if (error && error.message.includes('does not exist')) {
+            console.log('⚠️ verification_requests table missing — please create it in Supabase SQL editor');
+          } else {
+            console.log('✅ verification_requests table exists');
+          }
+        });
+    } catch {}
+  })();
+
+  app.post("/api/verification/request", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const { full_name, reason, category, social_links } = req.body;
+
+      const validCategories = ['personal', 'creator', 'business', 'public_figure', 'organization'];
+      if (!reason || typeof reason !== 'string' || !reason.trim()) {
+        return res.status(400).json({ error: 'Reason is required' });
+      }
+      if (category && !validCategories.includes(category)) {
+        return res.status(400).json({ error: 'Invalid category' });
+      }
+
+      const sanitizedLinks: Record<string, string> = {};
+      if (social_links && typeof social_links === 'object') {
+        for (const [key, val] of Object.entries(social_links)) {
+          if (typeof val === 'string' && val.trim()) {
+            if (/^https?:\/\//i.test(val.trim())) {
+              sanitizedLinks[key] = val.trim();
+            }
+          }
+        }
+      }
+
+      const { data: profile } = await adminDb!.from('profiles').select('is_verified, username, avatar_url, bio, followers_count').eq('id', userId).single();
+      if (profile?.is_verified) return res.status(400).json({ error: 'Account is already verified' });
+
+      const { data: existing } = await adminDb!.from('verification_requests').select('id, status').eq('user_id', userId).eq('status', 'pending').single();
+      if (existing) return res.status(400).json({ error: 'You already have a pending request' });
+
+      const { data, error } = await adminDb!.from('verification_requests').insert({
+        user_id: userId,
+        full_name: (full_name || profile?.username || '').slice(0, 100),
+        reason: reason.trim().slice(0, 1000),
+        category: category || 'personal',
+        social_links: sanitizedLinks,
+      }).select().single();
+
+      if (error) throw error;
+      res.status(201).json(data);
+    } catch (error) {
+      console.error('Verification request error:', error);
+      res.status(500).json({ error: 'Failed to submit verification request' });
+    }
+  });
+
+  app.get("/api/verification/status", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const { data } = await adminDb!.from('verification_requests').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).single();
+      res.json({ request: data || null });
+    } catch {
+      res.json({ request: null });
+    }
+  });
+
+  app.get("/api/admin/verification-requests", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { data, error } = await adminDb!.from('verification_requests').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+
+      const userIds = [...new Set((data || []).map((r: any) => r.user_id))];
+      let profiles: any[] = [];
+      if (userIds.length > 0) {
+        const { data: p } = await adminDb!.from('profiles').select('id, username, full_name, avatar_url, followers_count, posts_count, is_verified, created_at').in('id', userIds);
+        profiles = p || [];
+      }
+      const profileMap = Object.fromEntries(profiles.map(p => [p.id, p]));
+
+      const enriched = (data || []).map((r: any) => ({
+        ...r,
+        profile: profileMap[r.user_id] || null,
+      }));
+
+      res.json(enriched);
+    } catch (error) {
+      console.error('Fetch verification requests error:', error);
+      res.status(500).json({ error: 'Failed to fetch verification requests' });
+    }
+  });
+
+  app.patch("/api/admin/verification-requests/:requestId", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { requestId } = req.params;
+      const { status, admin_note } = req.body;
+
+      if (!['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ error: 'Status must be approved or rejected' });
+      }
+
+      const { data: request, error: fetchErr } = await adminDb!.from('verification_requests').select('*').eq('id', requestId).single();
+      if (fetchErr || !request) return res.status(404).json({ error: 'Request not found' });
+      if (request.status !== 'pending') return res.status(400).json({ error: 'Only pending requests can be updated' });
+
+      if (status === 'approved') {
+        const { error: profileErr } = await adminDb!.from('profiles').update({ is_verified: true }).eq('id', request.user_id);
+        if (profileErr) throw profileErr;
+      }
+
+      const { error } = await adminDb!.from('verification_requests').update({
+        status,
+        admin_note: admin_note || null,
+        reviewed_by: req.userId,
+        reviewed_at: new Date().toISOString(),
+      }).eq('id', requestId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, status === 'approved' ? 'verify_user' : 'reject_verification', 'user', request.user_id, admin_note || undefined);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Update verification request error:', error);
+      res.status(500).json({ error: 'Failed to update verification request' });
+    }
+  });
+
   return httpServer;
 }
