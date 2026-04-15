@@ -22,10 +22,7 @@ import {
   Loader2,
   ChevronDown,
   Check,
-  Sparkles,
   Upload,
-  Crop,
-  Wand2,
   Share2,
   Plus,
   Trash2,
@@ -59,20 +56,14 @@ type MediaType = 'post' | 'reel';
 type PostStep = 'select' | 'edit' | 'details';
 
 const FILTERS = [
-  { id: 'none', name: 'Original', nameAr: 'الأصل', icon: '✓', cssClass: '' },
-  { id: 'clarendon', name: 'Clarendon', nameAr: 'Clarendon', icon: '◯', cssClass: 'brightness-110 contrast-110' },
-  { id: 'gingham', name: 'Gingham', nameAr: 'Gingham', icon: '◭', cssClass: 'hue-rotate-15' },
-  { id: 'moon', name: 'Moon', nameAr: 'Moon', icon: '◐', cssClass: 'grayscale brightness-110 contrast-110' },
-  { id: 'lark', name: 'Lark', nameAr: 'Lark', icon: '▲', cssClass: 'contrast-90' },
-  { id: 'reyes', name: 'Reyes', nameAr: 'Reyes', icon: '▸', cssClass: 'sepia-20 brightness-110 contrast-75 saturate-75' },
-  { id: 'juno', name: 'Juno', nameAr: 'Juno', icon: '◆', cssClass: 'sepia-20 brightness-110 contrast-110 saturate-125' },
-  { id: 'slumber', name: 'Slumber', nameAr: 'Slumber', icon: '◎', cssClass: 'saturate-75 brightness-110' },
-];
-
-const STEPS: { id: PostStep; label: string; labelAr: string }[] = [
-  { id: 'select', label: 'Upload', labelAr: 'الرفع' },
-  { id: 'edit', label: 'Edit', labelAr: 'التعديل' },
-  { id: 'details', label: 'Share', labelAr: 'المشاركة' },
+  { id: 'none', name: 'Original', nameAr: 'الأصل', cssClass: '' },
+  { id: 'clarendon', name: 'Clarendon', nameAr: 'Clarendon', cssClass: 'brightness-110 contrast-110' },
+  { id: 'gingham', name: 'Gingham', nameAr: 'Gingham', cssClass: 'hue-rotate-15' },
+  { id: 'moon', name: 'Moon', nameAr: 'Moon', cssClass: 'grayscale brightness-110 contrast-110' },
+  { id: 'lark', name: 'Lark', nameAr: 'Lark', cssClass: 'contrast-90' },
+  { id: 'reyes', name: 'Reyes', nameAr: 'Reyes', cssClass: 'sepia-20 brightness-110 contrast-75 saturate-75' },
+  { id: 'juno', name: 'Juno', nameAr: 'Juno', cssClass: 'sepia-20 brightness-110 contrast-110 saturate-125' },
+  { id: 'slumber', name: 'Slumber', nameAr: 'Slumber', cssClass: 'saturate-75 brightness-110' },
 ];
 
 export function CreatePostModal({ open, onOpenChange, initialMediaType }: CreatePostModalProps) {
@@ -102,7 +93,6 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
   const isRTL = direction === "rtl";
   const t = language.code === 'ar';
 
-  // Sync mediaType and step when modal opens with a specific initialMediaType
   useEffect(() => {
     if (open) {
       setMediaType(initialMediaType || 'post');
@@ -110,6 +100,10 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
       setSelectedImages([]);
       setSelectedReel(null);
       setCaption("");
+      setLocation("");
+      setSelectedFilter('none');
+      setCurrentImageIndex(0);
+      setShowAdvanced(false);
     }
   }, [open, initialMediaType]);
 
@@ -281,381 +275,356 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
     }
   };
 
+  const stepTitle = currentStep === 'select'
+    ? (t ? "إنشاء منشور جديد" : "Create new post")
+    : currentStep === 'edit'
+    ? (t ? "تعديل الصور" : "Edit")
+    : (t ? "مشاركة" : "Share");
+
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent 
-          hideDefaultClose={true}
-          className="max-w-full sm:max-w-2xl lg:max-w-5xl p-0 gap-0 overflow-hidden rounded-none sm:rounded-3xl border-0 shadow-2xl bg-background h-screen sm:h-auto max-h-screen sm:max-h-[90vh]"
-        >
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            accept="image/*"
-            multiple
-            onChange={handleImageSelect}
-          />
-          <input
-            type="file"
-            ref={reelInputRef}
-            className="hidden"
-            accept="video/*"
-            onChange={handleReelSelect}
-          />
-          {/* Header */}
-          <div className="bg-gradient-to-r from-primary/15 via-primary/5 to-transparent border-b border-border/50 px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/70 rounded-2xl flex items-center justify-center shadow-lg">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-foreground">
-                  {t ? "إنشاء منشور" : "Create Post"}
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  {t ? "شارك لحظاتك الرائعة" : "Share your amazing moments"}
-                </p>
-              </div>
-            </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent 
+        hideDefaultClose={true}
+        className={cn(
+          "p-0 gap-0 overflow-hidden border-0 shadow-2xl bg-background",
+          "max-w-[95vw] sm:max-w-lg md:max-w-2xl lg:max-w-4xl",
+          "rounded-2xl",
+          "h-[90vh] sm:h-auto sm:max-h-[85vh]",
+          "flex flex-col"
+        )}
+      >
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          accept="image/*"
+          multiple
+          onChange={handleImageSelect}
+        />
+        <input
+          type="file"
+          ref={reelInputRef}
+          className="hidden"
+          accept="video/*"
+          onChange={handleReelSelect}
+        />
+
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+          {currentStep !== 'select' ? (
+            <button
+              onClick={() => setCurrentStep(currentStep === 'details' ? 'edit' : 'select')}
+              className="p-1.5 hover:bg-muted rounded-full transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          ) : (
+            <div className="w-8" />
+          )}
+          <h2 className="text-base font-semibold">{stepTitle}</h2>
+          {currentStep === 'edit' ? (
+            <button
+              onClick={() => setCurrentStep('details')}
+              className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors px-2 py-1"
+            >
+              {t ? "التالي" : "Next"}
+            </button>
+          ) : currentStep === 'details' ? (
+            <button
+              onClick={handlePost}
+              disabled={isLoading}
+              className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors px-2 py-1 disabled:opacity-50"
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                t ? "مشاركة" : "Share"
+              )}
+            </button>
+          ) : (
             <button
               onClick={() => onOpenChange(false)}
-              className="p-2 hover:bg-muted rounded-full transition-all hover:scale-110 ml-4"
+              className="p-1.5 hover:bg-muted rounded-full transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
-          </div>
+          )}
+        </div>
 
-          {/* Progress Indicator */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border/30 flex gap-2 flex-shrink-0">
-            {STEPS.map((step, index) => (
-              <div key={step.id} className="flex items-center gap-2 flex-1">
-                <button
+        {isLoading && (
+          <div className="w-full h-1 bg-muted flex-shrink-0">
+            <div
+              className="h-full bg-primary transition-all duration-300 rounded-r"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+        )}
+
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {currentStep === 'select' && (
+            <div
+              className="flex-1 flex flex-col items-center justify-center p-8 sm:p-12"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              <div className={cn(
+                "w-full max-w-sm text-center transition-all duration-300",
+                isDragging && "scale-105"
+              )}>
+                <div className="mb-6 flex justify-center">
+                  <div className={cn(
+                    "w-20 h-20 rounded-full border-2 border-dashed flex items-center justify-center transition-all duration-300",
+                    isDragging ? "border-primary bg-primary/10" : "border-muted-foreground/30"
+                  )}>
+                    <Upload className={cn(
+                      "w-8 h-8 transition-colors",
+                      isDragging ? "text-primary" : "text-muted-foreground"
+                    )} />
+                  </div>
+                </div>
+
+                <h3 className="text-xl font-semibold mb-1">
+                  {t ? "اسحب الصور والفيديو هنا" : "Drag photos and videos here"}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  {t ? "أو اختر من جهازك" : "or select from your device"}
+                </p>
+
+                <div className="space-y-2.5">
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full rounded-lg h-10 text-sm font-semibold"
+                  >
+                    <ImageIcon className="w-4 h-4 mr-2" />
+                    {t ? "اختر صور" : "Select Photos"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => reelInputRef.current?.click()}
+                    className="w-full rounded-lg h-10 text-sm font-semibold"
+                  >
+                    <Film className="w-4 h-4 mr-2" />
+                    {t ? "رفع فيديو" : "Upload Video"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 'edit' && selectedImages.length > 0 && (
+            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
+              <div className="flex-1 bg-black flex items-center justify-center relative min-h-[250px] sm:min-h-0">
+                <img
+                  src={selectedImages[currentImageIndex].url}
+                  alt="Preview"
                   className={cn(
-                    "flex-1 h-1.5 rounded-full transition-all duration-300",
-                    currentStep === step.id
-                      ? "bg-primary shadow-lg"
-                      : STEPS.findIndex(s => s.id === currentStep) > index
-                      ? "bg-primary/40"
-                      : "bg-border/40"
+                    "max-w-full max-h-full object-contain",
+                    FILTERS.find(f => f.id === selectedFilter)?.cssClass
                   )}
                 />
-              </div>
-            ))}
-          </div>
 
-          {/* Main Content */}
-          <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
-            {/* Step 1: Select Media */}
-            {currentStep === 'select' && (
-              <div className="w-full flex flex-col items-center justify-center p-6 sm:p-10 animate-in fade-in duration-300">
-                <div className="w-full max-w-md text-center">
-                  {/* Icon */}
-                  <div className="mb-8 flex justify-center">
-                    <div className="relative">
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-primary/30 to-primary/10 rounded-3xl flex items-center justify-center">
-                        <ImageIcon className="w-10 h-10 sm:w-12 sm:h-12 text-primary" />
-                      </div>
-                      <div className="absolute -top-1 -right-1 w-6 h-6 bg-primary/20 rounded-full"></div>
-                    </div>
-                  </div>
-
-                  {/* Text */}
-                  <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-                    {t ? "اختر الوسائط" : "Choose your media"}
-                  </h3>
-                  <p className="text-sm sm:text-base text-muted-foreground mb-8">
-                    {t ? "قم برفع صور أو فيديو لمشاركتها مع أصدقائك" : "Upload photos or videos to share with your friends"}
-                  </p>
-
-                  {/* Drag & Drop Area */}
-                  <div
-                    className={cn(
-                      "border-2 border-dashed rounded-2xl p-8 sm:p-12 transition-all duration-300 mb-8",
-                      isDragging
-                        ? "border-primary bg-primary/10 scale-105"
-                        : "border-border/60 hover:border-primary/50 bg-muted/30"
-                    )}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                  >
-                    <ImageIcon className={cn(
-                      "w-12 h-12 mx-auto mb-3 transition-all duration-300",
-                      isDragging ? "text-primary scale-125" : "text-muted-foreground"
-                    )} />
-                    <p className="text-sm font-medium text-foreground mb-1">
-                      {t ? "اسحب الملفات هنا" : "Drag files here"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t ? "أو انقر للبحث" : "or click to browse"}
-                    </p>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="space-y-3 w-full">
-                    <Button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full rounded-xl py-3 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all"
+                {selectedImages.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setCurrentImageIndex((p) => (p - 1 + selectedImages.length) % selectedImages.length)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 transition-all"
                     >
-                      <Plus className="w-5 h-5 mr-2" />
-                      {t ? "اختر صور" : "Select Photos"}
-                    </Button>
-                    <Button
-                      onClick={() => reelInputRef.current?.click()}
-                      className="w-full rounded-xl py-3 text-base font-semibold bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white shadow-lg hover:shadow-xl transition-all"
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setCurrentImageIndex((p) => (p + 1) % selectedImages.length)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 transition-all"
                     >
-                      <Film className="w-5 h-5 mr-2" />
-                      {t ? "رفع فيديو" : "Upload Video"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Edit Images */}
-            {currentStep === 'edit' && selectedImages.length > 0 && (
-              <div className="w-full flex flex-col sm:flex-row animate-in fade-in duration-300 overflow-hidden">
-                {/* Image Preview - Left side on desktop, top on mobile */}
-                <div className="flex-1 bg-black/95 flex items-center justify-center p-4 sm:p-6 overflow-auto min-h-[300px] sm:min-h-auto border-b sm:border-b-0 sm:border-r border-border/50">
-                  <div className="relative max-w-full max-h-full">
-                    <img
-                      src={selectedImages[currentImageIndex].url}
-                      alt="Preview"
-                      className={cn(
-                        "max-w-full max-h-full object-contain rounded-2xl transition-all duration-300",
-                        FILTERS.find(f => f.id === selectedFilter)?.cssClass
-                      )}
-                    />
-
-                    {/* Navigation Arrows */}
-                    {selectedImages.length > 1 && (
-                      <>
-                        <button
-                          onClick={() => setCurrentImageIndex((p) => (p - 1 + selectedImages.length) % selectedImages.length)}
-                          className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-black rounded-full p-3 transition-all hover:shadow-xl hover:scale-110 z-10"
-                        >
-                          <ChevronLeft className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => setCurrentImageIndex((p) => (p + 1) % selectedImages.length)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-black rounded-full p-3 transition-all hover:shadow-xl hover:scale-110 z-10"
-                        >
-                          <ChevronRight className="w-5 h-5" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Filters & Thumbnails - Right sidebar on desktop, bottom on mobile */}
-                <div className="w-full sm:w-80 border-t sm:border-t-0 bg-gradient-to-b from-background via-background to-muted/20 overflow-y-auto flex flex-col">
-                  {/* Filters Section */}
-                  <div className="p-4 sm:p-6 space-y-3 max-h-[35vh] overflow-y-auto">
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      ✨ {t ? "فلاتر" : "Filters"}
-                    </p>
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                      {FILTERS.map((filter) => (
-                        <button
-                          key={filter.id}
-                          onClick={() => {
-                            setSelectedFilter(filter.id);
-                            const newImages = [...selectedImages];
-                            newImages[currentImageIndex] = {
-                              ...newImages[currentImageIndex],
-                              filter: filter.id
-                            };
-                            setSelectedImages(newImages);
-                          }}
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+                      {selectedImages.map((_, idx) => (
+                        <div
+                          key={idx}
                           className={cn(
-                            "aspect-square rounded-lg overflow-hidden border-2 transition-all duration-200 group relative",
-                            selectedFilter === filter.id
-                              ? "border-primary ring-2 ring-primary/50 shadow-lg"
-                              : "border-border/50 hover:border-primary/50"
+                            "w-1.5 h-1.5 rounded-full transition-all",
+                            idx === currentImageIndex ? "bg-white" : "bg-white/40"
                           )}
-                        >
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="w-full sm:w-72 border-t sm:border-t-0 sm:border-l border-border overflow-y-auto flex-shrink-0">
+                <div className="p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                    {t ? "الفلاتر" : "Filters"}
+                  </p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {FILTERS.map((filter) => (
+                      <button
+                        key={filter.id}
+                        onClick={() => {
+                          setSelectedFilter(filter.id);
+                          const newImages = [...selectedImages];
+                          newImages[currentImageIndex] = {
+                            ...newImages[currentImageIndex],
+                            filter: filter.id
+                          };
+                          setSelectedImages(newImages);
+                        }}
+                        className="flex flex-col items-center gap-1"
+                      >
+                        <div className={cn(
+                          "aspect-square w-full rounded-md overflow-hidden border-2 transition-all",
+                          selectedFilter === filter.id
+                            ? "border-primary"
+                            : "border-transparent hover:border-muted-foreground/30"
+                        )}>
                           <img
                             src={selectedImages[currentImageIndex].url}
                             alt={filter.name}
                             className={cn("w-full h-full object-cover", filter.cssClass)}
                           />
-                          {selectedFilter === filter.id && (
-                            <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                              <Check className="w-5 h-5 text-primary" />
-                            </div>
+                        </div>
+                        <span className={cn(
+                          "text-[10px]",
+                          selectedFilter === filter.id ? "text-primary font-semibold" : "text-muted-foreground"
+                        )}>
+                          {t ? filter.nameAr : filter.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {selectedImages.length > 0 && (
+                  <div className="p-4 border-t border-border">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                      {t ? "الصور" : "Photos"} ({selectedImages.length})
+                    </p>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                      {selectedImages.map((img, idx) => (
+                        <button
+                          key={idx}
+                          className={cn(
+                            "relative rounded-md overflow-hidden border-2 transition-all flex-shrink-0 w-14 h-14 group",
+                            currentImageIndex === idx ? "border-primary" : "border-transparent"
                           )}
+                          onClick={() => setCurrentImageIndex(idx)}
+                        >
+                          <img src={img.url} alt="" className="w-full h-full object-cover" />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); removeImage(idx); }}
+                            className="absolute top-0 right-0 bg-black/70 rounded-bl-md p-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
                         </button>
                       ))}
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex-shrink-0 w-14 h-14 rounded-md border-2 border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary/50 transition-all"
+                      >
+                        <Plus className="w-4 h-4 text-muted-foreground" />
+                      </button>
                     </div>
                   </div>
-
-                  {/* Thumbnails Section */}
-                  {selectedImages.length > 1 && (
-                    <div className="p-4 sm:p-6 border-t border-border/50">
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">
-                        📸 {t ? "صورك" : "Your photos"}
-                      </p>
-                      <div className="flex gap-2 overflow-x-auto pb-2">
-                        {selectedImages.map((img, idx) => (
-                          <button
-                            key={idx}
-                            className={cn(
-                              "relative rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 w-20 h-20 group",
-                              currentImageIndex === idx ? "border-primary ring-2 ring-primary/50" : "border-border/50"
-                            )}
-                            onClick={() => setCurrentImageIndex(idx)}
-                          >
-                            <img src={img.url} alt={`thumb-${idx}`} className="w-full h-full object-cover" />
-                            <button
-                              onClick={(e) => { e.stopPropagation(); removeImage(idx); }}
-                              className="absolute -top-1 -right-1 bg-red-500 rounded-full p-1 text-white hover:bg-red-600 transition-all opacity-0 group-hover:opacity-100"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </button>
-                        ))}
-                        <button
-                          onClick={() => fileInputRef.current?.click()}
-                          className="flex-shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-border/50 flex items-center justify-center hover:border-primary/50 transition-all"
-                        >
-                          <Plus className="w-5 h-5 text-muted-foreground" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer Navigation */}
-                <div className="border-t border-border/50 bg-gradient-to-t from-background to-transparent p-4 sm:p-6 flex justify-end gap-3 mt-auto">
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentStep('select')}
-                    className="rounded-xl"
-                  >
-                    {t ? "رجوع" : "Back"}
-                  </Button>
-                  <Button
-                    onClick={() => setCurrentStep('details')}
-                    className="rounded-xl px-6 font-semibold bg-primary hover:bg-primary/90"
-                  >
-                    {t ? "التالي" : "Next"}
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
+                )}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Step 3: Details & Share */}
-            {currentStep === 'details' && (selectedImages.length > 0 || selectedReel) && (
-              <div className="w-full flex flex-col sm:flex-row gap-0 sm:gap-6 animate-in fade-in duration-300 overflow-hidden">
-                {/* Image Preview - Hidden on mobile */}
-                <div className="hidden sm:flex flex-col w-1/3 bg-black/95 items-center justify-center p-6 flex-shrink-0">
-                  {selectedReel ? (
-                    <div className="relative w-full aspect-video bg-black/50 rounded-2xl flex items-center justify-center">
-                      <Film className="w-16 h-16 text-primary/50" />
-                      <div className="absolute bottom-4 left-4 right-4 bg-black/70 px-3 py-2 rounded-lg text-xs text-white">
-                        Video Ready
-                      </div>
-                    </div>
-                  ) : (
-                    <img
-                      src={selectedImages[currentImageIndex].url}
-                      alt="Preview"
-                      className={cn(
-                        "max-w-full max-h-full object-contain rounded-2xl",
-                        FILTERS.find(f => f.id === selectedImages[currentImageIndex].filter)?.cssClass
-                      )}
-                    />
-                  )}
-                </div>
+          {currentStep === 'details' && (selectedImages.length > 0 || selectedReel) && (
+            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
+              <div className="hidden sm:flex flex-1 bg-black items-center justify-center">
+                {selectedReel ? (
+                  <div className="flex flex-col items-center gap-3 text-white/60">
+                    <Film className="w-16 h-16" />
+                    <span className="text-sm">{t ? "الفيديو جاهز" : "Video ready"}</span>
+                  </div>
+                ) : (
+                  <img
+                    src={selectedImages[currentImageIndex].url}
+                    alt="Preview"
+                    className={cn(
+                      "max-w-full max-h-full object-contain",
+                      FILTERS.find(f => f.id === selectedImages[currentImageIndex]?.filter)?.cssClass
+                    )}
+                  />
+                )}
+              </div>
 
-                {/* Form Section */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                  {/* User Info */}
-                  <div className="flex items-center gap-4 bg-gradient-to-r from-primary/10 to-primary/5 p-4 rounded-2xl border border-primary/20">
-                    <Avatar className="w-14 h-14 border-2 border-primary/30 shadow-lg">
+              <div className="w-full sm:w-80 border-t sm:border-t-0 sm:border-l border-border overflow-y-auto flex-shrink-0">
+                <div className="p-4 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-8 h-8">
                       <AvatarImage src={user?.user_metadata?.avatar_url} />
-                      <AvatarFallback className="font-bold bg-primary text-primary-foreground">
-                        {user?.user_metadata?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                      <AvatarFallback className="text-xs font-semibold bg-primary text-primary-foreground">
+                        {user?.user_metadata?.username?.[0]?.toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
-                      <p className="font-bold text-base">{user?.user_metadata?.username || user?.email?.split('@')[0] || 'User'}</p>
-                      <p className="text-xs text-muted-foreground">{t ? "حسابك الشخصي" : "Your account"}</p>
-                    </div>
+                    <span className="font-semibold text-sm">
+                      {user?.user_metadata?.username || user?.email?.split('@')[0] || 'User'}
+                    </span>
                   </div>
 
-                  <Separator className="opacity-50" />
-
-                  {/* Caption */}
-                  <div>
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 block">
-                      📝 {t ? "التعليق" : "Caption"}
-                    </label>
-                    <Textarea
-                      placeholder={t ? "شارك أفكارك وعواطفك..." : "Share your thoughts and feelings..."}
-                      value={caption}
-                      onChange={(e) => setCaption(e.target.value)}
-                      className="min-h-28 resize-none bg-muted/50 border border-border/50 text-sm rounded-2xl focus:ring-2 focus:ring-primary/50 focus:border-transparent"
-                      dir={direction}
-                      maxLength={2200}
-                    />
-                    <div className="text-xs text-muted-foreground mt-2 text-right">
-                      {caption.length} / 2,200
-                    </div>
+                  <Textarea
+                    placeholder={t ? "اكتب تعليقاً..." : "Write a caption..."}
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    className="min-h-32 resize-none border-0 bg-transparent text-sm p-0 focus-visible:ring-0 placeholder:text-muted-foreground/60"
+                    dir={direction}
+                    maxLength={2200}
+                  />
+                  <div className="text-[11px] text-muted-foreground text-right">
+                    {caption.length}/2,200
                   </div>
 
-                  {/* Location */}
-                  <div>
-                    <button
-                      onClick={() => setLocation(location ? "" : "Location")}
-                      className={cn(
-                        "w-full flex items-center gap-3 p-3 rounded-xl transition-all font-medium",
-                        location
-                          ? "bg-primary/15 text-primary border border-primary/30"
-                          : "bg-muted/50 text-foreground hover:bg-muted/80 border border-border/30"
-                      )}
-                    >
-                      <MapPin className="w-5 h-5 flex-shrink-0" />
-                      <span>{location || (t ? "📍 إضافة موقع" : "📍 Add location")}</span>
-                    </button>
-                    {location && (
-                      <input
-                        type="text"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        className="w-full mt-2 bg-muted/50 border border-border/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        placeholder={t ? "اسم الموقع" : "Location name"}
-                        dir={direction}
-                      />
-                    )}
-                  </div>
+                  <Separator />
 
-                  {/* Advanced Settings */}
                   <button
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="w-full flex items-center justify-between p-3 hover:bg-muted/50 rounded-xl transition-all group"
+                    onClick={() => setLocation(location ? "" : "Location")}
+                    className="w-full flex items-center justify-between py-2 text-sm hover:text-foreground transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      <Settings className="w-5 h-5" />
-                      <span className="font-medium text-sm">{t ? "⚙️ إعدادات إضافية" : "⚙️ More options"}</span>
+                      <MapPin className="w-4 h-4" />
+                      <span>{location || (t ? "إضافة موقع" : "Add location")}</span>
                     </div>
-                    <ChevronDown className={cn("w-4 h-4 transition-transform duration-300", showAdvanced && "rotate-180")} />
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  {location && (
+                    <input
+                      type="text"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder={t ? "اسم الموقع" : "Location name"}
+                      dir={direction}
+                    />
+                  )}
+
+                  <Separator />
+
+                  <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full flex items-center justify-between py-2 text-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-4 h-4" />
+                      <span>{t ? "إعدادات متقدمة" : "Advanced settings"}</span>
+                    </div>
+                    <ChevronDown className={cn("w-4 h-4 transition-transform", showAdvanced && "rotate-180")} />
                   </button>
 
                   {showAdvanced && (
-                    <div className="space-y-4 p-4 bg-muted/40 rounded-2xl border border-border/50 animate-in slide-in-from-top-2 duration-200">
+                    <div className="space-y-3 pl-6">
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium cursor-pointer">
-                          {t ? "إخفاء الإعجابات" : "Hide likes"}
+                        <Label className="text-sm cursor-pointer">
+                          {t ? "إخفاء الإعجابات" : "Hide like count"}
                         </Label>
                         <Switch checked={hidelikeCount} onCheckedChange={setHideLikeCount} />
                       </div>
-                      <Separator className="opacity-30" />
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium cursor-pointer">
-                          {t ? "إيقاف التعليقات" : "Disable comments"}
+                        <Label className="text-sm cursor-pointer">
+                          {t ? "إيقاف التعليقات" : "Turn off commenting"}
                         </Label>
                         <Switch checked={hideComments} onCheckedChange={setHideComments} />
                       </div>
@@ -663,41 +632,10 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
                   )}
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Footer Actions - Only for details step */}
-          {currentStep === 'details' && (
-            <div className="border-t border-border/50 bg-gradient-to-t from-background to-muted/20 p-4 sm:p-6 flex gap-3 flex-shrink-0">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentStep('edit')}
-                className="rounded-xl"
-                disabled={isLoading}
-              >
-                {t ? "رجوع" : "Back"}
-              </Button>
-              <Button
-                onClick={handlePost}
-                disabled={isLoading}
-                className="flex-1 rounded-xl py-3 text-base font-bold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    {uploadProgress}%
-                  </>
-                ) : (
-                  <>
-                    <Share2 className="w-5 h-5 mr-2" />
-                    {t ? "مشاركة الآن" : "Share Now"}
-                  </>
-                )}
-              </Button>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-    </>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
