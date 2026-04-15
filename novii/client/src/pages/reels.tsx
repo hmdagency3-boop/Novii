@@ -1,6 +1,6 @@
 import Layout from "@/components/layout";
 import { ReelCommentsSheet } from "@/components/reel-comments-sheet";
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useLanguage } from "@/lib/language-context";
 import { useInfiniteReels, useToggleReelLike, useToggleFollow } from "@/hooks/use-data";
 import { Spinner } from "@/components/ui/spinner";
@@ -78,48 +78,59 @@ export default function Reels() {
     return () => obs.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
+  const stableRefs = useRef({ toggleReelLike, toggleFollow, currentUser, showPrompt, followedUsers, savedReels, isRTL });
+  stableRefs.current = { toggleReelLike, toggleFollow, currentUser, showPrompt, followedUsers, savedReels, isRTL };
+
   const handleLike = useCallback(async (reelId: string): Promise<boolean> => {
-    if (!currentUser) { showPrompt(); return false; }
-    try { await toggleReelLike.mutateAsync(reelId); return true; } catch { return false; }
-  }, [currentUser, showPrompt, toggleReelLike]);
+    const { currentUser: u, showPrompt: sp, toggleReelLike: trl } = stableRefs.current;
+    if (!u) { sp(); return false; }
+    try { await trl.mutateAsync(reelId); return true; } catch { return false; }
+  }, []);
 
   const handleFollow = useCallback(async (uid: string) => {
-    if (!currentUser) { showPrompt(); return; }
-    const wasFollowed = followedUsers.has(uid);
+    const { currentUser: u, showPrompt: sp, toggleFollow: tf, followedUsers: fu, isRTL: rtl } = stableRefs.current;
+    if (!u) { sp(); return; }
+    const wasFollowed = fu.has(uid);
     setFollowedUsers(p => { const n = new Set(p); wasFollowed ? n.delete(uid) : n.add(uid); return n; });
     try {
-      await toggleFollow.mutateAsync({ targetUserId: uid });
+      await tf.mutateAsync({ targetUserId: uid });
     } catch {
       setFollowedUsers(p => { const n = new Set(p); wasFollowed ? n.add(uid) : n.delete(uid); return n; });
-      toast.error(isRTL ? "حدث خطأ" : "Something went wrong");
+      toast.error(rtl ? "حدث خطأ" : "Something went wrong");
     }
-  }, [currentUser, showPrompt, toggleFollow, followedUsers, isRTL]);
+  }, []);
 
   const handleSave = useCallback((id: string) => {
-    if (!currentUser) { showPrompt(); return; }
+    const { currentUser: u, showPrompt: sp, savedReels: sr, isRTL: rtl } = stableRefs.current;
+    if (!u) { sp(); return; }
     setSavedReels(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
-    toast.success(savedReels.has(id) ? (isRTL ? "تمت الإزالة" : "Removed") : (isRTL ? "تم الحفظ" : "Saved"));
-  }, [currentUser, showPrompt, isRTL, savedReels]);
+    toast.success(sr.has(id) ? (rtl ? "تمت الإزالة" : "Removed") : (rtl ? "تم الحفظ" : "Saved"));
+  }, []);
 
   const handleShare = useCallback((reel: any) => {
+    const { isRTL: rtl } = stableRefs.current;
     navigator.clipboard.writeText(`${window.location.origin}/reel/${reel.id}`);
-    toast.success(isRTL ? "تم نسخ الرابط" : "Link copied!");
-  }, [isRTL]);
+    toast.success(rtl ? "تم نسخ الرابط" : "Link copied!");
+  }, []);
 
   const handleComment = useCallback((id: string) => {
-    if (!currentUser) { showPrompt(); return; }
+    const { currentUser: u, showPrompt: sp } = stableRefs.current;
+    if (!u) { sp(); return; }
     setCommentReelId(id);
-  }, [currentUser, showPrompt]);
+  }, []);
+
+  const isGuestRef = useRef(isGuest);
+  isGuestRef.current = isGuest;
 
   const onVisible = useCallback(() => {
-    if (isGuest && !guestPromptShown.current) {
+    if (isGuestRef.current && !guestPromptShown.current) {
       guestViewCount.current += 1;
       if (guestViewCount.current > 2) {
         guestPromptShown.current = true;
-        setTimeout(() => showPrompt(), 600);
+        setTimeout(() => stableRefs.current.showPrompt(), 600);
       }
     }
-  }, [isGuest, showPrompt]);
+  }, []);
 
   const sharedProps = (reel: any) => ({
     reel,
@@ -375,7 +386,7 @@ function useVideoPlayback(reel: any, muted: boolean) {
 /* ════════════════════════════════════════════════════
    MOBILE CARD
 ════════════════════════════════════════════════════ */
-function MobileReelCard({
+const MobileReelCard = React.memo(function MobileReelCard({
   reel, idx, isRTL, muted, setMuted, followed, saved,
   currentUserId, cardHeight = "100svh",
   onLike, onFollow, onSave, onShare, onComment, onVisible,
@@ -468,7 +479,7 @@ function MobileReelCard({
     if (now - lastTapTime.current < 350) {
       clearTimeout(singleTapTimer.current ?? undefined);
       lastTapTime.current = 0;
-      doLike();
+      if (!localLikedRef.current) doLike();
       spawnHeart(e);
     } else {
       lastTapTime.current = now;
@@ -564,12 +575,12 @@ function MobileReelCard({
       </div>
     </div>
   );
-}
+});
 
 /* ════════════════════════════════════════════════════
    DESKTOP CARD
 ════════════════════════════════════════════════════ */
-function DesktopReelCard({
+const DesktopReelCard = React.memo(function DesktopReelCard({
   reel, idx, isRTL, muted, setMuted, followed, saved,
   currentUserId,
   onLike, onFollow, onSave, onShare, onComment, onVisible,
@@ -717,7 +728,7 @@ function DesktopReelCard({
       </div>
     </div>
   );
-}
+});
 
 function fmt(n: number): string {
   if (!n) return "0";
