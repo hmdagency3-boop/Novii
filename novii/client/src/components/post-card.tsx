@@ -129,14 +129,14 @@ export default function PostCard({ post }: PostCardProps) {
           if (part?.startsWith('#') && part.length > 1) {
             const tagName = part.slice(1);
             return (
-              <a
+              <Link
                 key={i}
                 href={`/hashtag/${tagName}`}
-                onClick={(e) => { e.preventDefault(); window.location.href = `/hashtag/${tagName}`; }}
                 className="text-primary font-medium hover:text-primary/80 transition-colors cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
               >
                 {part}
-              </a>
+              </Link>
             );
           }
           return <span key={i}>{part}</span>;
