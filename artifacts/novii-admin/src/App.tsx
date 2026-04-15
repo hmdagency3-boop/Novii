@@ -10,6 +10,7 @@ import CommunitiesPage from "@/pages/communities";
 import AdminsPage from "@/pages/admins";
 import ReportsPage from "@/pages/reports";
 import VerificationPage from "@/pages/verification";
+import AppealsPage from "@/pages/appeals";
 import SettingsPage from "@/pages/settings";
 import LogsPage from "@/pages/logs";
 
@@ -21,6 +22,7 @@ const pageComponents: Record<TabId, React.FC> = {
   admins: AdminsPage,
   reports: ReportsPage,
   verification: VerificationPage,
+  appeals: AppealsPage,
   settings: SettingsPage,
   logs: LogsPage,
 };

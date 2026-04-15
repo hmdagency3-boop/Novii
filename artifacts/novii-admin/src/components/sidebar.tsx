@@ -12,10 +12,11 @@ import {
   UsersRound,
   ChevronRight,
   Menu,
+  Scale,
 } from "lucide-react";
 import { useState } from "react";
 
-export type TabId = "dashboard" | "users" | "content" | "communities" | "admins" | "reports" | "verification" | "settings" | "logs";
+export type TabId = "dashboard" | "users" | "content" | "communities" | "admins" | "reports" | "verification" | "appeals" | "settings" | "logs";
 
 interface SidebarProps {
   activeTab: TabId;
@@ -32,6 +33,7 @@ const menuItems: { id: TabId; label: string; labelAr: string; icon: React.Elemen
   { id: "admins", label: "Admins", labelAr: "المشرفين", icon: Shield, permission: "can_manage_admins" },
   { id: "reports", label: "Reports", labelAr: "البلاغات", icon: Flag, permission: "can_manage_reports" },
   { id: "verification", label: "Verification", labelAr: "طلبات التوثيق", icon: BadgeCheck, permission: "can_manage_users" },
+  { id: "appeals", label: "Appeals", labelAr: "الاستئنافات", icon: Scale, permission: "can_manage_users" },
   { id: "settings", label: "Settings", labelAr: "الإعدادات", icon: Settings, permission: "can_manage_settings" },
   { id: "logs", label: "Logs", labelAr: "السجلات", icon: ScrollText, permission: "can_view_analytics" },
 ];

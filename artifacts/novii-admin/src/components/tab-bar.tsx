@@ -9,6 +9,7 @@ const tabLabels: Record<TabId, string> = {
   admins: "المشرفين",
   reports: "البلاغات",
   verification: "طلبات التوثيق",
+  appeals: "الاستئنافات",
   settings: "الإعدادات",
   logs: "السجلات",
 };

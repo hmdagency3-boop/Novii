@@ -398,6 +398,35 @@ export interface CommunityMessageRecord {
   sender_avatar: string | null;
 }
 
+export interface BanAppeal {
+  id: string;
+  user_id: string;
+  status: 'pending' | 'reviewing' | 'approved' | 'rejected';
+  id_front_url: string;
+  id_back_url: string;
+  selfie_url: string;
+  message?: string;
+  admin_note?: string;
+  reviewed_by?: string;
+  created_at: string;
+  reviewed_at?: string;
+  profiles?: { username: string; full_name?: string; avatar_url?: string; email?: string };
+}
+
+export async function fetchBanAppeals(): Promise<BanAppeal[]> {
+  return adminFetch("/ban-appeals");
+}
+
+export async function updateBanAppeal(
+  appealId: string,
+  data: { status: 'approved' | 'rejected'; admin_note?: string }
+): Promise<unknown> {
+  return adminFetch(`/ban-appeals/${appealId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function sendSystemMessage(
   communityId: string,
   content: string

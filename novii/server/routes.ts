@@ -11,7 +11,7 @@ import { userDevices, profiles } from "../shared/schema";
 import { sql, eq } from "drizzle-orm";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
-import { upload, handleUpload } from "./cloudinary";
+import { upload, handleUpload, uploadToCloudinary } from "./cloudinary";
 
 // Helper to convert Uint8Array/array/string to UUID string
 function arrayToUUID(arr: any): string {
@@ -193,6 +193,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== Cloudinary Upload Route (with auth, rate limit, file validation) =====
   app.post("/api/upload", requireAuth as any, upload.single("file") as any, validateUploadFile as any, rateLimitUpload as any, handleUpload as any);
+
+  // ===== Ban Appeal Endpoints =====
+
+  app.get("/api/auth/ban-appeal-status", async (req: Request, res: Response) => {
+    try {
+      const token = req.headers['x-user-token'] as string;
+      if (!token || !adminDb) return res.status(401).json({ error: 'Unauthorized' });
+
+      const supabaseUrl = process.env.SUPABASE_URL!;
+      const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+      const verifier = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: { user } } = await verifier.auth.getUser(token);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+      const { data: appeal } = await adminDb
+        .from('ban_appeals')
+        .select('id, status, created_at, admin_note, reviewed_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      res.json({ appeal: appeal || null });
+    } catch {
+      res.json({ appeal: null });
+    }
+  });
+
+  app.post("/api/auth/ban-appeal", upload.fields([
+    { name: 'id_front', maxCount: 1 },
+    { name: 'id_back', maxCount: 1 },
+    { name: 'selfie', maxCount: 1 },
+  ]) as any, async (req: Request, res: Response) => {
+    try {
+      const token = req.headers['x-user-token'] as string;
+      if (!token || !adminDb) return res.status(401).json({ error: 'Unauthorized' });
+
+      const supabaseUrl = process.env.SUPABASE_URL!;
+      const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+      const verifier = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: { user } } = await verifier.auth.getUser(token);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+      const { data: existing } = await adminDb
+        .from('ban_appeals')
+        .select('id, status')
+        .eq('user_id', user.id)
+        .in('status', ['pending', 'reviewing'])
+        .limit(1)
+        .single();
+
+      if (existing) {
+        return res.status(400).json({ error: 'لديك طلب استئناف قيد المراجعة بالفعل' });
+      }
+
+      const { data: profile } = await adminDb
+        .from('profiles')
+        .select('is_banned')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.is_banned) {
+        return res.status(400).json({ error: 'حسابك ليس محظوراً' });
+      }
+
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      if (!files?.id_front?.[0] || !files?.id_back?.[0] || !files?.selfie?.[0]) {
+        return res.status(400).json({ error: 'جميع الصور مطلوبة: صورة البطاقة وجه وظهر وصورة شخصية' });
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const maxSize = 10 * 1024 * 1024;
+      for (const field of ['id_front', 'id_back', 'selfie'] as const) {
+        const f = files[field]?.[0];
+        if (f && !allowedTypes.includes(f.mimetype)) {
+          return res.status(400).json({ error: 'نوع الملف غير مدعوم. يرجى رفع صور بصيغة JPG أو PNG' });
+        }
+        if (f && f.size > maxSize) {
+          return res.status(400).json({ error: 'حجم الصورة يجب أن لا يتجاوز 10 ميغابايت' });
+        }
+      }
+
+      const [idFrontUrl, idBackUrl, selfieUrl] = await Promise.all([
+        uploadToCloudinary(files.id_front[0].buffer, 'appeals', 'image'),
+        uploadToCloudinary(files.id_back[0].buffer, 'appeals', 'image'),
+        uploadToCloudinary(files.selfie[0].buffer, 'appeals', 'image'),
+      ]);
+
+      const { error } = await adminDb.from('ban_appeals').insert({
+        user_id: user.id,
+        id_front_url: idFrontUrl,
+        id_back_url: idBackUrl,
+        selfie_url: selfieUrl,
+        message: req.body.message || null,
+      });
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('Ban appeal submit error:', err);
+      res.status(500).json({ error: err.message || 'فشل في إرسال الاستئناف' });
+    }
+  });
 
   // ===== Server-side Auth Routes (browser calls backend → backend calls Supabase) =====
 
@@ -3241,6 +3344,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Update verification request error:', error);
       res.status(500).json({ error: 'Failed to update verification request' });
+    }
+  });
+
+  // ─── Admin: Ban Appeals Management ───────────────────────────────────────────
+
+  app.get("/api/admin/ban-appeals", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { data: appeals, error } = await adminDb!
+        .from('ban_appeals')
+        .select('*, profiles!ban_appeals_user_id_fkey(username, full_name, avatar_url, email)')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      res.json(appeals || []);
+    } catch (err) {
+      console.error('Fetch ban appeals error:', err);
+      res.status(500).json({ error: 'Failed to fetch ban appeals' });
+    }
+  });
+
+  app.patch("/api/admin/ban-appeals/:appealId", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { appealId } = req.params;
+      const { status, admin_note } = req.body;
+
+      if (!['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ error: 'Status must be approved or rejected' });
+      }
+
+      const { data: appeal, error: fetchErr } = await adminDb!
+        .from('ban_appeals')
+        .select('*')
+        .eq('id', appealId)
+        .single();
+
+      if (fetchErr || !appeal) return res.status(404).json({ error: 'Appeal not found' });
+      if (!['pending', 'reviewing'].includes(appeal.status)) {
+        return res.status(400).json({ error: 'Only pending/reviewing appeals can be updated' });
+      }
+
+      if (status === 'approved') {
+        const { error: unbanErr } = await adminDb!.from('profiles').update({
+          is_banned: false,
+          banned_reason: null,
+          ban_until: null,
+          show_ban_duration: false,
+        }).eq('id', appeal.user_id);
+        if (unbanErr) throw unbanErr;
+      }
+
+      const { error } = await adminDb!.from('ban_appeals').update({
+        status,
+        admin_note: admin_note || null,
+        reviewed_by: req.userId,
+        reviewed_at: new Date().toISOString(),
+      }).eq('id', appealId);
+
+      if (error) throw error;
+
+      const notifContent = status === 'approved'
+        ? 'تم قبول استئنافك! تم رفع الحظر عن حسابك. يُرجى الالتزام بإرشادات المجتمع.'
+        : `تم رفض استئنافك.${admin_note ? ` السبب: ${admin_note}` : ''}`;
+
+      await adminDb!.from('notifications').insert({
+        user_id: appeal.user_id,
+        type: 'security',
+        content: notifContent,
+      });
+
+      await logAdminAction(req, status === 'approved' ? 'approve_appeal' : 'reject_appeal', 'ban_appeal', appeal.user_id, admin_note || undefined);
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Update ban appeal error:', err);
+      res.status(500).json({ error: 'Failed to update ban appeal' });
     }
   });
 
