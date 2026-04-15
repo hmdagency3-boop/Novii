@@ -33,6 +33,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+import UserDetailPage from "./user-detail";
+
 export default function UsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +46,7 @@ export default function UsersPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [actionUser, setActionUser] = useState<UserProfile | null>(null);
   const [actionMenu, setActionMenu] = useState<string | null>(null);
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
 
   const loadUsers = () => {
     setLoading(true);
@@ -86,6 +89,10 @@ export default function UsersPage() {
     { key: "banned" as const, label: "محظورين", count: users.filter(u => u.is_banned).length },
     { key: "creators" as const, label: "صناع محتوى", count: users.filter(u => u.is_creator).length },
   ];
+
+  if (detailUserId) {
+    return <UserDetailPage userId={detailUserId} onBack={() => setDetailUserId(null)} />;
+  }
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto" dir="rtl">
@@ -177,7 +184,7 @@ export default function UsersPage() {
                   <tr key={user.id} className="border-b border-[#efefef] last:border-0 hover:bg-[#fafafa] transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#833AB4] via-[#E1306C] to-[#F77737] p-[1.5px] shrink-0">
+                        <button onClick={() => setDetailUserId(user.id)} className="w-9 h-9 rounded-full bg-gradient-to-br from-[#833AB4] via-[#E1306C] to-[#F77737] p-[1.5px] shrink-0 cursor-pointer hover:scale-110 transition-transform">
                           <div className="w-full h-full rounded-full bg-white overflow-hidden flex items-center justify-center">
                             {user.avatar_url ? (
                               <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -187,7 +194,7 @@ export default function UsersPage() {
                               </span>
                             )}
                           </div>
-                        </div>
+                        </button>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1">
                             <p className="text-[14px] font-semibold text-[#262626] truncate">{user.display_name || user.username}</p>
@@ -235,7 +242,7 @@ export default function UsersPage() {
                         </button>
                         {actionMenu === user.id && (
                           <div className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.15)] border border-[#dbdbdb] py-1.5 z-50 min-w-[180px]" dir="rtl">
-                            <ActionMenuItem icon={<Eye className="w-4 h-4" />} label="عرض التفاصيل" onClick={() => { setSelectedUser(user); setActionMenu(null); }} />
+                            <ActionMenuItem icon={<Eye className="w-4 h-4" />} label="عرض التفاصيل" onClick={() => { setDetailUserId(user.id); setActionMenu(null); }} />
                             <ActionMenuItem icon={<UserCog className="w-4 h-4" />} label="تعديل" onClick={() => { setActionUser(user); setShowEditModal(true); setActionMenu(null); }} />
                             <ActionMenuItem
                               icon={<Ban className="w-4 h-4" />}

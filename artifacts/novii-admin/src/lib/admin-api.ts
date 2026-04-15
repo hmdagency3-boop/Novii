@@ -398,6 +398,10 @@ export interface CommunityMessageRecord {
   sender_avatar: string | null;
 }
 
+export async function fetchUserDetails(userId: string): Promise<any> {
+  return adminFetch(`/users/${userId}/details`);
+}
+
 export interface BanAppeal {
   id: string;
   user_id: string;

@@ -2364,6 +2364,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/admin/users/:userId/details — full user details
+  app.get("/api/admin/users/:userId/details", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+
+      const [
+        profileRes,
+        devicesRes,
+        postsRes,
+        reelsRes,
+        storiesRes,
+        reportsAgainstRes,
+        reportsByRes,
+        warningsRes,
+        appealsRes,
+        verificationRes,
+        logsRes,
+        statsRes,
+        followersRes,
+        followingRes,
+        communitiesRes,
+        blockedRes,
+      ] = await Promise.all([
+        adminDb!.from('profiles').select('*').eq('id', userId).single(),
+        adminDb!.from('user_devices').select('*').eq('user_id', userId).order('last_active_at', { ascending: false }),
+        adminDb!.from('posts').select('id, caption, image_url, likes_count, comments_count, created_at, is_archived, is_deleted').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
+        adminDb!.from('reels').select('id, caption, video_url, thumbnail_url, likes_count, comments_count, views_count, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
+        adminDb!.from('stories').select('id, media_url, media_type, views_count, created_at, expires_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(20),
+        adminDb!.from('reports').select('*, profiles!reports_reporter_id_fkey(username, avatar_url)').eq('reported_user_id', userId).order('created_at', { ascending: false }),
+        adminDb!.from('reports').select('*, profiles!reports_reported_user_id_fkey(username, avatar_url)').eq('reporter_id', userId).order('created_at', { ascending: false }),
+        adminDb!.from('user_warnings').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        adminDb!.from('ban_appeals').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        adminDb!.from('verification_requests').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        adminDb!.from('admin_logs').select('*').eq('target_id', userId).order('created_at', { ascending: false }).limit(30),
+        adminDb!.from('user_statistics').select('*').eq('user_id', userId).single(),
+        adminDb!.from('follows').select('follower_id, profiles!follows_follower_id_fkey(username, avatar_url)').eq('following_id', userId).limit(10),
+        adminDb!.from('follows').select('following_id, profiles!follows_following_id_fkey(username, avatar_url)').eq('follower_id', userId).limit(10),
+        adminDb!.from('community_members').select('community_id, role, joined_at, communities(name, avatar_url)').eq('user_id', userId),
+        adminDb!.from('blocked_users').select('blocked_user_id, profiles!blocked_users_blocked_user_id_fkey(username, avatar_url)').eq('user_id', userId),
+      ]);
+
+      if (profileRes.error || !profileRes.data) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const profile = {
+        ...profileRes.data,
+        display_name: profileRes.data.full_name || profileRes.data.display_name || profileRes.data.username,
+      };
+
+      const sectionErrors: string[] = [];
+      const safeData = (res: any, name: string) => {
+        if (res.error) { sectionErrors.push(`${name}: ${res.error.message}`); return []; }
+        return res.data || [];
+      };
+      const safeSingle = (res: any, name: string) => {
+        if (res.error) { sectionErrors.push(`${name}: ${res.error.message}`); return null; }
+        return res.data || null;
+      };
+
+      if (sectionErrors.length) console.warn('User detail partial errors:', sectionErrors);
+
+      res.json({
+        profile,
+        devices: safeData(devicesRes, 'devices'),
+        posts: safeData(postsRes, 'posts'),
+        reels: safeData(reelsRes, 'reels'),
+        stories: safeData(storiesRes, 'stories'),
+        reports_against: safeData(reportsAgainstRes, 'reports_against'),
+        reports_by: safeData(reportsByRes, 'reports_by'),
+        warnings: safeData(warningsRes, 'warnings'),
+        appeals: safeData(appealsRes, 'appeals'),
+        verification_requests: safeData(verificationRes, 'verification'),
+        admin_logs: safeData(logsRes, 'admin_logs'),
+        statistics: safeSingle(statsRes, 'statistics'),
+        followers_sample: safeData(followersRes, 'followers'),
+        following_sample: safeData(followingRes, 'following'),
+        communities: safeData(communitiesRes, 'communities'),
+        blocked_users: safeData(blockedRes, 'blocked'),
+        _errors: sectionErrors.length ? sectionErrors : undefined,
+      });
+    } catch (error) {
+      console.error('Admin user details error:', error);
+      res.status(500).json({ error: 'Failed to fetch user details' });
+    }
+  });
+
   // POST /api/admin/users/:userId/ban — ban/unban user
   app.post("/api/admin/users/:userId/ban", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
     try {
