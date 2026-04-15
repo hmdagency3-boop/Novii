@@ -222,6 +222,17 @@
   }
 }
 
+/* Hide scrollbars on mobile globally */
+@media (max-width: 768px) {
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Custom Utilities */
 @layer utilities {
   .scrollbar-hide::-webkit-scrollbar {
