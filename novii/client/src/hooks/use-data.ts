@@ -239,20 +239,24 @@ export function useToggleLike() {
         if (!old) return old;
         return Array.isArray(old) ? old.map(updatePost) : old;
       });
+
+      // ── Hashtag posts ──
+      queryClient.setQueriesData({ queryKey: ['hashtag-posts'] }, (old: any) => {
+        if (!old) return old;
+        return Array.isArray(old) ? old.map(updatePost) : old;
+      });
     },
     onSuccess: (_, postId) => {
-      // Only refetch the single post — leave feed-infinite alone to avoid
-      // expensive multi-page refetch after every like.
       queryClient.refetchQueries({ queryKey: ['post', postId] });
     },
     onError: (error: any) => {
       console.error('Like toggle error:', error);
-      // On error, reset everything to server truth
       queryClient.invalidateQueries({ queryKey: ['feed-infinite'] });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['post'] });
       queryClient.invalidateQueries({ queryKey: ['explore'] });
       queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['hashtag-posts'] });
     },
   });
 }
@@ -692,30 +696,41 @@ export function useToggleSave() {
   return useMutation({
     mutationFn: (postId: string) => api.toggleSave(postId),
     onMutate: async (postId) => {
-      await queryClient.cancelQueries({ queryKey: ['feed'] });
-      
-      const previousData = queryClient.getQueryData(['feed']);
-      
-      queryClient.setQueryData(['feed'], (old: any) => {
+      const updatePost = (post: Post) =>
+        post.id === postId ? { ...post, is_saved: !post.is_saved } : post;
+
+      queryClient.setQueriesData({ queryKey: ['feed'] }, (old: any) => {
         if (!old) return old;
-        return old.map((post: Post) => {
-          if (post.id === postId) {
-            return {
-              ...post,
-              is_saved: !post.is_saved,
-            };
-          }
-          return post;
-        });
+        return Array.isArray(old) ? old.map(updatePost) : old;
       });
 
-      return { previousData };
+      queryClient.setQueriesData({ queryKey: ['feed-infinite'] }, (old: any) => {
+        if (!old?.pages) return old;
+        return { ...old, pages: old.pages.map((page: Post[]) => Array.isArray(page) ? page.map(updatePost) : page) };
+      });
+
+      queryClient.setQueriesData({ queryKey: ['hashtag-posts'] }, (old: any) => {
+        if (!old) return old;
+        return Array.isArray(old) ? old.map(updatePost) : old;
+      });
+
+      queryClient.setQueriesData({ queryKey: ['explore'] }, (old: any) => {
+        if (!old) return old;
+        return Array.isArray(old) ? old.map(updatePost) : old;
+      });
+
+      queryClient.setQueriesData({ queryKey: ['posts'] }, (old: any) => {
+        if (!old) return old;
+        return Array.isArray(old) ? old.map(updatePost) : old;
+      });
     },
-    onError: (err, variables, context) => {
-      queryClient.setQueryData(['feed'], context?.previousData);
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['feed-infinite'] });
+      queryClient.invalidateQueries({ queryKey: ['hashtag-posts'] });
+      queryClient.invalidateQueries({ queryKey: ['saved'] });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['saved'] });
     },
   });

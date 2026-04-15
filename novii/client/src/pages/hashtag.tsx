@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Hash, TrendingUp } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import PostCard from "@/components/post-card";
 import Layout from "@/components/layout";
 import { api } from "@/lib/api";
-import type { Post } from "@/lib/api";
 
 interface HashtagData {
   id: string;
@@ -19,42 +19,25 @@ export default function HashtagPage() {
   const tag = params.tag || "";
   const [, navigate] = useLocation();
   const { isArabic } = useLanguage();
-  const [hashtag, setHashtag] = useState<HashtagData | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
   const [trendingTags, setTrendingTags] = useState<HashtagData[]>([]);
+  const [hashtag, setHashtag] = useState<HashtagData | null>(null);
+
+  const { data: posts = [], isLoading } = useQuery({
+    queryKey: ['hashtag-posts', tag],
+    queryFn: () => api.getHashtagPosts(tag),
+    enabled: !!tag,
+  });
 
   useEffect(() => {
     if (!tag) return;
-    loadHashtag();
-    loadTrending();
+    fetch(`/api/hashtags/${encodeURIComponent(tag)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setHashtag(data); });
+    fetch("/api/hashtags/trending")
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setTrendingTags(data.filter((t: HashtagData) => t.name !== tag.toLowerCase())))
+      .catch(() => {});
   }, [tag]);
-
-  async function loadHashtag() {
-    setLoading(true);
-    try {
-      const [hashtagRes, hashtagPosts] = await Promise.all([
-        fetch(`/api/hashtags/${encodeURIComponent(tag)}`).then(r => r.ok ? r.json() : null),
-        api.getHashtagPosts(tag)
-      ]);
-      if (hashtagRes) setHashtag(hashtagRes);
-      setPosts(hashtagPosts);
-    } catch (err) {
-      console.error("Error loading hashtag:", err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadTrending() {
-    try {
-      const res = await fetch("/api/hashtags/trending");
-      if (res.ok) {
-        const data = await res.json();
-        setTrendingTags(data.filter((t: HashtagData) => t.name !== tag.toLowerCase()));
-      }
-    } catch {}
-  }
 
   return (
     <Layout>
@@ -100,7 +83,7 @@ export default function HashtagPage() {
           </div>
         )}
 
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-3 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" />
           </div>
