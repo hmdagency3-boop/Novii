@@ -2,7 +2,7 @@ export function TempBan() {
   const logo = "https://placehold.co/64x64/1a1a2e/a855f7?text=N";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-white via-white to-purple-50/40" dir="rtl">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-white via-white to-purple-50/40 overflow-hidden" dir="rtl" style={{ isolation: "isolate" }}>
       <div className="w-full max-w-[380px] mx-4 flex flex-col items-center">
         <div className="mb-6">
           <div className="w-16 h-16 rounded-2xl shadow-lg bg-gradient-to-br from-purple-600 to-violet-500 flex items-center justify-center">
@@ -34,21 +34,6 @@ export function TempBan() {
             </div>
           </div>
 
-          <div className="w-full rounded-2xl border border-gray-200 bg-white overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-gray-900">المخالفات</span>
-              <span className="text-[12px] font-bold text-red-500">2/5</span>
-            </div>
-            <div className="px-4 py-3">
-              <div className="flex gap-1.5">
-                <div className="flex-1 h-[5px] rounded-full bg-red-500" />
-                <div className="flex-1 h-[5px] rounded-full bg-red-500" />
-                <div className="flex-1 h-[5px] rounded-full bg-gray-200" />
-                <div className="flex-1 h-[5px] rounded-full bg-gray-200" />
-                <div className="flex-1 h-[5px] rounded-full bg-gray-200" />
-              </div>
-            </div>
-          </div>
         </div>
 
         <div className="w-full space-y-2.5">

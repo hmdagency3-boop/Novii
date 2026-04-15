@@ -11,7 +11,7 @@ export function BanScreen() {
   const showDuration = banInfo.show_duration && banUntil;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-b from-white via-white to-purple-50/40" dir="rtl">
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-b from-white via-white to-purple-50/40 overflow-hidden" dir="rtl" style={{ isolation: "isolate" }}>
       <div className="w-full max-w-[380px] mx-4 flex flex-col items-center">
         <div className="mb-6">
           <img src={logo} alt="Novii" className="w-16 h-16 rounded-2xl shadow-lg object-contain bg-black/5 p-1.5" />
@@ -61,26 +61,6 @@ export function BanScreen() {
             </div>
           )}
 
-          {(banInfo.strikes_count ?? 0) > 0 && (
-            <div className="w-full rounded-2xl border border-border bg-card overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
-                <span className="text-[13px] font-semibold text-foreground">المخالفات</span>
-                <span className="text-[12px] font-bold text-destructive">{banInfo.strikes_count}/5</span>
-              </div>
-              <div className="px-4 py-3">
-                <div className="flex gap-1.5">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`flex-1 h-[5px] rounded-full ${
-                        i < (banInfo.strikes_count ?? 0) ? "bg-destructive" : "bg-muted"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="w-full space-y-2.5">
