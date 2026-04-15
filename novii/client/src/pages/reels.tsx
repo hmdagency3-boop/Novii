@@ -317,12 +317,14 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, isLiked, li
 /* ════════════════════════════════════════════════════
    Hook: visibility-based video playback
 ════════════════════════════════════════════════════ */
-function useVideoPlayback(reel: any, muted: boolean) {
+function useVideoPlayback(reel: any, muted: boolean, setMuted: React.Dispatch<React.SetStateAction<boolean>>) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [paused, setPaused] = useState(false);
   const isVisible = useRef(false);
   const userPaused = useRef(false);
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -337,9 +339,13 @@ function useVideoPlayback(reel: any, muted: boolean) {
         if (entry.isIntersecting) {
           userPaused.current = false;
           setPaused(false);
-          vid.muted = muted;
+          vid.muted = mutedRef.current;
           const p = vid.play();
-          if (p) p.catch(() => { vid.muted = true; vid.play().catch(() => {}); });
+          if (p) p.catch(() => {
+            vid.muted = true;
+            setMuted(true);
+            vid.play().catch(() => {});
+          });
         } else {
           vid.pause();
           vid.currentTime = 0;
@@ -351,7 +357,7 @@ function useVideoPlayback(reel: any, muted: boolean) {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [setMuted]);
 
   useEffect(() => {
     const vid = videoRef.current;
@@ -365,16 +371,16 @@ function useVideoPlayback(reel: any, muted: boolean) {
     if (!vid) return;
     if (vid.paused) {
       userPaused.current = false;
-      vid.muted = muted;
+      vid.muted = mutedRef.current;
       const p = vid.play();
-      if (p) p.catch(() => { vid.muted = true; vid.play().catch(() => {}); });
+      if (p) p.catch(() => { vid.muted = true; setMuted(true); vid.play().catch(() => {}); });
       setPaused(false);
     } else {
       userPaused.current = true;
       vid.pause();
       setPaused(true);
     }
-  }, [muted]);
+  }, [setMuted]);
 
   return { videoRef, containerRef, paused, togglePlay };
 }
@@ -387,7 +393,7 @@ const MobileReelCard = React.memo(function MobileReelCard({
   currentUserId, cardHeight = "100svh",
   onLike, onFollow, onSave, onShare, onComment, onVisible,
 }: CardProps) {
-  const { videoRef, containerRef, paused, togglePlay } = useVideoPlayback(reel, muted);
+  const { videoRef, containerRef, paused, togglePlay } = useVideoPlayback(reel, muted, setMuted);
   const hasNav = cardHeight !== "100svh";
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPress = useRef(false);
@@ -581,7 +587,7 @@ const DesktopReelCard = React.memo(function DesktopReelCard({
   currentUserId,
   onLike, onFollow, onSave, onShare, onComment, onVisible,
 }: CardProps) {
-  const { videoRef, containerRef, paused, togglePlay } = useVideoPlayback(reel, muted);
+  const { videoRef, containerRef, paused, togglePlay } = useVideoPlayback(reel, muted, setMuted);
   const [floatingHearts, setFloatingHearts] = useState<FloatingHeart[]>([]);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clickCount = useRef(0);
