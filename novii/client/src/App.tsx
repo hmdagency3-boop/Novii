@@ -41,6 +41,20 @@ const Help            = lazy(() => import("@/pages/help"));
 const About           = lazy(() => import("@/pages/about"));
 const ModerationNotice = lazy(() => import("@/pages/moderation-notice"));
 
+const preloadPages = () => {
+  setTimeout(() => {
+    import("@/pages/home");
+    import("@/pages/explore");
+    import("@/pages/profile");
+    import("@/pages/notifications");
+    import("@/pages/messages");
+    import("@/pages/search");
+    import("@/pages/reels");
+    import("@/pages/settings");
+    import("@/pages/create");
+  }, 3000);
+};
+
 function BanGuard() {
   const { isBanned } = useAuth();
   if (!isBanned) return null;
@@ -139,10 +153,17 @@ function SplashOverlay() {
 function PageLoader() {
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "hsl(240,10%,3.9%)",
+      position: "fixed", inset: 0,
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
     }}>
-      <img src="/assets/novii_logo_new.png" alt="" style={{ width: 60, opacity: 0.6 }} />
+      <div style={{
+        width: 28, height: 28,
+        border: "3px solid rgba(168,85,247,0.2)",
+        borderTopColor: "#a855f7",
+        borderRadius: "50%",
+        animation: "pageLoaderSpin 0.6s linear infinite",
+      }} />
+      <style>{`@keyframes pageLoaderSpin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
@@ -240,6 +261,10 @@ function Router() {
 
 function App() {
   const [showSplash] = useState(true);
+
+  useEffect(() => {
+    preloadPages();
+  }, []);
 
   return (
     <ErrorBoundary>
