@@ -92,6 +92,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
   const [hidelikeCount, setHideLikeCount] = useState(false);
   const [hideComments, setHideComments] = useState(false);
   const [selectedAspect, setSelectedAspect] = useState<AspectRatioOption>(POST_ASPECT_RATIOS[0]);
+  const [croppedPreviewUrl, setCroppedPreviewUrl] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reelInputRef = useRef<HTMLInputElement>(null);
@@ -110,8 +111,28 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
       setCurrentImageIndex(0);
       setShowAdvanced(false);
       setSelectedAspect(POST_ASPECT_RATIOS[0]);
+      if (croppedPreviewUrl) URL.revokeObjectURL(croppedPreviewUrl);
+      setCroppedPreviewUrl(null);
     }
   }, [open, initialMediaType]);
+
+  const generateCroppedPreview = async () => {
+    const img = selectedImages[0];
+    if (!img?.croppedAreaPixels) return;
+    try {
+      const croppedFile = await getCroppedImg(
+        img.url,
+        img.croppedAreaPixels,
+        selectedAspect.outputWidth,
+        selectedAspect.outputHeight,
+        img.filter || selectedFilter
+      );
+      if (croppedPreviewUrl) URL.revokeObjectURL(croppedPreviewUrl);
+      setCroppedPreviewUrl(URL.createObjectURL(croppedFile));
+    } catch (err) {
+      console.error("Preview generation failed:", err);
+    }
+  };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -321,7 +342,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
       case 'crop':
         return { label: t ? "التالي" : "Next", action: () => setCurrentStep('filter') };
       case 'filter':
-        return { label: t ? "التالي" : "Next", action: () => setCurrentStep('details') };
+        return { label: t ? "التالي" : "Next", action: () => { generateCroppedPreview(); setCurrentStep('details'); } };
       case 'details':
         return {
           label: isLoading ? null : (t ? "مشاركة" : "Share"),
@@ -577,15 +598,21 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
 
           {currentStep === 'details' && (selectedImages.length > 0 || selectedReel) && (
             <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
-              <div className="hidden sm:flex flex-1 bg-black items-center justify-center">
+              <div className="flex flex-1 bg-black items-center justify-center p-2 sm:p-4 min-h-[200px] sm:min-h-0">
                 {selectedReel ? (
                   <div className="flex flex-col items-center gap-3 text-white/60">
                     <Film className="w-16 h-16" />
                     <span className="text-sm">{t ? "الفيديو جاهز" : "Video ready"}</span>
                   </div>
+                ) : croppedPreviewUrl ? (
+                  <img
+                    src={croppedPreviewUrl}
+                    alt="Cropped preview"
+                    className="max-w-full max-h-full object-contain rounded-md"
+                  />
                 ) : (
                   <img
-                    src={selectedImages[currentImageIndex].url}
+                    src={selectedImages[currentImageIndex]?.url}
                     alt="Preview"
                     className={cn(
                       "max-w-full max-h-full object-contain",
