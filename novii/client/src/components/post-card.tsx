@@ -22,8 +22,10 @@ import { formatDistanceToNow } from "date-fns";
 import { ar } from "date-fns/locale";
 import { Link } from "wouter";
 import { PostViewerModal } from "./post-viewer-modal";
+import { PostCommentsSheet } from "./post-comments-sheet";
 import { UserHoverCard } from "./user-hover-card";
 import { StoryAwareAvatar } from "./story-aware-avatar";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useLanguage } from "@/lib/language-context";
 import { useSettings } from "@/lib/settings-context";
 import { ReportDialog } from "./report-dialog";
@@ -50,6 +52,7 @@ interface PostCardProps {
 export default function PostCard({ post }: PostCardProps) {
   const [isDoubleTapLiked, setIsDoubleTapLiked] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
+  const [showCommentsSheet, setShowCommentsSheet] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [floatingHearts, setFloatingHearts] = useState<FloatingHeart[]>([]);
   const [shareSuccess, setShareSuccess] = useState(false);
@@ -70,6 +73,7 @@ export default function PostCard({ post }: PostCardProps) {
   
   const { data: currentUser } = useCurrentUser();
   const { direction } = useLanguage();
+  const isMobile = useIsMobile();
   const { settings } = useSettings();
   const t = direction === "rtl";
   const shouldHideLikes = hideLikes || (currentUser?.id === post.user_id ? settings.likes.hide_like_counts_own : settings.likes.hide_like_counts_others);
@@ -355,7 +359,7 @@ export default function PostCard({ post }: PostCardProps) {
             </button>
             
             <button 
-                onClick={() => setShowPostModal(true)}
+                onClick={() => isMobile ? setShowCommentsSheet(true) : setShowPostModal(true)}
                 className="group focus:outline-none hover:text-primary transition-all duration-300 hover:scale-110"
             >
                 <MessageCircle className="w-7 h-7 -rotate-90" />
@@ -414,7 +418,7 @@ export default function PostCard({ post }: PostCardProps) {
         {/* Comments Link */}
         {post.comments_count > 0 && (
             <div 
-                onClick={() => setShowPostModal(true)}
+                onClick={() => isMobile ? setShowCommentsSheet(true) : setShowPostModal(true)}
                 className="text-primary text-sm font-semibold cursor-pointer hover:text-primary/80 transition-colors flex items-center gap-1"
             >
                 <MessageCircle className="w-4 h-4 -rotate-90" />
@@ -428,6 +432,12 @@ export default function PostCard({ post }: PostCardProps) {
         open={showPostModal}
         onOpenChange={setShowPostModal}
         isRTL={direction === 'rtl'}
+      />
+
+      <PostCommentsSheet
+        postId={post.id}
+        open={showCommentsSheet}
+        onClose={() => setShowCommentsSheet(false)}
       />
 
       {/* Delete Confirmation Dialog */}
