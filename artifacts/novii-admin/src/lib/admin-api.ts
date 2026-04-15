@@ -145,6 +145,12 @@ export async function warnUser(
   });
 }
 
+export async function forceLogoutUser(userId: string): Promise<{ success: boolean; sessions_terminated: number }> {
+  return adminFetch(`/users/${userId}/force-logout`, {
+    method: "POST",
+  });
+}
+
 export async function fetchReports(): Promise<ReportRecord[]> {
   return adminFetch("/reports");
 }

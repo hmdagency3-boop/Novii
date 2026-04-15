@@ -4,6 +4,7 @@ import {
   banUser,
   deleteUser,
   updateUser,
+  forceLogoutUser,
   type UserProfile,
 } from "@/lib/admin-api";
 import {
@@ -27,6 +28,7 @@ import {
   Trophy,
   FlaskConical,
   Bug,
+  LogOut,
 } from "lucide-react";
 
 export default function UsersPage() {
@@ -191,6 +193,22 @@ export default function UsersPage() {
                         <button onClick={() => { setActionUser(user); setShowBanModal(true); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-amber-600 transition-colors" title={user.is_banned ? "إلغاء حظر" : "حظر"}>
                           <Ban className="w-4 h-4" />
                         </button>
+                        <button
+                          onClick={async () => {
+                            if (confirm(`إنهاء جميع جلسات @${user.username}؟`)) {
+                              try {
+                                const result = await forceLogoutUser(user.id);
+                                alert(`تم إنهاء ${result.sessions_terminated} جلسة`);
+                              } catch (e) {
+                                alert("فشل في إنهاء الجلسات");
+                              }
+                            }
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-orange-600 transition-colors"
+                          title="إنهاء الجلسات"
+                        >
+                          <LogOut className="w-4 h-4" />
+                        </button>
                         <button onClick={() => { setActionUser(user); setShowDeleteModal(true); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-red-600 transition-colors" title="حذف">
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -260,23 +278,58 @@ function ViewUserModal({ user, onClose }: { user: UserProfile; onClose: () => vo
   );
 }
 
+const BAN_REASONS = [
+  { id: "spam", label: "سبام / محتوى مزعج", icon: "🚫" },
+  { id: "harassment", label: "تحرش أو تنمر", icon: "⚠️" },
+  { id: "hate_speech", label: "خطاب كراهية أو عنصرية", icon: "🔴" },
+  { id: "nudity", label: "محتوى إباحي أو عري", icon: "🔞" },
+  { id: "violence", label: "عنف أو تهديد", icon: "💀" },
+  { id: "impersonation", label: "انتحال شخصية", icon: "🎭" },
+  { id: "scam", label: "احتيال أو نصب", icon: "💰" },
+  { id: "underage", label: "حساب قاصر (أقل من 13 سنة)", icon: "👶" },
+  { id: "fake_account", label: "حساب وهمي أو مزيف", icon: "🤖" },
+  { id: "intellectual_property", label: "انتهاك حقوق ملكية فكرية", icon: "©️" },
+  { id: "misinformation", label: "نشر معلومات مضللة", icon: "📰" },
+  { id: "other", label: "سبب آخر", icon: "📝" },
+];
+
+const BAN_DURATIONS = [
+  { label: "ساعة واحدة", value: "1h" },
+  { label: "6 ساعات", value: "6h" },
+  { label: "12 ساعة", value: "12h" },
+  { label: "24 ساعة", value: "24h" },
+  { label: "3 أيام", value: "3d" },
+  { label: "7 أيام", value: "7d" },
+  { label: "14 يوم", value: "14d" },
+  { label: "30 يوم", value: "30d" },
+  { label: "90 يوم (3 أشهر)", value: "90d" },
+  { label: "6 أشهر", value: "6m" },
+  { label: "سنة", value: "1y" },
+  { label: "دائم", value: "permanent" },
+];
+
 function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () => void; onDone: () => void }) {
-  const [reason, setReason] = useState("");
-  const [durationNum, setDurationNum] = useState("7");
-  const [durationUnit, setDurationUnit] = useState("d");
-  const [isPermanent, setIsPermanent] = useState(false);
+  const [selectedReason, setSelectedReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const [selectedDuration, setSelectedDuration] = useState("7d");
+  const [terminateSessions, setTerminateSessions] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [step, setStep] = useState<"reason" | "duration" | "confirm">(user.is_banned ? "confirm" : "reason");
+
+  const reasonLabel = BAN_REASONS.find(r => r.id === selectedReason)?.label || "";
+  const finalReason = selectedReason === "other" ? customReason : reasonLabel;
+  const durationLabel = BAN_DURATIONS.find(d => d.value === selectedDuration)?.label || "";
 
   const handleBan = async () => {
     setBusy(true);
     setError("");
     try {
-      const duration = user.is_banned ? undefined : (isPermanent ? "permanent" : `${durationNum}${durationUnit}`);
       await banUser(user.id, {
         ban: !user.is_banned,
-        reason: reason || undefined,
-        duration,
+        reason: user.is_banned ? undefined : finalReason,
+        duration: user.is_banned ? undefined : selectedDuration,
+        terminateSessions: user.is_banned ? undefined : terminateSessions,
       });
       onDone();
       onClose();
@@ -287,72 +340,188 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
     }
   };
 
-  return (
-    <ModalWrapper onClose={onClose} title={user.is_banned ? "إلغاء حظر المستخدم" : "حظر المستخدم"}>
-      <div className="space-y-4" dir="rtl">
-        <p className="text-sm text-gray-600">
-          {user.is_banned
-            ? `هل تريد إلغاء حظر @${user.username}؟`
-            : `هل تريد حظر @${user.username}؟`}
-        </p>
-        {!user.is_banned && (
-          <>
+  if (user.is_banned) {
+    return (
+      <ModalWrapper onClose={onClose} title="إلغاء حظر المستخدم">
+        <div className="space-y-4" dir="rtl">
+          <div className="flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl p-3">
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-lg">✅</div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">السبب</label>
+              <p className="text-sm font-semibold text-green-700">رفع الحظر عن @{user.username}</p>
+              <p className="text-xs text-green-600">سيتمكن المستخدم من استخدام المنصة بشكل طبيعي</p>
+            </div>
+          </div>
+          {(user.ban_reason || user.banned_reason) && (
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-500 mb-1">سبب الحظر الحالي:</p>
+              <p className="text-sm text-gray-700">{user.ban_reason || user.banned_reason}</p>
+            </div>
+          )}
+          {error && <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}
+          <div className="flex gap-2 justify-end">
+            <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">إلغاء</button>
+            <button onClick={handleBan} disabled={busy} className="px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50">
+              {busy ? "جاري..." : "رفع الحظر"}
+            </button>
+          </div>
+        </div>
+      </ModalWrapper>
+    );
+  }
+
+  return (
+    <ModalWrapper onClose={onClose} title="حظر المستخدم">
+      <div className="space-y-4" dir="rtl">
+        <div className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-xl p-3">
+          <img src={user.avatar_url || ""} alt="" className="w-10 h-10 rounded-full object-cover bg-gray-200" />
+          <div>
+            <p className="text-sm font-semibold text-gray-800">{user.display_name || user.username}</p>
+            <p className="text-xs text-gray-500">@{user.username}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 mb-2">
+          {["reason", "duration", "confirm"].map((s, i) => (
+            <div key={s} className="flex items-center gap-1 flex-1">
+              <div className={`h-1.5 rounded-full flex-1 transition-colors ${
+                (s === "reason" && step !== "reason" ? true : s === "duration" && step === "confirm" ? true : s === step) ? "bg-red-500" : "bg-gray-200"
+              }`} />
+              {i < 2 && <div className="w-1" />}
+            </div>
+          ))}
+        </div>
+
+        {step === "reason" && (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-gray-700">اختر سبب الحظر:</p>
+            <div className="grid grid-cols-1 gap-1.5 max-h-60 overflow-y-auto">
+              {BAN_REASONS.map(r => (
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedReason(r.id)}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-right transition-all ${
+                    selectedReason === r.id
+                      ? "bg-red-50 border-2 border-red-400 text-red-700 font-medium"
+                      : "bg-gray-50 border-2 border-transparent hover:bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  <span className="text-base">{r.icon}</span>
+                  <span>{r.label}</span>
+                </button>
+              ))}
+            </div>
+            {selectedReason === "other" && (
               <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 resize-none"
+                value={customReason}
+                onChange={(e) => setCustomReason(e.target.value)}
+                placeholder="اكتب سبب الحظر..."
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 resize-none"
                 rows={2}
               />
+            )}
+            <div className="flex gap-2 justify-end">
+              <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">إلغاء</button>
+              <button
+                onClick={() => setStep("duration")}
+                disabled={!selectedReason || (selectedReason === "other" && !customReason.trim())}
+                className="px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                التالي
+              </button>
             </div>
-            <label className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
+          </div>
+        )}
+
+        {step === "duration" && (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-gray-700">اختر مدة الحظر:</p>
+            <div className="grid grid-cols-2 gap-1.5 max-h-60 overflow-y-auto">
+              {BAN_DURATIONS.map(d => (
+                <button
+                  key={d.value}
+                  onClick={() => setSelectedDuration(d.value)}
+                  className={`px-3 py-2.5 rounded-xl text-sm text-center transition-all ${
+                    selectedDuration === d.value
+                      ? d.value === "permanent"
+                        ? "bg-red-100 border-2 border-red-500 text-red-700 font-bold"
+                        : "bg-red-50 border-2 border-red-400 text-red-700 font-medium"
+                      : d.value === "permanent"
+                        ? "bg-red-50/50 border-2 border-transparent hover:bg-red-50 text-red-600"
+                        : "bg-gray-50 border-2 border-transparent hover:bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+
+            <label className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors border border-gray-100">
               <input
                 type="checkbox"
-                checked={isPermanent}
-                onChange={(e) => setIsPermanent(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                checked={terminateSessions}
+                onChange={(e) => setTerminateSessions(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
               />
-              <span className="text-sm text-gray-700">حظر دائم</span>
+              <div>
+                <span className="text-sm text-gray-700 font-medium">إنهاء جميع الجلسات</span>
+                <p className="text-xs text-gray-500">تسجيل خروج المستخدم من جميع الأجهزة فوراً</p>
+              </div>
             </label>
-            {!isPermanent && (
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">المدة</label>
-                  <input
-                    type="number"
-                    value={durationNum}
-                    onChange={(e) => setDurationNum(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                    min="1"
-                  />
+
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setStep("reason")} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">رجوع</button>
+              <button onClick={() => setStep("confirm")} className="px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors">
+                التالي
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === "confirm" && !user.is_banned && (
+          <div className="space-y-3">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
+              <p className="text-sm font-bold text-red-700 mb-2">ملخص الحظر:</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">المستخدم:</span>
+                  <span className="font-medium text-gray-800">@{user.username}</span>
                 </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">الوحدة</label>
-                  <select
-                    value={durationUnit}
-                    onChange={(e) => setDurationUnit(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                  >
-                    <option value="h">ساعات</option>
-                    <option value="d">أيام</option>
-                    <option value="m">أشهر</option>
-                    <option value="y">سنوات</option>
-                  </select>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">السبب:</span>
+                  <span className="font-medium text-gray-800">{finalReason}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">المدة:</span>
+                  <span className={`font-medium ${selectedDuration === "permanent" ? "text-red-600" : "text-gray-800"}`}>{durationLabel}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">إنهاء الجلسات:</span>
+                  <span className="font-medium text-gray-800">{terminateSessions ? "نعم ✓" : "لا"}</span>
                 </div>
               </div>
+            </div>
+
+            {selectedDuration === "permanent" && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex items-start gap-2">
+                <span className="text-yellow-500 mt-0.5">⚠️</span>
+                <p className="text-xs text-yellow-700">الحظر الدائم يمنع المستخدم من الوصول للمنصة نهائياً. يمكن رفعه لاحقاً بواسطة مسؤول.</p>
+              </div>
             )}
-          </>
+
+            {error && <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}
+
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setStep("duration")} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">رجوع</button>
+              <button
+                onClick={handleBan}
+                disabled={busy}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {busy ? "جاري التنفيذ..." : "تأكيد الحظر"}
+              </button>
+            </div>
+          </div>
         )}
-        {error && (
-          <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>
-        )}
-        <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">إلغاء</button>
-          <button onClick={handleBan} disabled={busy} className={`px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors ${user.is_banned ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"} disabled:opacity-50`}>
-            {busy ? "جاري..." : user.is_banned ? "إلغاء الحظر" : "حظر"}
-          </button>
-        </div>
       </div>
     </ModalWrapper>
   );

@@ -1,18 +1,25 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "./supabase";
-import { checkUserBanStatus } from "./ban-checker";
 import type { User, Session } from "@supabase/supabase-js";
+
+interface BanInfo {
+  reason?: string;
+  ban_until?: string;
+  is_permanent: boolean;
+  strikes_count?: number;
+}
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
   isBanned: boolean;
-  banMessage: string | null;
+  banInfo: BanInfo | null;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  recheckBan: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,8 +29,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isBanned, setIsBanned] = useState(false);
-  const [banMessage, setBanMessage] = useState<string | null>(null);
+  const [banInfo, setBanInfo] = useState<BanInfo | null>(null);
   const [, setLocation] = useLocation();
+  const banCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const checkBanStatus = useCallback(async (accessToken?: string) => {
+    const token = accessToken || session?.access_token;
+    if (!token) return;
+
+    try {
+      const res = await fetch('/api/auth/ban-status', {
+        headers: { 'x-user-token': token },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+
+      if (data.is_banned) {
+        setIsBanned(true);
+        setBanInfo({
+          reason: data.reason,
+          ban_until: data.ban_until,
+          is_permanent: data.is_permanent,
+          strikes_count: data.strikes_count,
+        });
+      } else {
+        setIsBanned(false);
+        setBanInfo(null);
+      }
+    } catch {}
+  }, [session?.access_token]);
 
   useEffect(() => {
     let isMounted = true;
@@ -35,6 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
+          if (session?.access_token) {
+            checkBanStatus(session.access_token);
+          }
         }
       } catch {
         if (isMounted) setLoading(false);
@@ -49,6 +86,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isMounted) {
         setSession(session);
         setUser(session?.user ?? null);
+        if (session?.access_token) {
+          checkBanStatus(session.access_token);
+        }
       }
     });
 
@@ -57,6 +97,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (session?.access_token) {
+      banCheckInterval.current = setInterval(() => {
+        checkBanStatus();
+      }, 30000);
+
+      const handleFocus = () => checkBanStatus();
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        if (banCheckInterval.current) clearInterval(banCheckInterval.current);
+        window.removeEventListener('focus', handleFocus);
+      };
+    }
+  }, [session?.access_token, checkBanStatus]);
 
   const signUp = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
@@ -69,7 +125,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
     if (data.user) setUser(data.user);
-    if (data.session) setSession(data.session);
+    if (data.session) {
+      setSession(data.session);
+      await checkBanStatus(data.session.access_token);
+    }
   };
 
   const signOut = async () => {
@@ -90,15 +149,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setSession(null);
       setIsBanned(false);
-      setBanMessage(null);
+      setBanInfo(null);
       window.location.href = "/auth";
     } catch (error) {
       window.location.href = "/auth";
     }
   };
 
+  const recheckBan = useCallback(async () => {
+    await checkBanStatus();
+  }, [checkBanStatus]);
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, isBanned, banMessage, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, isBanned, banInfo, signUp, signIn, signOut, recheckBan }}>
       {children}
     </AuthContext.Provider>
   );

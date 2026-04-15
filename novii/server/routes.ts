@@ -68,6 +68,29 @@ async function requireAuth(req: Request, res: Response, next: Function) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
     req.userId = user.id;
+
+    if (adminDb && !req.path.includes('/ban-status') && !req.path.includes('/admin/')) {
+      const { data: profile } = await adminDb
+        .from('profiles')
+        .select('is_banned, banned_reason, ban_until')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.is_banned) {
+        const banUntil = profile.ban_until ? new Date(profile.ban_until) : null;
+        if (banUntil && new Date() > banUntil) {
+          await adminDb.from('profiles').update({ is_banned: false, banned_reason: null, ban_until: null }).eq('id', user.id);
+        } else {
+          return res.status(403).json({
+            error: 'account_banned',
+            reason: profile.banned_reason,
+            ban_until: profile.ban_until,
+            is_permanent: !profile.ban_until,
+          });
+        }
+      }
+    }
+
     return next();
   } catch {
     return res.status(401).json({ error: 'Token verification failed' });
@@ -128,6 +151,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
 
   const authSupabase = createClient(supabaseUrl, supabaseAnonKey);
+
+  // ===== Ban Status Check (no ban middleware applied) =====
+  app.get("/api/auth/ban-status", async (req: Request, res: Response) => {
+    try {
+      const token = req.headers['x-user-token'] as string;
+      if (!token || !adminDb) return res.json({ is_banned: false });
+
+      const supabaseUrl = process.env.SUPABASE_URL!;
+      const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+      const verifier = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: { user } } = await verifier.auth.getUser(token);
+      if (!user) return res.json({ is_banned: false });
+
+      const { data: profile } = await adminDb
+        .from('profiles')
+        .select('is_banned, banned_reason, ban_until, strikes_count')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile || !profile.is_banned) return res.json({ is_banned: false });
+
+      const banUntil = profile.ban_until ? new Date(profile.ban_until) : null;
+      if (banUntil && new Date() > banUntil) {
+        await adminDb.from('profiles').update({ is_banned: false, banned_reason: null, ban_until: null }).eq('id', user.id);
+        return res.json({ is_banned: false });
+      }
+
+      return res.json({
+        is_banned: true,
+        reason: profile.banned_reason,
+        ban_until: profile.ban_until,
+        is_permanent: !profile.ban_until,
+        strikes_count: profile.strikes_count || 0,
+      });
+    } catch {
+      return res.json({ is_banned: false });
+    }
+  });
 
   // ===== Cloudinary Upload Route (with auth, rate limit, file validation) =====
   app.post("/api/upload", requireAuth as any, upload.single("file") as any, validateUploadFile as any, rateLimitUpload as any, handleUpload as any);
@@ -2203,7 +2264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/users/:userId/ban", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;
-      const { ban, reason, duration } = req.body;
+      const { ban, reason, duration, terminateSessions = true } = req.body;
 
       let banUntil = null;
       if (ban && duration && duration !== 'permanent') {
@@ -2231,12 +2292,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error) throw error;
 
       if (ban) {
+        if (terminateSessions) {
+          await adminDb.from('user_devices')
+            .update({ status: 'revoked', session_token: null })
+            .eq('user_id', userId);
+        }
+
+        try {
+          const { data: currentProfile } = await adminDb.from('profiles').select('strikes_count').eq('id', userId).single();
+          const currentStrikes = currentProfile?.strikes_count || 0;
+          await adminDb.from('profiles').update({ strikes_count: currentStrikes + 1 }).eq('id', userId);
+        } catch {}
+
+        const banTypeLabel = duration === 'permanent' ? 'دائم' : `مؤقت (${duration})`;
         const { error: notifErr } = await adminDb.from('notifications').insert({
           user_id: userId,
           type: 'ban',
           content: reason
-            ? `تم تقييد حسابك بسبب: ${reason}`
-            : 'تم تقييد حسابك لمخالفة سياسة الاستخدام.',
+            ? `تم تقييد حسابك بسبب: ${reason}\nنوع الحظر: ${banTypeLabel}`
+            : `تم تقييد حسابك لمخالفة سياسة الاستخدام.\nنوع الحظر: ${banTypeLabel}`,
         });
         if (notifErr) console.error('⚠️ Failed to send ban notification:', notifErr);
       } else {
@@ -2248,8 +2322,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (notifErr) console.error('⚠️ Failed to send unban notification:', notifErr);
       }
 
-      await logAdminAction(req, ban ? 'ban_user' : 'unban_user', 'user', userId, reason || undefined);
-      res.json({ success: true });
+      await logAdminAction(req, ban ? 'ban_user' : 'unban_user', 'user', userId, JSON.stringify({ reason, duration, ban_until: banUntil }));
+      res.json({ success: true, sessions_revoked: ban ? true : false });
     } catch (error) {
       console.error('Admin ban error:', error);
       res.status(500).json({ error: 'Failed to ban/unban user' });
@@ -2279,6 +2353,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Admin warn error:', error);
       res.status(500).json({ error: 'Failed to warn user' });
+    }
+  });
+
+  // POST /api/admin/users/:userId/force-logout — terminate all sessions
+  app.post("/api/admin/users/:userId/force-logout", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+
+      const { error, count } = await adminDb.from('user_devices')
+        .update({ status: 'revoked', session_token: null }, { count: 'exact' })
+        .eq('user_id', userId)
+        .eq('status', 'active');
+
+      if (error) throw error;
+
+      await adminDb.from('notifications').insert({
+        user_id: userId,
+        type: 'security',
+        content: 'تم إنهاء جميع جلساتك النشطة بواسطة الإدارة. يرجى تسجيل الدخول مرة أخرى.',
+      });
+
+      await logAdminAction(req, 'force_logout', 'user', userId, `Terminated all active sessions`);
+      res.json({ success: true, sessions_terminated: count || 0 });
+    } catch (error) {
+      console.error('Admin force-logout error:', error);
+      res.status(500).json({ error: 'Failed to terminate sessions' });
     }
   });
 

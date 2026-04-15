@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 import { LanguageProvider } from "@/lib/language-context";
-import { AuthProvider } from "@/lib/auth-context";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { SettingsProvider } from "@/lib/settings-context";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { GlobalMessageListener } from "@/components/global-message-listener";
@@ -39,6 +39,13 @@ import ModerationNotice from "@/pages/moderation-notice";
 import ProtectedLayout from "@/components/protected-layout";
 import PublicRoute from "@/components/public-route";
 import { GuestPromptProvider } from "@/components/guest-login-prompt";
+import { BanScreen } from "@/components/ban-screen";
+
+function BanGuard() {
+  const { isBanned } = useAuth();
+  if (!isBanned) return null;
+  return <BanScreen />;
+}
 
 function SplashOverlay() {
   const [visible, setVisible] = useState(true);
@@ -237,6 +244,7 @@ function App() {
                     <TimeTracker />
                     <VisitorDetector />
                     <DeviceHeartbeat />
+                    <BanGuard />
                     {showSplash && <SplashOverlay />}
                     <Router />
                   </TooltipProvider>
