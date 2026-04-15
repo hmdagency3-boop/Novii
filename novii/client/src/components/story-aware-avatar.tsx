@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { StoryViewerModal } from "./story-viewer-modal";
-import { useStories } from "@/hooks/use-data";
+import { useStories, useCurrentProfile } from "@/hooks/use-data";
 import { useLanguage } from "@/lib/language-context";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,7 @@ export function StoryAwareAvatar({
 }: StoryAwareAvatarProps) {
   const [showStories, setShowStories] = useState(false);
   const { data: allStories = [] } = useStories();
+  const { data: currentProfile } = useCurrentProfile();
   const { direction } = useLanguage();
 
   /* Stories for this specific user that are still active */
@@ -97,7 +98,7 @@ export function StoryAwareAvatar({
           open={showStories}
           onOpenChange={setShowStories}
           isRTL={direction === "rtl"}
-          currentUserId={undefined}
+          currentUserId={currentProfile?.id}
         />
       )}
     </>
