@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -19,41 +19,27 @@ import { BanScreen } from "@/components/ban-screen";
 import ProtectedLayout from "@/components/protected-layout";
 import PublicRoute from "@/components/public-route";
 
-const NotFound        = lazy(() => import("@/pages/not-found"));
-const Home            = lazy(() => import("@/pages/home"));
-const Create          = lazy(() => import("@/pages/create"));
-const Profile         = lazy(() => import("@/pages/profile"));
-const UserProfile     = lazy(() => import("@/pages/user-profile"));
-const Explore         = lazy(() => import("@/pages/explore"));
-const Search          = lazy(() => import("@/pages/search"));
-const Reels           = lazy(() => import("@/pages/reels"));
-const Settings        = lazy(() => import("@/pages/settings"));
-const Messages        = lazy(() => import("@/pages/messages"));
-const Notifications   = lazy(() => import("@/pages/notifications"));
-const AuthPage        = lazy(() => import("@/pages/auth"));
-const PostPage        = lazy(() => import("@/pages/post"));
-const FollowersDetail = lazy(() => import("@/pages/followers-detail"));
-const ResetPassword   = lazy(() => import("@/pages/reset-password"));
-const Features        = lazy(() => import("@/pages/features"));
-const PrivacyPolicy   = lazy(() => import("@/pages/privacy"));
-const TermsOfService  = lazy(() => import("@/pages/terms"));
-const Help            = lazy(() => import("@/pages/help"));
-const About           = lazy(() => import("@/pages/about"));
-const ModerationNotice = lazy(() => import("@/pages/moderation-notice"));
-
-const preloadPages = () => {
-  setTimeout(() => {
-    import("@/pages/home");
-    import("@/pages/explore");
-    import("@/pages/profile");
-    import("@/pages/notifications");
-    import("@/pages/messages");
-    import("@/pages/search");
-    import("@/pages/reels");
-    import("@/pages/settings");
-    import("@/pages/create");
-  }, 3000);
-};
+import NotFound from "@/pages/not-found";
+import Home from "@/pages/home";
+import Create from "@/pages/create";
+import Profile from "@/pages/profile";
+import UserProfile from "@/pages/user-profile";
+import Explore from "@/pages/explore";
+import Search from "@/pages/search";
+import Reels from "@/pages/reels";
+import Settings from "@/pages/settings";
+import Messages from "@/pages/messages";
+import Notifications from "@/pages/notifications";
+import AuthPage from "@/pages/auth";
+import PostPage from "@/pages/post";
+import FollowersDetail from "@/pages/followers-detail";
+import ResetPassword from "@/pages/reset-password";
+import Features from "@/pages/features";
+import PrivacyPolicy from "@/pages/privacy";
+import TermsOfService from "@/pages/terms";
+import Help from "@/pages/help";
+import About from "@/pages/about";
+import ModerationNotice from "@/pages/moderation-notice";
 
 function BanGuard() {
   const { isBanned } = useAuth();
@@ -150,121 +136,97 @@ function SplashOverlay() {
   );
 }
 
-function PageLoader() {
-  return (
-    <div style={{
-      position: "fixed", inset: 0,
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
-    }}>
-      <div style={{
-        width: 28, height: 28,
-        border: "3px solid rgba(168,85,247,0.2)",
-        borderTopColor: "#a855f7",
-        borderRadius: "50%",
-        animation: "pageLoaderSpin 0.6s linear infinite",
-      }} />
-      <style>{`@keyframes pageLoaderSpin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
-}
-
 function Router() {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <Switch>
-        <Route path="/auth" component={AuthPage}/>
-        <Route path="/reset-password" component={ResetPassword}/>
+    <Switch>
+      <Route path="/auth" component={AuthPage}/>
+      <Route path="/reset-password" component={ResetPassword}/>
 
-        <Route path="/">
-          <ProtectedLayout>
-            <Home />
-          </ProtectedLayout>
-        </Route>
-        <Route path="/profile">
-          <ProtectedLayout>
-            <Profile />
-          </ProtectedLayout>
-        </Route>
-        <Route path="/user">
-          <ProtectedLayout>
-            <UserProfile />
-          </ProtectedLayout>
-        </Route>
-        <Route path="/explore">
-          <PublicRoute>
-            <Explore />
-          </PublicRoute>
-        </Route>
-        <Route path="/search">
-          <ProtectedLayout>
-            <Search />
-          </ProtectedLayout>
-        </Route>
-        <Route path="/reels">
-          <PublicRoute>
-            <Reels />
-          </PublicRoute>
-        </Route>
-        <Route path="/reel/:id">
-          <PublicRoute>
-            <Reels />
-          </PublicRoute>
-        </Route>
-        <Route path="/settings">
-          <ProtectedLayout>
-            <Settings />
-          </ProtectedLayout>
-        </Route>
-        <Route path="/messages">
-          <ProtectedLayout>
-            <Messages />
-          </ProtectedLayout>
-        </Route>
-        <Route path="/notifications">
-          <ProtectedLayout>
-            <Notifications />
-          </ProtectedLayout>
-        </Route>
+      <Route path="/">
+        <ProtectedLayout>
+          <Home />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/profile">
+        <ProtectedLayout>
+          <Profile />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/user">
+        <ProtectedLayout>
+          <UserProfile />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/explore">
+        <PublicRoute>
+          <Explore />
+        </PublicRoute>
+      </Route>
+      <Route path="/search">
+        <ProtectedLayout>
+          <Search />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/reels">
+        <PublicRoute>
+          <Reels />
+        </PublicRoute>
+      </Route>
+      <Route path="/reel/:id">
+        <PublicRoute>
+          <Reels />
+        </PublicRoute>
+      </Route>
+      <Route path="/settings">
+        <ProtectedLayout>
+          <Settings />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/messages">
+        <ProtectedLayout>
+          <Messages />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/notifications">
+        <ProtectedLayout>
+          <Notifications />
+        </ProtectedLayout>
+      </Route>
 
-        <Route path="/create">
-          <ProtectedLayout>
-            <Create />
-          </ProtectedLayout>
-        </Route>
-        <Route path="/post/:id">
-          <ProtectedLayout>
-            <PostPage />
-          </ProtectedLayout>
-        </Route>
-        <Route path="/followers-detail">
-          <ProtectedLayout>
-            <FollowersDetail />
-          </ProtectedLayout>
-        </Route>
-        <Route path="/moderation/:id">
-          <ProtectedLayout>
-            <ModerationNotice />
-          </ProtectedLayout>
-        </Route>
+      <Route path="/create">
+        <ProtectedLayout>
+          <Create />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/post/:id">
+        <ProtectedLayout>
+          <PostPage />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/followers-detail">
+        <ProtectedLayout>
+          <FollowersDetail />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/moderation/:id">
+        <ProtectedLayout>
+          <ModerationNotice />
+        </ProtectedLayout>
+      </Route>
 
-        <Route path="/features" component={Features} />
-        <Route path="/privacy" component={PrivacyPolicy} />
-        <Route path="/terms" component={TermsOfService} />
-        <Route path="/help" component={Help} />
-        <Route path="/about" component={About} />
+      <Route path="/features" component={Features} />
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/terms" component={TermsOfService} />
+      <Route path="/help" component={Help} />
+      <Route path="/about" component={About} />
 
-        <Route component={NotFound} />
-      </Switch>
-    </Suspense>
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 
 function App() {
   const [showSplash] = useState(true);
-
-  useEffect(() => {
-    preloadPages();
-  }, []);
 
   return (
     <ErrorBoundary>
