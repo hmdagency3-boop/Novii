@@ -11,7 +11,7 @@ export function BanScreen() {
   const showDuration = banInfo.show_duration && banUntil;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-b from-white via-white to-purple-50/40 overflow-hidden" dir="rtl" style={{ isolation: "isolate" }}>
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white overflow-hidden" dir="rtl">
       <div className="w-full max-w-[380px] mx-4 flex flex-col items-center">
         <div className="mb-6">
           <img src={logo} alt="Novii" className="w-16 h-16 rounded-2xl shadow-lg object-contain bg-black/5 p-1.5" />
