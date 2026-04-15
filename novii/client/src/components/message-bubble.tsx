@@ -412,7 +412,7 @@ export function MessageBubble({
           </AlertDialogContent>
         </AlertDialog>
         {storyData && (
-          <StoryViewerModal stories={[storyData]} initialIndex={0} open={showStoryViewer} onOpenChange={setShowStoryViewer} isRTL={isRTL} />
+          <StoryViewerModal stories={[storyData]} initialIndex={0} open={showStoryViewer} onOpenChange={setShowStoryViewer} isRTL={isRTL} currentUserId={currentUserId} />
         )}
       </div>
     );

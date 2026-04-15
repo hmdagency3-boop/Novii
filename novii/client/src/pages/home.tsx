@@ -248,6 +248,7 @@ export default function Home() {
           open={isStoryViewerOpen}
           onOpenChange={setIsStoryViewerOpen}
           isRTL={isRTL}
+          currentUserId={currentUser?.id}
         />
       )}
     </Layout>

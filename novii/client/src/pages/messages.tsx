@@ -3106,6 +3106,7 @@ export default function Messages() {
           open={isStoryViewerOpen}
           onOpenChange={setIsStoryViewerOpen}
           isRTL={isRTL}
+          currentUserId={currentUser?.id}
         />
       )}
     </Layout>

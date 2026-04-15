@@ -97,6 +97,7 @@ export function StoryAwareAvatar({
           open={showStories}
           onOpenChange={setShowStories}
           isRTL={direction === "rtl"}
+          currentUserId={undefined}
         />
       )}
     </>

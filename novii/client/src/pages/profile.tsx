@@ -581,6 +581,7 @@ export default function Profile() {
           open={storyViewerOpen}
           onOpenChange={setStoryViewerOpen}
           isRTL={isRTL}
+          currentUserId={user?.id}
         />
       )}
 

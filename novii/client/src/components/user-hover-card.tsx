@@ -305,6 +305,7 @@ export function UserHoverCard({ userId, children, disabled = false }: UserHoverC
           open={showStories}
           onOpenChange={setShowStories}
           isRTL={isRTL}
+          currentUserId={currentUser?.id}
         />
       )}
     </>

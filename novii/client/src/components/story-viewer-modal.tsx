@@ -17,9 +17,10 @@ interface StoryViewerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isRTL?: boolean;
+  currentUserId?: string | null;
 }
 
-export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, isRTL }: StoryViewerModalProps) {
+export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, isRTL, currentUserId: propUserId }: StoryViewerModalProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -28,7 +29,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   const [storyViews, setStoryViews] = useState<(Profile & { viewedAt: string })[]>([]);
   const [showViews, setShowViews] = useState(false);
   const [isLoadingViews, setIsLoadingViews] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [fallbackUserId, setFallbackUserId] = useState<string | null>(null);
   const [viewsCount, setViewsCount] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [musicBlocked, setMusicBlocked] = useState(false);
@@ -38,6 +39,8 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   const [showMenu, setShowMenu] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [mediaLoaded, setMediaLoaded] = useState(false);
+
+  const currentUserId = propUserId ?? fallbackUserId;
 
   const { language } = useLanguage();
   const { toast } = useToast();
@@ -51,11 +54,12 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   const currentStory = stories[currentIndex];
   const isOwnStory = currentStory?.user_id === currentUserId;
 
-  /* ─── Auth ─── */
+  /* ─── Auth fallback (only if prop not provided) ─── */
   useEffect(() => {
+    if (propUserId != null) return;
     const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-    supabase.auth.getSession().then(({ data: { session } }) => setCurrentUserId(session?.user?.id || null));
-  }, []);
+    supabase.auth.getSession().then(({ data: { session } }) => setFallbackUserId(session?.user?.id || null));
+  }, [propUserId]);
 
   /* ─── Reset on open / index change ─── */
   useEffect(() => {
