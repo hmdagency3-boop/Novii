@@ -3117,10 +3117,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status === 'approved') {
         const { error: notifErr } = await adminDb!.from('notifications').insert({
           user_id: request.user_id,
-          type: 'badge_awarded',
-          content: 'تهانينا! 🎉 تم توثيق حسابك بنجاح. أصبح حسابك موثقاً الآن.',
+          type: 'verified_granted',
+          content: 'تهانينا! تم توثيق حسابك رسمياً. أصبح حسابك الآن يحمل علامة التوثيق ✓',
         });
-        if (notifErr) console.error('⚠️ Failed to send verification approved notification:', notifErr);
+        if (notifErr) console.error('⚠️ Failed to send verified_granted notification:', notifErr);
       } else {
         const noteText = admin_note ? ` السبب: ${admin_note}` : '';
         const { error: notifErr } = await adminDb!.from('notifications').insert({
