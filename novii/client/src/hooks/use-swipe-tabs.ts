@@ -8,25 +8,37 @@ interface UseSwipeTabsOptions {
   isRTL?: boolean;
 }
 
-export function useSwipeTabs({ tabs, currentTab, onTabChange, threshold = 50, isRTL = false }: UseSwipeTabsOptions) {
+export function useSwipeTabs({ tabs, currentTab, onTabChange, threshold = 40, isRTL = false }: UseSwipeTabsOptions) {
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
-  const swiping = useRef(false);
+  const touchStartTime = useRef(0);
+  const locked = useRef<'horizontal' | 'vertical' | null>(null);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
-    swiping.current = true;
+    touchStartTime.current = Date.now();
+    locked.current = null;
+  }, []);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (locked.current) return;
+    const dx = Math.abs(e.touches[0].clientX - touchStartX.current);
+    const dy = Math.abs(e.touches[0].clientY - touchStartY.current);
+    if (dx > 10 || dy > 10) {
+      locked.current = dx > dy ? 'horizontal' : 'vertical';
+    }
   }, []);
 
   const onTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!swiping.current) return;
-    swiping.current = false;
+    if (locked.current !== 'horizontal') return;
 
     const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    const dt = Date.now() - touchStartTime.current;
+    const velocity = Math.abs(deltaX) / dt;
 
-    if (Math.abs(deltaX) < threshold || Math.abs(deltaY) > Math.abs(deltaX)) return;
+    const shouldSwipe = Math.abs(deltaX) > threshold || velocity > 0.35;
+    if (!shouldSwipe) return;
 
     const currentIndex = tabs.indexOf(currentTab);
     if (currentIndex === -1) return;
@@ -41,5 +53,5 @@ export function useSwipeTabs({ tabs, currentTab, onTabChange, threshold = 50, is
     }
   }, [tabs, currentTab, onTabChange, threshold, isRTL]);
 
-  return { onTouchStart, onTouchEnd };
+  return { onTouchStart, onTouchMove, onTouchEnd };
 }

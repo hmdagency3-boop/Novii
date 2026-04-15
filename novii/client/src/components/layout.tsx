@@ -7,7 +7,7 @@ import { CreateStoryModal } from "@/components/create-story-modal";
 const logo = "/assets/novii_logo_transparent.png";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import SuggestionsSidebar from "./suggestions-sidebar";
 import { useLanguage } from "@/lib/language-context";
 import { getTranslation } from "@/lib/translations";
@@ -45,6 +45,73 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [isCreateStoryModalOpen, setIsCreateStoryModalOpen] = useState(false);
   const [chatActive, setChatActive] = useState(false);
   const createButtonRef = useRef<HTMLButtonElement>(null);
+  
+  const mainPages = useMemo(() => ['/', '/search', '/explore', '/reels', '/profile'], []);
+  const swipeTouchStart = useRef<{ x: number; y: number; time: number } | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwipeTransitioning, setIsSwipeTransitioning] = useState(false);
+  const swipeLocked = useRef(false);
+  const isMainPage = mainPages.includes(location);
+  const isRTL = direction === "rtl";
+
+  const handleMainSwipeStart = useCallback((e: React.TouchEvent) => {
+    if (!isMainPage) return;
+    swipeTouchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
+    swipeLocked.current = false;
+    setSwipeOffset(0);
+  }, [isMainPage]);
+
+  const handleMainSwipeMove = useCallback((e: React.TouchEvent) => {
+    if (!swipeTouchStart.current || !isMainPage) return;
+    const dx = e.touches[0].clientX - swipeTouchStart.current.x;
+    const dy = e.touches[0].clientY - swipeTouchStart.current.y;
+    if (!swipeLocked.current) {
+      if (Math.abs(dy) > Math.abs(dx)) { swipeTouchStart.current = null; return; }
+      if (Math.abs(dx) > 10) swipeLocked.current = true;
+      else return;
+    }
+    const idx = mainPages.indexOf(location);
+    const atStart = isRTL ? idx >= mainPages.length - 1 : idx <= 0;
+    const atEnd = isRTL ? idx <= 0 : idx >= mainPages.length - 1;
+    const goingRight = dx > 0;
+    const goingLeft = dx < 0;
+    if ((goingRight && !isRTL && atStart) || (goingLeft && !isRTL && atEnd) ||
+        (goingLeft && isRTL && atStart) || (goingRight && isRTL && atEnd)) {
+      setSwipeOffset(dx * 0.15);
+      return;
+    }
+    setSwipeOffset(dx * 0.4);
+  }, [isMainPage, location, mainPages, isRTL]);
+
+  const handleMainSwipeEnd = useCallback((e: React.TouchEvent) => {
+    if (!swipeTouchStart.current || !isMainPage) { setSwipeOffset(0); return; }
+    const dx = e.changedTouches[0].clientX - swipeTouchStart.current.x;
+    const dy = e.changedTouches[0].clientY - swipeTouchStart.current.y;
+    const dt = Date.now() - swipeTouchStart.current.time;
+    swipeTouchStart.current = null;
+
+    if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 40) { setSwipeOffset(0); return; }
+
+    const velocity = Math.abs(dx) / dt;
+    const shouldSwipe = Math.abs(dx) > 80 || velocity > 0.4;
+    if (!shouldSwipe) { setIsSwipeTransitioning(true); setSwipeOffset(0); setTimeout(() => setIsSwipeTransitioning(false), 250); return; }
+
+    const idx = mainPages.indexOf(location);
+    const swipedLeft = isRTL ? dx > 0 : dx < 0;
+    const swipedRight = isRTL ? dx < 0 : dx > 0;
+
+    if (swipedRight && idx > 0) {
+      setIsSwipeTransitioning(true);
+      setSwipeOffset(window.innerWidth * (isRTL ? -1 : 1));
+      setTimeout(() => { navigate(mainPages[idx - 1]); setSwipeOffset(0); setIsSwipeTransitioning(false); }, 200);
+    } else if (swipedLeft && idx < mainPages.length - 1) {
+      setIsSwipeTransitioning(true);
+      setSwipeOffset(-window.innerWidth * (isRTL ? -1 : 1));
+      setTimeout(() => { navigate(mainPages[idx + 1]); setSwipeOffset(0); setIsSwipeTransitioning(false); }, 200);
+    } else {
+      setIsSwipeTransitioning(true); setSwipeOffset(0); setTimeout(() => setIsSwipeTransitioning(false), 250);
+    }
+  }, [isMainPage, location, mainPages, navigate, isRTL]);
   
   // Fetch profile data to get username from database
   const { data: profile, refetch: refetchProfile } = useQuery({
@@ -439,7 +506,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </header>
         )}
 
-        {children}
+        <div
+          onTouchStart={handleMainSwipeStart}
+          onTouchMove={handleMainSwipeMove}
+          onTouchEnd={handleMainSwipeEnd}
+          className="min-h-0 flex-1"
+          style={{
+            transform: swipeOffset ? `translateX(${swipeOffset}px)` : undefined,
+            transition: isSwipeTransitioning ? 'transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
+            willChange: swipeOffset ? 'transform' : undefined,
+            opacity: swipeOffset ? Math.max(0.6, 1 - Math.abs(swipeOffset) / window.innerWidth * 0.5) : 1,
+          }}
+        >
+          {children}
+        </div>
       </main>
 
 
