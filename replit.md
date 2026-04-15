@@ -86,6 +86,25 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - `/post/:id` for individual posts
 - All protected routes wrapped in `ProtectedLayout`
 
+## Database Migration Rules
+
+> **قاعدة إلزامية**: أي تعديل أو إضافة على مخطط قاعدة البيانات (جدول جديد، عمود جديد، index، constraint، RLS policy) **يجب** أن يُرفق بملف SQL مستقل في مجلد `novii/supabase/`.
+
+- **المجلد**: `novii/supabase/*.sql`
+- **التسمية**: وصفية وواضحة (مثال: `add_system_message.sql`، `upgrade_communities.sql`)
+- **المحتوى**: SQL جاهز للتنفيذ في Supabase Dashboard → SQL Editor
+- **دائماً استخدم**: `IF NOT EXISTS` / `IF EXISTS` لضمان إمكانية إعادة التنفيذ بأمان
+- **قائمة الملفات الحالية**:
+  - `NOVII_COMPLETE_DATABASE.sql` — المخطط الكامل الأصلي
+  - `upgrade_admin_system.sql` — جداول الأدمن والصلاحيات
+  - `upgrade_device_tracking.sql` — نظام تتبع الأجهزة
+  - `upgrade_verification_requests.sql` — طلبات التوثيق
+  - `add_system_message.sql` — عمود `is_system_message` في `community_messages`
+  - `messages_enhancements.sql` — تحسينات الرسائل
+  - `fix_community_rls_recursion.sql` — إصلاح RLS للمجتمعات
+  - `fix_server_rls_writes.sql` — إصلاح RLS للكتابة
+  - وملفات إضافات أخرى في المجلد
+
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces
