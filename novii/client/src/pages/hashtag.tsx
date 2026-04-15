@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
-import { supabase } from "@/lib/supabase";
 import { ArrowRight, Hash, TrendingUp } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import PostCard from "@/components/post-card";
 import Layout from "@/components/layout";
+import { api } from "@/lib/api";
+import type { Post } from "@/lib/api";
 
 interface HashtagData {
   id: string;
@@ -19,7 +20,7 @@ export default function HashtagPage() {
   const [, navigate] = useLocation();
   const { isArabic } = useLanguage();
   const [hashtag, setHashtag] = useState<HashtagData | null>(null);
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [trendingTags, setTrendingTags] = useState<HashtagData[]>([]);
 
@@ -32,22 +33,12 @@ export default function HashtagPage() {
   async function loadHashtag() {
     setLoading(true);
     try {
-      const { data: session } = await supabase.auth.getSession();
-      const token = session?.session?.access_token;
-      const headers: any = { "Content-Type": "application/json" };
-      if (token) headers["x-user-token"] = token;
-
-      const res = await fetch(`/api/hashtags/${encodeURIComponent(tag)}`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setHashtag(data);
-      }
-
-      const postsRes = await fetch(`/api/hashtags/${encodeURIComponent(tag)}/posts`, { headers });
-      if (postsRes.ok) {
-        const postsData = await postsRes.json();
-        setPosts(postsData);
-      }
+      const [hashtagRes, hashtagPosts] = await Promise.all([
+        fetch(`/api/hashtags/${encodeURIComponent(tag)}`).then(r => r.ok ? r.json() : null),
+        api.getHashtagPosts(tag)
+      ]);
+      if (hashtagRes) setHashtag(hashtagRes);
+      setPosts(hashtagPosts);
     } catch (err) {
       console.error("Error loading hashtag:", err);
     } finally {

@@ -494,6 +494,43 @@ export const api = {
     return posts as unknown as Post[];
   },
 
+  async getHashtagPosts(tag: string, limit = 20, offset = 0): Promise<Post[]> {
+    const res = await fetch(`/api/hashtags/${encodeURIComponent(tag)}/posts?limit=${limit}&page=${Math.floor(offset / limit)}`);
+    if (!res.ok) return [];
+    const postIds: string[] = (await res.json()).map((p: any) => p.id);
+    if (!postIds.length) return [];
+
+    const { data, error } = await supabase
+      .from('posts')
+      .select(POST_WITH_PROFILE)
+      .in('id', postIds)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    const user = await getCurrentUser();
+    const posts = data || [];
+
+    if (user && posts.length > 0) {
+      const ids = posts.map(p => p.id);
+      const [likesData, savedData] = await Promise.all([
+        supabase.from('likes').select('post_id').eq('user_id', user.id).in('post_id', ids),
+        supabase.from('saved_posts').select('post_id').eq('user_id', user.id).in('post_id', ids)
+      ]);
+
+      const likedIds = new Set(likesData.data?.map(l => l.post_id) || []);
+      const savedIds = new Set(savedData.data?.map(s => s.post_id) || []);
+
+      return posts.map(post => ({
+        ...post,
+        is_liked: likedIds.has(post.id),
+        is_saved: savedIds.has(post.id)
+      })) as unknown as Post[];
+    }
+
+    return posts as unknown as Post[];
+  },
+
   // Algorithmic feed: fetch a large batch, score by engagement + recency + seeded randomness
   async getFeedAlgorithmic(seed: number, limit = 10): Promise<Post[]> {
     const BATCH = 60;
