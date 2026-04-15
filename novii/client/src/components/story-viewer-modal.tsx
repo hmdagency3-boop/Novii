@@ -462,35 +462,18 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
             </div>
           )}
 
-          {/* ══════════ MUSIC BAR ══════════ */}
-          {(currentStory as any).music_url && !showViews && (
+          {/* ══════════ MUSIC BLOCKED PROMPT ══════════ */}
+          {(currentStory as any).music_url && !showViews && musicBlocked && (
             <div className="absolute z-30 pointer-events-none"
               style={{ bottom: isOwnStory ? '28px' : '90px', left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}
             >
-              {musicBlocked && (
-                <button
-                  className="pointer-events-auto flex items-center gap-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full px-4 py-2 animate-pulse"
-                  onClick={(e) => { e.stopPropagation(); musicRef.current?.play().then(() => setMusicBlocked(false)).catch(() => {}); }}
-                >
-                  <VolumeX className="w-4 h-4 text-white" />
-                  <span className="text-white text-xs font-semibold">{isRTL ? 'اضغط لتشغيل الصوت' : 'Tap to play sound'}</span>
-                </button>
-              )}
-              <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 max-w-[70%]">
-                {(currentStory as any).music_artwork_url ? (
-                  <img
-                    src={(currentStory as any).music_artwork_url}
-                    alt=""
-                    className={cn("w-5 h-5 rounded-full object-cover flex-shrink-0", !musicBlocked && !isPaused && "animate-spin")}
-                    style={{ animationDuration: '4s' }}
-                  />
-                ) : (
-                  <Music2 className="w-4 h-4 text-white flex-shrink-0" />
-                )}
-                <p className="text-white text-[11px] font-medium truncate">
-                  {(currentStory as any).music_title || ''}{(currentStory as any).music_artist ? ` · ${(currentStory as any).music_artist}` : ''}
-                </p>
-              </div>
+              <button
+                className="pointer-events-auto flex items-center gap-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full px-4 py-2 animate-pulse"
+                onClick={(e) => { e.stopPropagation(); musicRef.current?.play().then(() => setMusicBlocked(false)).catch(() => {}); }}
+              >
+                <VolumeX className="w-4 h-4 text-white" />
+                <span className="text-white text-xs font-semibold">{isRTL ? 'اضغط لتشغيل الصوت' : 'Tap to play sound'}</span>
+              </button>
             </div>
           )}
 
