@@ -41,7 +41,7 @@ export default function HashtagPage() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
+      <div className="w-full max-w-full lg:max-w-[630px] mx-auto">
         <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border">
           <div className="flex items-center gap-3 px-4 h-14">
             <button onClick={() => window.history.back()} className="p-2 rounded-full hover:bg-accent">
