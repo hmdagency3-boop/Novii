@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS verification_requests (
   category TEXT NOT NULL DEFAULT 'personal'
     CHECK (category IN ('personal', 'creator', 'business', 'public_figure', 'organization')),
   social_links JSONB DEFAULT '{}',
+  id_card_url TEXT,
+  selfie_url TEXT,
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'approved', 'rejected')),
   admin_note TEXT,

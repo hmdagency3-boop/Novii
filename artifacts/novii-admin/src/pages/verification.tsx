@@ -22,6 +22,8 @@ interface VerificationRequest {
   reason: string;
   category: string;
   social_links: Record<string, string>;
+  id_card_url: string | null;
+  selfie_url: string | null;
   status: "pending" | "approved" | "rejected";
   admin_note: string | null;
   reviewed_by: string | null;
@@ -233,6 +235,30 @@ export default function VerificationPage() {
                   </div>
                 </div>
               </div>
+
+              {(selectedRequest.id_card_url || selectedRequest.selfie_url) && (
+                <div>
+                  <label className="text-xs text-slate-500 block mb-2">مستندات التحقق من الهوية</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedRequest.id_card_url && (
+                      <div className="rounded-lg overflow-hidden border border-slate-700">
+                        <p className="text-[10px] font-medium text-center py-1 bg-slate-800 text-slate-400 border-b border-slate-700">البطاقة الشخصية</p>
+                        <a href={selectedRequest.id_card_url} target="_blank" rel="noopener noreferrer">
+                          <img src={selectedRequest.id_card_url} alt="ID Card" className="w-full h-32 object-contain bg-slate-900/50 hover:opacity-80 transition-opacity cursor-zoom-in" />
+                        </a>
+                      </div>
+                    )}
+                    {selectedRequest.selfie_url && (
+                      <div className="rounded-lg overflow-hidden border border-slate-700">
+                        <p className="text-[10px] font-medium text-center py-1 bg-slate-800 text-slate-400 border-b border-slate-700">صورة السيلفي</p>
+                        <a href={selectedRequest.selfie_url} target="_blank" rel="noopener noreferrer">
+                          <img src={selectedRequest.selfie_url} alt="Selfie" className="w-full h-32 object-contain bg-slate-900/50 hover:opacity-80 transition-opacity cursor-zoom-in" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <div>

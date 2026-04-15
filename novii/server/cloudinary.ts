@@ -48,7 +48,7 @@ export async function handleUpload(req: Request, res: Response) {
       return res.status(400).json({ error: "No file provided" });
     }
 
-    const ALLOWED_FOLDERS = ['avatars', 'posts', 'stories', 'reels', 'messages', 'covers', 'audio', 'misc', 'communities'];
+    const ALLOWED_FOLDERS = ['avatars', 'posts', 'stories', 'reels', 'messages', 'covers', 'audio', 'misc', 'communities', 'verification'];
     const rawFolder = (req.body.folder as string) || "misc";
     const folder = ALLOWED_FOLDERS.includes(rawFolder) ? rawFolder : "misc";
     const isVideo = req.file.mimetype.startsWith("video/");

@@ -2828,7 +2828,7 @@ export const api = {
     return saveHashtags(contentId, contentType, caption);
   },
 
-  async submitVerificationRequest(data: { full_name: string; reason: string; category: string; social_links?: Record<string, string> }) {
+  async submitVerificationRequest(data: { full_name: string; reason: string; category: string; social_links?: Record<string, string>; id_card_url: string; selfie_url: string }) {
     const res = await communityFetch('/api/verification/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

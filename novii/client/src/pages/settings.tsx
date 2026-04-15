@@ -13,7 +13,8 @@ import {
   LayoutDashboard, UserCog, BadgeCheck, EyeOff, AtSign, Share2,
   Archive, Download, Laptop, ShieldAlert, Smartphone, X,
   ExternalLink, ListTodo, TrendingUp, Clock, Eye, Flame, Activity, Bookmark, LogOut,
-  Trash2, UserPlus, UserX, Settings, AlertCircle, CheckCircle
+  Trash2, UserPlus, UserX, Settings, AlertCircle, CheckCircle,
+  Camera, Upload as UploadIcon, ImageIcon, ArrowRight, ArrowLeft, FileCheck, ScanFace
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
@@ -519,22 +520,66 @@ const settingsMenuStructure: MenuSection[] = [
 
 function VerificationSection({ profile, direction }: { profile: any; direction: string }) {
   const isRTL = direction === 'rtl';
+  const [step, setStep] = useState(0);
   const [reason, setReason] = useState('');
   const [category, setCategory] = useState('personal');
   const [fullName, setFullName] = useState('');
   const [socialLinks, setSocialLinks] = useState({ website: '', twitter: '', instagram: '' });
+  const [idCardUrl, setIdCardUrl] = useState('');
+  const [selfieUrl, setSelfieUrl] = useState('');
+  const [idCardPreview, setIdCardPreview] = useState('');
+  const [selfiePreview, setSelfiePreview] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const idCardInputRef = useRef<HTMLInputElement>(null);
+  const selfieInputRef = useRef<HTMLInputElement>(null);
 
   const { data: existingRequest, refetch } = useQuery({
     queryKey: ['verification-status'],
     queryFn: () => api.getVerificationStatus(),
   });
 
-  const handleSubmit = async () => {
-    if (!reason.trim()) {
-      toast.error(isRTL ? 'يرجى كتابة سبب طلب التوثيق' : 'Please provide a reason for verification');
+  const steps = [
+    { icon: FileCheck, label: isRTL ? 'البطاقة' : 'ID Card' },
+    { icon: ScanFace, label: isRTL ? 'السيلفي' : 'Selfie' },
+    { icon: User, label: isRTL ? 'البيانات' : 'Details' },
+    { icon: BadgeCheck, label: isRTL ? 'المراجعة' : 'Review' },
+  ];
+
+  const handleFileUpload = async (file: File, type: 'id_card' | 'selfie') => {
+    if (!file.type.startsWith('image/')) {
+      toast.error(isRTL ? 'يرجى اختيار صورة' : 'Please select an image file');
       return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error(isRTL ? 'حجم الصورة كبير جداً (الحد الأقصى 10 ميجا)' : 'Image too large (max 10MB)');
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    if (type === 'id_card') setIdCardPreview(preview);
+    else setSelfiePreview(preview);
+
+    setUploading(true);
+    setUploadProgress(0);
+    try {
+      const url = await api._uploadToCloudinary(file, 'verification', (p: number) => setUploadProgress(p));
+      if (type === 'id_card') setIdCardUrl(url);
+      else setSelfieUrl(url);
+      toast.success(isRTL ? 'تم رفع الصورة بنجاح' : 'Image uploaded successfully');
+    } catch (err: any) {
+      toast.error(err.message || (isRTL ? 'فشل رفع الصورة' : 'Upload failed'));
+      if (type === 'id_card') { setIdCardPreview(''); setIdCardUrl(''); }
+      else { setSelfiePreview(''); setSelfieUrl(''); }
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!idCardUrl || !selfieUrl || !reason.trim()) return;
     setSubmitting(true);
     try {
       await api.submitVerificationRequest({
@@ -542,8 +587,10 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
         reason,
         category,
         social_links: Object.fromEntries(Object.entries(socialLinks).filter(([, v]) => v.trim())),
+        id_card_url: idCardUrl,
+        selfie_url: selfieUrl,
       });
-      toast.success(isRTL ? 'تم إرسال طلب التوثيق بنجاح!' : 'Verification request submitted!');
+      toast.success(isRTL ? 'تم إرسال طلب التوثيق بنجاح! سيتم مراجعته قريباً.' : 'Verification request submitted!');
       refetch();
     } catch (err: any) {
       toast.error(err.message || (isRTL ? 'فشل إرسال الطلب' : 'Failed to submit'));
@@ -552,9 +599,17 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
     }
   };
 
+  const canProceed = () => {
+    if (step === 0) return !!idCardUrl;
+    if (step === 1) return !!selfieUrl;
+    if (step === 2) return !!reason.trim();
+    return true;
+  };
+
   return (
     <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      <h2 className="text-2xl font-bold mb-4">{isRTL ? 'التوثيق' : 'Verification'}</h2>
+      <h2 className="text-2xl font-bold mb-4">{isRTL ? 'التحقق من الهوية' : 'Identity Verification'}</h2>
+
       {profile?.is_verified ? (
         <div className="text-center py-12 border border-green-500/30 rounded-2xl bg-green-500/5">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
@@ -565,7 +620,7 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
         <div className="text-center py-12 border border-yellow-500/30 rounded-2xl bg-yellow-500/5">
           <Clock className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
           <h3 className="text-xl font-bold mb-2">{isRTL ? 'طلبك قيد المراجعة' : 'Request Under Review'}</h3>
-          <p className="text-sm text-muted-foreground">{isRTL ? 'تم إرسال طلبك وسيتم مراجعته قريباً' : 'Your request has been submitted and will be reviewed soon'}</p>
+          <p className="text-sm text-muted-foreground">{isRTL ? 'تم إرسال طلبك ومستنداتك وسيتم مراجعتها قريباً' : 'Your request and documents have been submitted for review'}</p>
           <p className="text-xs text-muted-foreground mt-2">{isRTL ? 'تاريخ الإرسال:' : 'Submitted:'} {new Date(existingRequest.created_at).toLocaleDateString()}</p>
         </div>
       ) : existingRequest?.status === 'rejected' ? (
@@ -574,28 +629,172 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
             <X className="w-12 h-12 text-red-500 mx-auto mb-3" />
             <h3 className="text-lg font-bold mb-1">{isRTL ? 'تم رفض طلبك السابق' : 'Previous Request Rejected'}</h3>
             {existingRequest.admin_note && <p className="text-sm text-muted-foreground px-6">{isRTL ? 'السبب:' : 'Reason:'} {existingRequest.admin_note}</p>}
+            <p className="text-xs text-muted-foreground mt-3">{isRTL ? 'يمكنك تقديم طلب جديد أدناه' : 'You can submit a new request below'}</p>
           </div>
-          {renderVerificationForm()}
+          {renderMultiStepForm()}
         </div>
       ) : (
-        <div className="space-y-6">{renderVerificationForm()}</div>
+        <div className="space-y-6">{renderMultiStepForm()}</div>
       )}
     </div>
   );
 
-  function renderVerificationForm() {
+  function renderMultiStepForm() {
     return (
-      <div className="border border-border rounded-2xl p-6 bg-card">
-        <div className="flex items-center gap-3 mb-4"><BadgeCheck className="w-8 h-8 text-primary" /><h3 className="font-bold text-lg">{isRTL ? 'طلب التوثيق' : 'Request Verification'}</h3></div>
-        <p className="text-sm text-muted-foreground mb-6">{isRTL ? 'التوثيق متاح للحسابات التي تستوفي شروط معينة' : 'Verification is available for accounts meeting certain criteria'}</p>
-        <div className="space-y-3 mb-6">
-          <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", (profile?.followers_count || 0) >= 100 ? "text-green-500" : "text-muted-foreground")} /><span>{isRTL ? '100+ متابع' : '100+ followers'}</span></div>
-          <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", profile?.bio ? "text-green-500" : "text-muted-foreground")} /><span>{isRTL ? 'بايو مكتمل' : 'Complete bio'}</span></div>
-          <div className="flex items-center gap-2 text-sm"><CheckCircle className={cn("w-4 h-4", profile?.avatar_url ? "text-green-500" : "text-muted-foreground")} /><span>{isRTL ? 'صورة شخصية' : 'Profile photo'}</span></div>
+      <div className="border border-border rounded-2xl bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b border-border">
+          {steps.map((s, i) => {
+            const Icon = s.icon;
+            const isActive = i === step;
+            const isDone = i < step || (i === 0 && !!idCardUrl) && step > 0 || (i === 1 && !!selfieUrl) && step > 1;
+            return (
+              <button key={i} onClick={() => { if (i < step) setStep(i); }} className={cn("flex flex-col items-center gap-1 flex-1 py-1.5 rounded-lg transition-all", isActive ? "text-primary" : isDone ? "text-green-500" : "text-muted-foreground")}>
+                <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all", isActive ? "bg-primary/10 ring-2 ring-primary" : isDone ? "bg-green-500/10" : "bg-muted/50")}>
+                  {isDone && i < step ? <CheckCircle className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
+                </div>
+                <span className="text-[10px] font-medium">{s.label}</span>
+              </button>
+            );
+          })}
         </div>
-        <div className="space-y-4 mb-6">
+
+        <div className="p-6">
+          {step === 0 && renderIdCardStep()}
+          {step === 1 && renderSelfieStep()}
+          {step === 2 && renderDetailsStep()}
+          {step === 3 && renderReviewStep()}
+        </div>
+
+        <div className="flex items-center gap-3 px-6 pb-6">
+          {step > 0 && (
+            <Button variant="outline" onClick={() => setStep(step - 1)} className="flex-1">
+              {isRTL ? <ArrowRight className="w-4 h-4 ml-2" /> : <ArrowLeft className="w-4 h-4 mr-2" />}
+              {isRTL ? 'السابق' : 'Back'}
+            </Button>
+          )}
+          {step < 3 ? (
+            <Button onClick={() => setStep(step + 1)} disabled={!canProceed() || uploading} className="flex-1">
+              {isRTL ? 'التالي' : 'Next'}
+              {isRTL ? <ArrowLeft className="w-4 h-4 mr-2" /> : <ArrowRight className="w-4 h-4 ml-2" />}
+            </Button>
+          ) : (
+            <Button onClick={handleSubmit} disabled={submitting || !idCardUrl || !selfieUrl || !reason.trim()} className="flex-1 bg-green-600 hover:bg-green-700">
+              {submitting ? <Spinner className="w-4 h-4" /> : (
+                <>{isRTL ? 'إرسال طلب التحقق' : 'Submit Verification'}<BadgeCheck className="w-4 h-4 mr-2 ml-2" /></>
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderIdCardStep() {
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-2">
+          <FileCheck className="w-10 h-10 text-primary mx-auto mb-2" />
+          <h3 className="font-bold text-lg">{isRTL ? 'رفع صورة البطاقة الشخصية' : 'Upload ID Card Photo'}</h3>
+          <p className="text-sm text-muted-foreground mt-1">{isRTL ? 'ارفع صورة واضحة للوجه الأمامي لبطاقة الهوية أو جواز السفر' : 'Upload a clear photo of the front of your ID card or passport'}</p>
+        </div>
+
+        <div className="space-y-2 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
+          <p className="font-medium text-foreground text-sm mb-1">{isRTL ? 'تعليمات:' : 'Instructions:'}</p>
+          <p>• {isRTL ? 'تأكد أن الصورة واضحة ومقروءة' : 'Make sure the photo is clear and readable'}</p>
+          <p>• {isRTL ? 'الاسم وتاريخ الميلاد والصورة يجب أن تكون ظاهرة' : 'Name, date of birth, and photo must be visible'}</p>
+          <p>• {isRTL ? 'الملفات المقبولة: JPG, PNG (الحد الأقصى 10 ميجا)' : 'Accepted: JPG, PNG (max 10MB)'}</p>
+        </div>
+
+        <input ref={idCardInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, 'id_card'); e.target.value = ''; }} />
+
+        {idCardPreview ? (
+          <div className="relative rounded-xl overflow-hidden border border-border bg-muted/20">
+            <img src={idCardPreview} alt="ID Card" className="w-full h-48 object-contain bg-black/5" />
+            <div className="absolute top-2 left-2 right-2 flex justify-between">
+              {idCardUrl && <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle className="w-3 h-3" /> {isRTL ? 'تم الرفع' : 'Uploaded'}</span>}
+              <button onClick={() => { setIdCardPreview(''); setIdCardUrl(''); }} className="bg-red-500 text-white p-1 rounded-full"><X className="w-3.5 h-3.5" /></button>
+            </div>
+            {uploading && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted">
+                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+              </div>
+            )}
+          </div>
+        ) : (
+          <button onClick={() => idCardInputRef.current?.click()} disabled={uploading} className="w-full h-48 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-3 hover:border-primary/50 hover:bg-primary/5 transition-all">
+            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+              <UploadIcon className="w-6 h-6 text-primary" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium">{isRTL ? 'اضغط لرفع صورة البطاقة' : 'Click to upload ID photo'}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">JPG, PNG</p>
+            </div>
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  function renderSelfieStep() {
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-2">
+          <ScanFace className="w-10 h-10 text-primary mx-auto mb-2" />
+          <h3 className="font-bold text-lg">{isRTL ? 'صورة سيلفي للتحقق' : 'Verification Selfie'}</h3>
+          <p className="text-sm text-muted-foreground mt-1">{isRTL ? 'ارفع صورة سيلفي واضحة لوجهك للمقارنة مع البطاقة' : 'Upload a clear selfie of your face to compare with your ID'}</p>
+        </div>
+
+        <div className="space-y-2 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
+          <p className="font-medium text-foreground text-sm mb-1">{isRTL ? 'تعليمات:' : 'Instructions:'}</p>
+          <p>• {isRTL ? 'وجهك يجب أن يكون واضح ومباشر' : 'Your face must be clear and facing forward'}</p>
+          <p>• {isRTL ? 'إضاءة جيدة بدون نظارة شمسية أو قبعة' : 'Good lighting, no sunglasses or hat'}</p>
+          <p>• {isRTL ? 'الصورة يجب أن تطابق صورة البطاقة' : 'The photo should match your ID photo'}</p>
+        </div>
+
+        <input ref={selfieInputRef} type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, 'selfie'); e.target.value = ''; }} />
+
+        {selfiePreview ? (
+          <div className="relative rounded-xl overflow-hidden border border-border bg-muted/20">
+            <img src={selfiePreview} alt="Selfie" className="w-full h-48 object-contain bg-black/5" />
+            <div className="absolute top-2 left-2 right-2 flex justify-between">
+              {selfieUrl && <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle className="w-3 h-3" /> {isRTL ? 'تم الرفع' : 'Uploaded'}</span>}
+              <button onClick={() => { setSelfiePreview(''); setSelfieUrl(''); }} className="bg-red-500 text-white p-1 rounded-full"><X className="w-3.5 h-3.5" /></button>
+            </div>
+            {uploading && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted">
+                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            <button onClick={() => selfieInputRef.current?.click()} disabled={uploading} className="flex-1 h-48 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-3 hover:border-primary/50 hover:bg-primary/5 transition-all">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                <Camera className="w-6 h-6 text-primary" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium">{isRTL ? 'التقط سيلفي أو ارفع صورة' : 'Take selfie or upload photo'}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">JPG, PNG</p>
+              </div>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderDetailsStep() {
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-2">
+          <User className="w-10 h-10 text-primary mx-auto mb-2" />
+          <h3 className="font-bold text-lg">{isRTL ? 'البيانات الشخصية' : 'Personal Details'}</h3>
+          <p className="text-sm text-muted-foreground mt-1">{isRTL ? 'أكمل بياناتك وسبب طلب التوثيق' : 'Complete your details and reason for verification'}</p>
+        </div>
+
+        <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium mb-1.5 block">{isRTL ? 'الاسم الكامل' : 'Full Name'}</label>
+            <label className="text-sm font-medium mb-1.5 block">{isRTL ? 'الاسم الكامل (كما في البطاقة)' : 'Full Name (as on ID)'}</label>
             <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder={profile?.full_name || profile?.username || ''} />
           </div>
           <div>
@@ -612,7 +811,7 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
             </Select>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1.5 block">{isRTL ? 'لماذا تستحق التوثيق؟' : 'Why should you be verified?'}</label>
+            <label className="text-sm font-medium mb-1.5 block">{isRTL ? 'لماذا تستحق التوثيق؟' : 'Why should you be verified?'} <span className="text-red-500">*</span></label>
             <Textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} placeholder={isRTL ? 'اشرح لماذا تريد التوثيق...' : 'Explain why you want verification...'} />
           </div>
           <div>
@@ -624,9 +823,48 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
             </div>
           </div>
         </div>
-        <Button className="w-full" onClick={handleSubmit} disabled={submitting || !reason.trim()}>
-          {submitting ? <Spinner className="w-4 h-4" /> : (isRTL ? 'إرسال طلب التوثيق' : 'Submit Verification Request')}
-        </Button>
+      </div>
+    );
+  }
+
+  function renderReviewStep() {
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-2">
+          <BadgeCheck className="w-10 h-10 text-primary mx-auto mb-2" />
+          <h3 className="font-bold text-lg">{isRTL ? 'مراجعة الطلب' : 'Review Your Request'}</h3>
+          <p className="text-sm text-muted-foreground mt-1">{isRTL ? 'راجع بياناتك قبل الإرسال' : 'Review your information before submitting'}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl overflow-hidden border border-border">
+            <p className="text-xs font-medium text-center py-1.5 bg-muted/30 border-b border-border">{isRTL ? 'البطاقة الشخصية' : 'ID Card'}</p>
+            {idCardPreview ? (
+              <img src={idCardPreview} alt="ID" className="w-full h-28 object-contain bg-black/5" />
+            ) : (
+              <div className="w-full h-28 flex items-center justify-center text-muted-foreground"><X className="w-6 h-6" /></div>
+            )}
+          </div>
+          <div className="rounded-xl overflow-hidden border border-border">
+            <p className="text-xs font-medium text-center py-1.5 bg-muted/30 border-b border-border">{isRTL ? 'صورة السيلفي' : 'Selfie'}</p>
+            {selfiePreview ? (
+              <img src={selfiePreview} alt="Selfie" className="w-full h-28 object-contain bg-black/5" />
+            ) : (
+              <div className="w-full h-28 flex items-center justify-center text-muted-foreground"><X className="w-6 h-6" /></div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2 bg-muted/20 rounded-xl p-4">
+          <div className="flex justify-between text-sm"><span className="text-muted-foreground">{isRTL ? 'الاسم:' : 'Name:'}</span><span className="font-medium">{fullName || profile?.full_name || profile?.username || '-'}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-muted-foreground">{isRTL ? 'الفئة:' : 'Category:'}</span><span className="font-medium">{{ personal: isRTL ? 'شخصي' : 'Personal', creator: isRTL ? 'صانع محتوى' : 'Creator', business: isRTL ? 'نشاط تجاري' : 'Business', public_figure: isRTL ? 'شخصية عامة' : 'Public Figure', organization: isRTL ? 'مؤسسة' : 'Organization' }[category]}</span></div>
+          <div className="text-sm"><span className="text-muted-foreground">{isRTL ? 'السبب:' : 'Reason:'}</span><p className="mt-1 text-sm">{reason || '-'}</p></div>
+        </div>
+
+        <div className="flex items-start gap-2 text-xs text-muted-foreground bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
+          <Shield className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+          <p>{isRTL ? 'بياناتك ومستنداتك محمية ولن تتم مشاركتها. سيتم استخدامها فقط للتحقق من هويتك.' : 'Your data and documents are protected and will not be shared. They will only be used to verify your identity.'}</p>
+        </div>
       </div>
     );
   }

@@ -2985,6 +2985,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reason TEXT NOT NULL DEFAULT '',
           category TEXT NOT NULL DEFAULT 'personal',
           social_links JSONB DEFAULT '{}',
+          id_card_url TEXT,
+          selfie_url TEXT,
           status TEXT NOT NULL DEFAULT 'pending',
           admin_note TEXT,
           reviewed_by UUID,
@@ -2992,6 +2994,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           created_at TIMESTAMPTZ DEFAULT NOW(),
           updated_at TIMESTAMPTZ DEFAULT NOW()
         );
+        ALTER TABLE verification_requests ADD COLUMN IF NOT EXISTS id_card_url TEXT;
+        ALTER TABLE verification_requests ADD COLUMN IF NOT EXISTS selfie_url TEXT;
         CREATE INDEX IF NOT EXISTS idx_vr_user ON verification_requests(user_id);
         CREATE INDEX IF NOT EXISTS idx_vr_status ON verification_requests(status);
       `}).then(() => console.log('✅ verification_requests table ready'))
@@ -3009,7 +3013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/verification/request", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId!;
-      const { full_name, reason, category, social_links } = req.body;
+      const { full_name, reason, category, social_links, id_card_url, selfie_url } = req.body;
 
       const validCategories = ['personal', 'creator', 'business', 'public_figure', 'organization'];
       if (!reason || typeof reason !== 'string' || !reason.trim()) {
@@ -3017,6 +3021,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (category && !validCategories.includes(category)) {
         return res.status(400).json({ error: 'Invalid category' });
+      }
+      if (!id_card_url || typeof id_card_url !== 'string' || !id_card_url.startsWith('https://')) {
+        return res.status(400).json({ error: 'ID card photo is required' });
+      }
+      if (!selfie_url || typeof selfie_url !== 'string' || !selfie_url.startsWith('https://')) {
+        return res.status(400).json({ error: 'Selfie photo is required' });
       }
 
       const sanitizedLinks: Record<string, string> = {};
@@ -3042,6 +3052,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reason: reason.trim().slice(0, 1000),
         category: category || 'personal',
         social_links: sanitizedLinks,
+        id_card_url,
+        selfie_url,
       }).select().single();
 
       if (error) throw error;
