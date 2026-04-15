@@ -116,8 +116,8 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
     }
   }, [open, initialMediaType]);
 
-  const generateCroppedPreview = async () => {
-    const img = selectedImages[0];
+  const generateCroppedPreview = async (filterOverride?: string) => {
+    const img = selectedImages[currentImageIndex];
     if (!img?.croppedAreaPixels) return;
     try {
       const croppedFile = await getCroppedImg(
@@ -125,7 +125,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
         img.croppedAreaPixels,
         selectedAspect.outputWidth,
         selectedAspect.outputHeight,
-        img.filter || selectedFilter
+        filterOverride ?? img.filter ?? selectedFilter
       );
       if (croppedPreviewUrl) URL.revokeObjectURL(croppedPreviewUrl);
       setCroppedPreviewUrl(URL.createObjectURL(croppedFile));
@@ -340,7 +340,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
   const getNextAction = () => {
     switch (currentStep) {
       case 'crop':
-        return { label: t ? "التالي" : "Next", action: () => setCurrentStep('filter') };
+        return { label: t ? "التالي" : "Next", action: () => { generateCroppedPreview(); setCurrentStep('filter'); } };
       case 'filter':
         return { label: t ? "التالي" : "Next", action: () => { generateCroppedPreview(); setCurrentStep('details'); } };
       case 'details':
@@ -522,15 +522,12 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
             <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
               <div className="flex-1 bg-black flex items-center justify-center relative min-h-[250px] sm:min-h-0">
                 <img
-                  src={selectedImages[currentImageIndex].url}
+                  src={croppedPreviewUrl || selectedImages[currentImageIndex].url}
                   alt="Preview"
                   className={cn(
                     "max-w-full max-h-full object-contain",
-                    FILTERS.find(f => f.id === selectedFilter)?.cssClass
+                    !croppedPreviewUrl && FILTERS.find(f => f.id === selectedFilter)?.cssClass
                   )}
-                  style={{
-                    aspectRatio: `${selectedAspect.ratio}`,
-                  }}
                 />
                 {selectedImages.length > 1 && (
                   <>
@@ -567,6 +564,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
                             filter: filter.id
                           };
                           setSelectedImages(newImages);
+                          generateCroppedPreview(filter.id);
                         }}
                         className="flex flex-col items-center gap-1"
                       >
@@ -577,7 +575,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
                             : "border-transparent hover:border-muted-foreground/30"
                         )}>
                           <img
-                            src={selectedImages[currentImageIndex].url}
+                            src={croppedPreviewUrl || selectedImages[currentImageIndex].url}
                             alt={filter.name}
                             className={cn("w-full h-full object-cover", filter.cssClass)}
                           />
