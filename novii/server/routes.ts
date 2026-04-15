@@ -3854,13 +3854,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // HASHTAG SYSTEM
   // ========================================
 
+  (async () => {
+    try {
+      const statements = [
+        `CREATE TABLE IF NOT EXISTS hashtags (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT UNIQUE NOT NULL,
+          posts_count INTEGER DEFAULT 0,
+          is_banned BOOLEAN DEFAULT FALSE,
+          is_pinned BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )`,
+        `ALTER TABLE hashtags ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE`,
+        `ALTER TABLE hashtags ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE`,
+        `CREATE TABLE IF NOT EXISTS post_hashtags (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+          hashtag_id UUID NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
+          UNIQUE(post_id, hashtag_id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS reel_hashtags (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          reel_id UUID NOT NULL REFERENCES reels(id) ON DELETE CASCADE,
+          hashtag_id UUID NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
+          UNIQUE(reel_id, hashtag_id)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_hashtags_posts_count ON hashtags(posts_count DESC)`
+      ];
+      for (const sql of statements) {
+        try { await adminDb!.rpc('exec_sql', { query: sql }); } catch {}
+      }
+      const { data } = await adminDb!.from('hashtags').select('is_banned').limit(1);
+      if (data !== null) {
+        console.log('✅ hashtags table ready (is_banned column confirmed)');
+      } else {
+        console.log('⚠️ hashtags: is_banned column may be missing');
+      }
+    } catch (e) {
+      console.log('⚠️ hashtags table setup error:', e);
+    }
+  })();
+
   app.post("/api/hashtags/extract", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const { post_id, reel_id, caption } = req.body;
       if (!caption || (!post_id && !reel_id)) return res.status(400).json({ error: 'Missing fields' });
 
       const tags = Array.from(new Set(
-        (caption.match(/#(\w+)/g) || []).map((t: string) => t.slice(1).toLowerCase())
+        (caption.match(/#([\w\u0600-\u06FF]+)/g) || []).map((t: string) => t.slice(1).toLowerCase())
       ));
       if (tags.length === 0) return res.json({ saved: 0 });
 
@@ -3890,16 +3931,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/hashtags/backfill", async (_req: Request, res: Response) => {
+    try {
+      const saveDb = adminDb || db;
+      const { data: posts } = await saveDb
+        .from('posts')
+        .select('id, caption')
+        .neq('is_deleted', true);
+
+      let totalLinked = 0;
+      for (const post of (posts || [])) {
+        if (!post.caption) continue;
+        const tags = Array.from(new Set(
+          (post.caption.match(/#([\w\u0600-\u06FF]+)/g) || []).map((t: string) => t.slice(1).toLowerCase())
+        ));
+        if (tags.length === 0) continue;
+
+        const { data: hashtagRows } = await saveDb
+          .from('hashtags')
+          .upsert(tags.map((name: string) => ({ name })), { onConflict: 'name', ignoreDuplicates: false })
+          .select('id, name');
+
+        if (hashtagRows?.length) {
+          await saveDb
+            .from('post_hashtags')
+            .upsert(
+              hashtagRows.map((h: any) => ({ post_id: post.id, hashtag_id: h.id })),
+              { onConflict: 'post_id,hashtag_id', ignoreDuplicates: true }
+            );
+          totalLinked += hashtagRows.length;
+        }
+      }
+
+      for (const tag of (await saveDb.from('hashtags').select('id')).data || []) {
+        const { count } = await saveDb
+          .from('post_hashtags')
+          .select('*', { count: 'exact', head: true })
+          .eq('hashtag_id', tag.id);
+        await saveDb
+          .from('hashtags')
+          .update({ posts_count: count || 0 })
+          .eq('id', tag.id);
+      }
+
+      res.json({ success: true, totalLinked });
+    } catch (error) {
+      console.error('Backfill hashtags error:', error);
+      res.status(500).json({ error: 'Failed to backfill hashtags' });
+    }
+  });
+
   app.get("/api/hashtags/trending", async (_req: Request, res: Response) => {
     try {
-      const { data, error } = await db
+      const queryDb = adminDb || db;
+      let query = queryDb
         .from('hashtags')
         .select('*')
-        .eq('is_banned', false)
         .order('posts_count', { ascending: false })
         .limit(20);
+      const { data, error } = await query;
       if (error) throw error;
-      res.json(data || []);
+      res.json((data || []).filter((h: any) => !h.is_banned));
     } catch (error) {
       console.error('Trending hashtags error:', error);
       res.status(500).json({ error: 'Failed to fetch trending hashtags' });
@@ -3909,15 +4001,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/hashtags/search/:query", async (req: Request, res: Response) => {
     try {
       const q = req.params.query.toLowerCase().replace(/^#/, '');
-      const { data, error } = await db
+      const queryDb = adminDb || db;
+      const { data, error } = await queryDb
         .from('hashtags')
         .select('*')
-        .eq('is_banned', false)
         .ilike('name', `${q}%`)
         .order('posts_count', { ascending: false })
         .limit(10);
       if (error) throw error;
-      res.json(data || []);
+      res.json((data || []).filter((h: any) => !h.is_banned));
     } catch (error) {
       console.error('Search hashtags error:', error);
       res.status(500).json({ error: 'Failed to search hashtags' });
@@ -3930,27 +4022,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tag = name.toLowerCase().replace(/^#/, '');
       const page = parseInt(req.query.page as string) || 0;
       const limit = parseInt(req.query.limit as string) || 20;
+      const queryDb = adminDb || db;
 
-      const { data: hashtag } = await db
+      const { data: hashtag } = await queryDb
         .from('hashtags')
-        .select('id, is_banned')
+        .select('id')
         .eq('name', tag)
         .single();
 
-      if (!hashtag || hashtag.is_banned) return res.json([]);
+      if (!hashtag) return res.json([]);
 
-      const { data: postHashtags, error } = await db
+      const { data: postHashtags, error } = await queryDb
         .from('post_hashtags')
         .select('post_id')
         .eq('hashtag_id', hashtag.id)
-        .order('created_at', { ascending: false })
         .range(page * limit, (page + 1) * limit - 1);
 
       if (error) throw error;
       if (!postHashtags?.length) return res.json([]);
 
       const postIds = postHashtags.map((ph: any) => ph.post_id);
-      const { data: posts } = await db
+      const { data: posts } = await queryDb
         .from('posts')
         .select('*, profiles!posts_user_id_fkey(id, username, full_name, avatar_url, is_verified, is_official)')
         .in('id', postIds)
@@ -3968,13 +4060,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { name } = req.params;
       const tag = name.toLowerCase().replace(/^#/, '');
-      const { data: hashtag, error } = await db
+      const queryDb = adminDb || db;
+      const { data: hashtag, error } = await queryDb
         .from('hashtags')
         .select('*')
         .eq('name', tag)
-        .eq('is_banned', false)
         .single();
       if (error || !hashtag) return res.status(404).json({ error: 'Hashtag not found' });
+      if (hashtag.is_banned) return res.status(404).json({ error: 'Hashtag not found' });
       res.json(hashtag);
     } catch (error) {
       console.error('Get hashtag error:', error);
