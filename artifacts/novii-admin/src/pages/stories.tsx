@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth-context";
 import { Film, Trash2, RotateCcw, Eye, Clock, User } from "lucide-react";
+import { adminFetch } from "@/lib/admin-api";
 
 interface Story {
   id: string;
@@ -15,20 +15,17 @@ interface Story {
 }
 
 export default function StoriesPage() {
-  const { token } = useAuth();
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDeleted, setShowDeleted] = useState(false);
-
-  const headers = { "Content-Type": "application/json", "x-user-token": token || "" };
 
   useEffect(() => { loadStories(); }, [showDeleted]);
 
   async function loadStories() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/stories?deleted=${showDeleted}`, { headers });
-      if (res.ok) setStories(await res.json());
+      const data = await adminFetch<Story[]>(`/stories?deleted=${showDeleted}`);
+      setStories(data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -38,12 +35,12 @@ export default function StoriesPage() {
 
   async function deleteStory(id: string) {
     if (!confirm("هل تريد حذف هذه القصة؟")) return;
-    await fetch(`/api/admin/stories/${id}`, { method: "DELETE", headers });
+    await adminFetch(`/stories/${id}`, { method: "DELETE" });
     loadStories();
   }
 
   async function restoreStory(id: string) {
-    await fetch(`/api/admin/stories/${id}/restore`, { method: "POST", headers });
+    await adminFetch(`/stories/${id}/restore`, { method: "POST" });
     loadStories();
   }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth-context";
 import { Shield, Ban, AlertTriangle, Activity, Plus, Trash2, X, Globe, Fingerprint, Monitor, MapPin } from "lucide-react";
+import { adminFetch } from "@/lib/admin-api";
 
 interface IPBan { id: string; ip_address: string; reason: string; is_active: boolean; expires_at: string | null; created_at: string; profiles?: { username: string } }
 interface SuspiciousIP { ip: string; user_count: number; user_ids: string[] }
@@ -10,7 +10,6 @@ interface LoginActivity { id: string; user_id: string; ip_address: string; brows
 type Tab = "suspicious" | "ip-bans" | "login-activity";
 
 export default function SecurityPage() {
-  const { token } = useAuth();
   const [tab, setTab] = useState<Tab>("suspicious");
   const [ipBans, setIPBans] = useState<IPBan[]>([]);
   const [suspiciousIPs, setSuspiciousIPs] = useState<SuspiciousIP[]>([]);
@@ -20,26 +19,21 @@ export default function SecurityPage() {
   const [showAddBan, setShowAddBan] = useState(false);
   const [banForm, setBanForm] = useState({ ip_address: "", reason: "", expires_at: "" });
 
-  const headers = { "Content-Type": "application/json", "x-user-token": token || "" };
-
   useEffect(() => { loadData(); }, [tab]);
 
   async function loadData() {
     setLoading(true);
     try {
       if (tab === "suspicious") {
-        const res = await fetch("/api/admin/security/suspicious", { headers });
-        if (res.ok) {
-          const data = await res.json();
-          setSuspiciousIPs(data.suspiciousIPs || []);
-          setSuspiciousDevices(data.suspiciousDevices || []);
-        }
+        const data = await adminFetch<{ suspiciousIPs: SuspiciousIP[]; suspiciousDevices: SuspiciousDevice[] }>("/security/suspicious");
+        setSuspiciousIPs(data.suspiciousIPs || []);
+        setSuspiciousDevices(data.suspiciousDevices || []);
       } else if (tab === "ip-bans") {
-        const res = await fetch("/api/admin/security/ip-bans", { headers });
-        if (res.ok) setIPBans(await res.json());
+        const data = await adminFetch<IPBan[]>("/security/ip-bans");
+        setIPBans(data);
       } else {
-        const res = await fetch("/api/admin/security/login-activity?limit=100", { headers });
-        if (res.ok) setLoginActivity(await res.json());
+        const data = await adminFetch<LoginActivity[]>("/security/login-activity?limit=100");
+        setLoginActivity(data);
       }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -47,8 +41,8 @@ export default function SecurityPage() {
 
   async function addIPBan() {
     if (!banForm.ip_address) return;
-    await fetch("/api/admin/security/ip-bans", {
-      method: "POST", headers,
+    await adminFetch("/security/ip-bans", {
+      method: "POST",
       body: JSON.stringify({ ...banForm, expires_at: banForm.expires_at || null }),
     });
     setShowAddBan(false);
@@ -58,7 +52,7 @@ export default function SecurityPage() {
 
   async function removeIPBan(id: string) {
     if (!confirm("هل تريد إزالة حظر هذا IP؟")) return;
-    await fetch(`/api/admin/security/ip-bans/${id}`, { method: "DELETE", headers });
+    await adminFetch(`/security/ip-bans/${id}`, { method: "DELETE" });
     loadData();
   }
 

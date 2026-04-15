@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth-context";
 import { Video, Trash2, RotateCcw, Star, StarOff, Eye, Heart, Clock, User } from "lucide-react";
+import { adminFetch } from "@/lib/admin-api";
 
 interface Reel {
   id: string;
@@ -16,20 +16,17 @@ interface Reel {
 }
 
 export default function ReelsPage() {
-  const { token } = useAuth();
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDeleted, setShowDeleted] = useState(false);
-
-  const headers = { "Content-Type": "application/json", "x-user-token": token || "" };
 
   useEffect(() => { loadReels(); }, [showDeleted]);
 
   async function loadReels() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/reels?deleted=${showDeleted}`, { headers });
-      if (res.ok) setReels(await res.json());
+      const data = await adminFetch<Reel[]>(`/reels?deleted=${showDeleted}`);
+      setReels(data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -39,18 +36,19 @@ export default function ReelsPage() {
 
   async function deleteReel(id: string) {
     if (!confirm("هل تريد حذف هذا الريل؟")) return;
-    await fetch(`/api/admin/reels/${id}`, { method: "DELETE", headers });
+    await adminFetch(`/reels/${id}`, { method: "DELETE" });
     loadReels();
   }
 
   async function restoreReel(id: string) {
-    await fetch(`/api/admin/reels/${id}/restore`, { method: "POST", headers });
+    await adminFetch(`/reels/${id}/restore`, { method: "POST" });
     loadReels();
   }
 
   async function toggleFeature(id: string, featured: boolean) {
-    await fetch(`/api/admin/reels/${id}/feature`, {
-      method: "POST", headers, body: JSON.stringify({ featured: !featured })
+    await adminFetch(`/reels/${id}/feature`, {
+      method: "POST",
+      body: JSON.stringify({ featured: !featured }),
     });
     loadReels();
   }

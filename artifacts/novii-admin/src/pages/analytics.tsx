@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth-context";
 import { BarChart3, TrendingUp, Smartphone, Globe, Heart, Eye, MessageSquare, Users } from "lucide-react";
+import { adminFetch } from "@/lib/admin-api";
 
 interface GrowthData { date: string; count: number; }
 interface TopPost { id: string; caption: string; likes_count: number; comments_count: number; image_url: string; profiles?: { username: string; avatar_url: string } }
@@ -24,14 +24,11 @@ function StatBar({ items, color }: { items: [string, number][]; color: string })
 }
 
 export default function AnalyticsPage() {
-  const { token } = useAuth();
   const [growth, setGrowth] = useState<GrowthData[]>([]);
   const [topPosts, setTopPosts] = useState<TopPost[]>([]);
   const [deviceData, setDeviceData] = useState<DeviceData | null>(null);
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
-
-  const headers = { "Content-Type": "application/json", "x-user-token": token || "" };
 
   useEffect(() => {
     loadAll();
@@ -40,14 +37,14 @@ export default function AnalyticsPage() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [growthRes, topRes, devRes] = await Promise.all([
-        fetch(`/api/admin/analytics/growth?days=${days}`, { headers }),
-        fetch(`/api/admin/analytics/top-posts?limit=10`, { headers }),
-        fetch(`/api/admin/analytics/devices`, { headers }),
+      const [growthData, topData, devData] = await Promise.all([
+        adminFetch<GrowthData[]>(`/analytics/growth?days=${days}`),
+        adminFetch<TopPost[]>(`/analytics/top-posts?limit=10`),
+        adminFetch<DeviceData>(`/analytics/devices`),
       ]);
-      if (growthRes.ok) setGrowth(await growthRes.json());
-      if (topRes.ok) setTopPosts(await topRes.json());
-      if (devRes.ok) setDeviceData(await devRes.json());
+      setGrowth(growthData);
+      setTopPosts(topData);
+      setDeviceData(devData);
     } catch (err) {
       console.error(err);
     } finally {

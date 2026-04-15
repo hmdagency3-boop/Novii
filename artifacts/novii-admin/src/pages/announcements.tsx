@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth-context";
 import { Megaphone, Bell, Plus, Trash2, ToggleLeft, ToggleRight, Send, X } from "lucide-react";
+import { adminFetch } from "@/lib/admin-api";
 
 interface Announcement {
   id: string;
@@ -16,7 +16,6 @@ interface Announcement {
 }
 
 export default function AnnouncementsPage() {
-  const { token } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -25,15 +24,13 @@ export default function AnnouncementsPage() {
   const [broadcastContent, setBroadcastContent] = useState("");
   const [sending, setSending] = useState(false);
 
-  const headers = { "Content-Type": "application/json", "x-user-token": token || "" };
-
   useEffect(() => { loadAnnouncements(); }, []);
 
   async function loadAnnouncements() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/announcements", { headers });
-      if (res.ok) setAnnouncements(await res.json());
+      const data = await adminFetch<Announcement[]>("/announcements");
+      setAnnouncements(data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }
@@ -42,8 +39,8 @@ export default function AnnouncementsPage() {
     if (!form.title || !form.content) return alert("العنوان والمحتوى مطلوبين");
     setSending(true);
     try {
-      await fetch("/api/admin/announcements", {
-        method: "POST", headers,
+      await adminFetch("/announcements", {
+        method: "POST",
         body: JSON.stringify({ ...form, expires_at: form.expires_at || null }),
       });
       setShowCreate(false);
@@ -54,8 +51,8 @@ export default function AnnouncementsPage() {
   }
 
   async function toggleActive(id: string, current: boolean) {
-    await fetch(`/api/admin/announcements/${id}`, {
-      method: "PATCH", headers,
+    await adminFetch(`/announcements/${id}`, {
+      method: "PATCH",
       body: JSON.stringify({ is_active: !current }),
     });
     loadAnnouncements();
@@ -63,7 +60,7 @@ export default function AnnouncementsPage() {
 
   async function deleteAnnouncement(id: string) {
     if (!confirm("هل تريد حذف هذا الإعلان؟")) return;
-    await fetch(`/api/admin/announcements/${id}`, { method: "DELETE", headers });
+    await adminFetch(`/announcements/${id}`, { method: "DELETE" });
     loadAnnouncements();
   }
 
@@ -72,11 +69,10 @@ export default function AnnouncementsPage() {
     if (!confirm(`هل تريد إرسال إشعار لجميع المستخدمين؟`)) return;
     setSending(true);
     try {
-      const res = await fetch("/api/admin/notifications/broadcast", {
-        method: "POST", headers,
+      const data = await adminFetch<{ sent: number }>("/notifications/broadcast", {
+        method: "POST",
         body: JSON.stringify({ content: broadcastContent, type: "system" }),
       });
-      const data = await res.json();
       alert(`تم الإرسال بنجاح إلى ${data.sent} مستخدم`);
       setShowBroadcast(false);
       setBroadcastContent("");

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth-context";
 import { Filter, Plus, Trash2, AlertTriangle, X, ShieldAlert } from "lucide-react";
+import { adminFetch } from "@/lib/admin-api";
 
 interface BannedWord {
   id: string;
@@ -11,30 +11,27 @@ interface BannedWord {
 }
 
 export default function ContentFilterPage() {
-  const { token } = useAuth();
   const [words, setWords] = useState<BannedWord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [newWord, setNewWord] = useState("");
   const [severity, setSeverity] = useState("warning");
 
-  const headers = { "Content-Type": "application/json", "x-user-token": token || "" };
-
   useEffect(() => { loadWords(); }, []);
 
   async function loadWords() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/banned-words", { headers });
-      if (res.ok) setWords(await res.json());
+      const data = await adminFetch<BannedWord[]>("/banned-words");
+      setWords(data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }
 
   async function addWord() {
     if (!newWord.trim()) return;
-    await fetch("/api/admin/banned-words", {
-      method: "POST", headers,
+    await adminFetch("/banned-words", {
+      method: "POST",
       body: JSON.stringify({ word: newWord.trim(), severity }),
     });
     setNewWord("");
@@ -44,7 +41,7 @@ export default function ContentFilterPage() {
 
   async function removeWord(id: string) {
     if (!confirm("هل تريد إزالة هذه الكلمة؟")) return;
-    await fetch(`/api/admin/banned-words/${id}`, { method: "DELETE", headers });
+    await adminFetch(`/banned-words/${id}`, { method: "DELETE" });
     loadWords();
   }
 

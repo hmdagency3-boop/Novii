@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth-context";
 import { Hash, Ban, Pin, PinOff, TrendingUp, Search } from "lucide-react";
+import { adminFetch } from "@/lib/admin-api";
 
 interface Hashtag {
   id: string;
@@ -12,28 +12,25 @@ interface Hashtag {
 }
 
 export default function HashtagsPage() {
-  const { token } = useAuth();
   const [hashtags, setHashtags] = useState<Hashtag[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "pinned" | "banned">("all");
-
-  const headers = { "Content-Type": "application/json", "x-user-token": token || "" };
 
   useEffect(() => { loadHashtags(); }, []);
 
   async function loadHashtags() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/hashtags", { headers });
-      if (res.ok) setHashtags(await res.json());
+      const data = await adminFetch<Hashtag[]>("/hashtags");
+      setHashtags(data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }
 
   async function updateHashtag(id: string, updates: { is_banned?: boolean; is_pinned?: boolean }) {
-    await fetch(`/api/admin/hashtags/${id}`, {
-      method: "PATCH", headers,
+    await adminFetch(`/hashtags/${id}`, {
+      method: "PATCH",
       body: JSON.stringify(updates),
     });
     loadHashtags();
