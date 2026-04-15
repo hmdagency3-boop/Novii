@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [banCheckDone, setBanCheckDone] = useState(false);
   const [isBanned, setIsBanned] = useState(false);
   const [banInfo, setBanInfo] = useState<BanInfo | null>(null);
   const [, setLocation] = useLocation();
@@ -52,12 +53,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ban_until: data.ban_until,
           is_permanent: data.is_permanent,
           strikes_count: data.strikes_count,
+          show_duration: data.show_duration,
         });
       } else {
         setIsBanned(false);
         setBanInfo(null);
       }
     } catch {}
+    setBanCheckDone(true);
   }, [session?.access_token]);
 
   useEffect(() => {
@@ -69,13 +72,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (isMounted) {
           setSession(session);
           setUser(session?.user ?? null);
-          setLoading(false);
           if (session?.access_token) {
-            checkBanStatus(session.access_token);
+            await checkBanStatus(session.access_token);
+          } else {
+            setBanCheckDone(true);
           }
+          setLoading(false);
         }
       } catch {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setBanCheckDone(true);
+          setLoading(false);
+        }
       }
     };
 
