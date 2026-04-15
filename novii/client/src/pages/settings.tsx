@@ -27,6 +27,8 @@ import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
 import { AvatarUploader } from "@/components/avatar-uploader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { IdCardScanner } from "@/components/id-card-scanner";
+import { FaceScanner } from "@/components/face-scanner";
 import { useUserStatistics, useUserDevices, useRemoveDevice, useTrustDevice, useRevokeAllDevices, useDeviceHeartbeat } from "@/hooks/use-data";
 import type { UserDevice } from "@/lib/api";
 import { changePassword, type UserSettings, type StoredUser } from "@/lib/settings-storage";
@@ -532,6 +534,8 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [scanningIdCard, setScanningIdCard] = useState(false);
+  const [scanningSelfie, setScanningSelfie] = useState(false);
   const idCardInputRef = useRef<HTMLInputElement>(null);
   const selfieInputRef = useRef<HTMLInputElement>(null);
 
@@ -690,19 +694,35 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
   }
 
   function renderIdCardStep() {
+    if (scanningIdCard) {
+      return (
+        <IdCardScanner
+          isRTL={isRTL}
+          onCapture={async (file) => {
+            setScanningIdCard(false);
+            const preview = URL.createObjectURL(file);
+            setIdCardPreview(preview);
+            setUploading(true);
+            try {
+              const url = await api._uploadToCloudinary(file, 'verification', (p: number) => setUploadProgress(p));
+              setIdCardUrl(url);
+              toast.success(isRTL ? 'تم مسح البطاقة بنجاح' : 'ID card scanned successfully');
+            } catch (err: any) {
+              toast.error(err.message || (isRTL ? 'فشل رفع الصورة' : 'Upload failed'));
+              setIdCardPreview(''); setIdCardUrl('');
+            } finally { setUploading(false); setUploadProgress(0); }
+          }}
+          onCancel={() => setScanningIdCard(false)}
+        />
+      );
+    }
+
     return (
       <div className="space-y-4">
         <div className="text-center mb-2">
           <FileCheck className="w-10 h-10 text-primary mx-auto mb-2" />
-          <h3 className="font-bold text-lg">{isRTL ? 'رفع صورة البطاقة الشخصية' : 'Upload ID Card Photo'}</h3>
-          <p className="text-sm text-muted-foreground mt-1">{isRTL ? 'ارفع صورة واضحة للوجه الأمامي لبطاقة الهوية أو جواز السفر' : 'Upload a clear photo of the front of your ID card or passport'}</p>
-        </div>
-
-        <div className="space-y-2 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
-          <p className="font-medium text-foreground text-sm mb-1">{isRTL ? 'تعليمات:' : 'Instructions:'}</p>
-          <p>• {isRTL ? 'تأكد أن الصورة واضحة ومقروءة' : 'Make sure the photo is clear and readable'}</p>
-          <p>• {isRTL ? 'الاسم وتاريخ الميلاد والصورة يجب أن تكون ظاهرة' : 'Name, date of birth, and photo must be visible'}</p>
-          <p>• {isRTL ? 'الملفات المقبولة: JPG, PNG (الحد الأقصى 10 ميجا)' : 'Accepted: JPG, PNG (max 10MB)'}</p>
+          <h3 className="font-bold text-lg">{isRTL ? 'مسح البطاقة الشخصية' : 'Scan ID Card'}</h3>
+          <p className="text-sm text-muted-foreground mt-1">{isRTL ? 'صوّر البطاقة بالكاميرا مباشرة أو ارفع صورة' : 'Scan your ID card with the camera or upload a photo'}</p>
         </div>
 
         <input ref={idCardInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, 'id_card'); e.target.value = ''; }} />
@@ -711,7 +731,7 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
           <div className="relative rounded-xl overflow-hidden border border-border bg-muted/20">
             <img src={idCardPreview} alt="ID Card" className="w-full h-48 object-contain bg-black/5" />
             <div className="absolute top-2 left-2 right-2 flex justify-between">
-              {idCardUrl && <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle className="w-3 h-3" /> {isRTL ? 'تم الرفع' : 'Uploaded'}</span>}
+              {idCardUrl && <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle className="w-3 h-3" /> {isRTL ? 'تم المسح' : 'Scanned'}</span>}
               <button onClick={() => { setIdCardPreview(''); setIdCardUrl(''); }} className="bg-red-500 text-white p-1 rounded-full"><X className="w-3.5 h-3.5" /></button>
             </div>
             {uploading && (
@@ -721,34 +741,61 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
             )}
           </div>
         ) : (
-          <button onClick={() => idCardInputRef.current?.click()} disabled={uploading} className="w-full h-48 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-3 hover:border-primary/50 hover:bg-primary/5 transition-all">
-            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-              <UploadIcon className="w-6 h-6 text-primary" />
+          <div className="space-y-3">
+            <button onClick={() => setScanningIdCard(true)} disabled={uploading} className="w-full h-40 border-2 border-dashed border-primary/40 rounded-xl flex flex-col items-center justify-center gap-3 hover:border-primary hover:bg-primary/5 transition-all bg-primary/5">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                <Camera className="w-7 h-7 text-primary" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-primary">{isRTL ? 'مسح بالكاميرا' : 'Scan with Camera'}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{isRTL ? 'موصى به - أسرع وأدق' : 'Recommended - faster & more accurate'}</p>
+              </div>
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">{isRTL ? 'أو' : 'or'}</span>
+              <div className="flex-1 h-px bg-border" />
             </div>
-            <div className="text-center">
-              <p className="text-sm font-medium">{isRTL ? 'اضغط لرفع صورة البطاقة' : 'Click to upload ID photo'}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">JPG, PNG</p>
-            </div>
-          </button>
+            <button onClick={() => idCardInputRef.current?.click()} disabled={uploading} className="w-full py-3 border border-border rounded-xl flex items-center justify-center gap-2 hover:bg-muted/50 transition-all text-sm text-muted-foreground">
+              <UploadIcon className="w-4 h-4" />
+              {isRTL ? 'رفع صورة من الجهاز' : 'Upload from device'}
+            </button>
+          </div>
         )}
       </div>
     );
   }
 
   function renderSelfieStep() {
+    if (scanningSelfie) {
+      return (
+        <FaceScanner
+          isRTL={isRTL}
+          onCapture={async (file) => {
+            setScanningSelfie(false);
+            const preview = URL.createObjectURL(file);
+            setSelfiePreview(preview);
+            setUploading(true);
+            try {
+              const url = await api._uploadToCloudinary(file, 'verification', (p: number) => setUploadProgress(p));
+              setSelfieUrl(url);
+              toast.success(isRTL ? 'تم مسح الوجه بنجاح' : 'Face scanned successfully');
+            } catch (err: any) {
+              toast.error(err.message || (isRTL ? 'فشل رفع الصورة' : 'Upload failed'));
+              setSelfiePreview(''); setSelfieUrl('');
+            } finally { setUploading(false); setUploadProgress(0); }
+          }}
+          onCancel={() => setScanningSelfie(false)}
+        />
+      );
+    }
+
     return (
       <div className="space-y-4">
         <div className="text-center mb-2">
           <ScanFace className="w-10 h-10 text-primary mx-auto mb-2" />
-          <h3 className="font-bold text-lg">{isRTL ? 'صورة سيلفي للتحقق' : 'Verification Selfie'}</h3>
-          <p className="text-sm text-muted-foreground mt-1">{isRTL ? 'ارفع صورة سيلفي واضحة لوجهك للمقارنة مع البطاقة' : 'Upload a clear selfie of your face to compare with your ID'}</p>
-        </div>
-
-        <div className="space-y-2 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
-          <p className="font-medium text-foreground text-sm mb-1">{isRTL ? 'تعليمات:' : 'Instructions:'}</p>
-          <p>• {isRTL ? 'وجهك يجب أن يكون واضح ومباشر' : 'Your face must be clear and facing forward'}</p>
-          <p>• {isRTL ? 'إضاءة جيدة بدون نظارة شمسية أو قبعة' : 'Good lighting, no sunglasses or hat'}</p>
-          <p>• {isRTL ? 'الصورة يجب أن تطابق صورة البطاقة' : 'The photo should match your ID photo'}</p>
+          <h3 className="font-bold text-lg">{isRTL ? 'مسح الوجه للتحقق' : 'Face Verification Scan'}</h3>
+          <p className="text-sm text-muted-foreground mt-1">{isRTL ? 'صوّر وجهك بالكاميرا مباشرة للمقارنة مع البطاقة' : 'Scan your face with the camera to compare with your ID'}</p>
         </div>
 
         <input ref={selfieInputRef} type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, 'selfie'); e.target.value = ''; }} />
@@ -757,7 +804,7 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
           <div className="relative rounded-xl overflow-hidden border border-border bg-muted/20">
             <img src={selfiePreview} alt="Selfie" className="w-full h-48 object-contain bg-black/5" />
             <div className="absolute top-2 left-2 right-2 flex justify-between">
-              {selfieUrl && <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle className="w-3 h-3" /> {isRTL ? 'تم الرفع' : 'Uploaded'}</span>}
+              {selfieUrl && <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle className="w-3 h-3" /> {isRTL ? 'تم المسح' : 'Scanned'}</span>}
               <button onClick={() => { setSelfiePreview(''); setSelfieUrl(''); }} className="bg-red-500 text-white p-1 rounded-full"><X className="w-3.5 h-3.5" /></button>
             </div>
             {uploading && (
@@ -767,15 +814,24 @@ function VerificationSection({ profile, direction }: { profile: any; direction: 
             )}
           </div>
         ) : (
-          <div className="flex gap-3">
-            <button onClick={() => selfieInputRef.current?.click()} disabled={uploading} className="flex-1 h-48 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-3 hover:border-primary/50 hover:bg-primary/5 transition-all">
+          <div className="space-y-3">
+            <button onClick={() => setScanningSelfie(true)} disabled={uploading} className="w-full h-40 border-2 border-dashed border-primary/40 rounded-xl flex flex-col items-center justify-center gap-3 hover:border-primary hover:bg-primary/5 transition-all bg-primary/5">
               <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-                <Camera className="w-6 h-6 text-primary" />
+                <ScanFace className="w-7 h-7 text-primary" />
               </div>
               <div className="text-center">
-                <p className="text-sm font-medium">{isRTL ? 'التقط سيلفي أو ارفع صورة' : 'Take selfie or upload photo'}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">JPG, PNG</p>
+                <p className="text-sm font-semibold text-primary">{isRTL ? 'مسح الوجه بالكاميرا' : 'Scan Face with Camera'}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{isRTL ? 'موصى به - أسرع وأدق' : 'Recommended - faster & more accurate'}</p>
               </div>
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">{isRTL ? 'أو' : 'or'}</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <button onClick={() => selfieInputRef.current?.click()} disabled={uploading} className="w-full py-3 border border-border rounded-xl flex items-center justify-center gap-2 hover:bg-muted/50 transition-all text-sm text-muted-foreground">
+              <UploadIcon className="w-4 h-4" />
+              {isRTL ? 'رفع صورة من الجهاز' : 'Upload from device'}
             </button>
           </div>
         )}
