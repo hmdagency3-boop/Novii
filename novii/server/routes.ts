@@ -4053,10 +4053,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .neq('is_deleted', true)
         .order('created_at', { ascending: false });
 
-      const mapped = (posts || []).map((p: any) => ({
-        ...p,
-        profile: p.profiles,
-      }));
+      const mapped = (posts || []).map((p: any) => {
+        const { profiles, ...rest } = p;
+        return { ...rest, profile: profiles };
+      });
       res.json(mapped);
     } catch (error) {
       console.error('Hashtag posts error:', error);
