@@ -932,28 +932,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.userId || req.headers['x-user-id'] as string;
       if (!userId) return res.status(401).json({ error: 'User ID required' });
 
-      // Get as creator
-      const { data: creatorComm, error: creatorErr } = await getDb(req)
+      if (!adminDb) return res.status(500).json({ error: 'Server configuration error' });
+
+      // Use adminDb to bypass RLS — filter by userId to only return user's communities
+      const { data: creatorComm, error: creatorErr } = await adminDb
         .from('communities')
         .select('*, profiles!created_by(username, avatar_url, is_official)')
         .eq('created_by', userId);
 
       if (creatorErr) throw creatorErr;
 
-      // Get as member
-      const { data: memberIds, error: memberErr } = await getDb(req)
+      // Get communities where user is a member (not kicked)
+      const { data: memberIds, error: memberErr } = await adminDb
         .from('community_members')
         .select('community_id')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .is('kicked_at', null);
 
       if (memberErr) throw memberErr;
 
       let memberComm: any[] = [];
       if (memberIds?.length) {
-        const { data: mComm, error: mErr } = await getDb(req)
+        const { data: mComm, error: mErr } = await adminDb
           .from('communities')
           .select('*, profiles!created_by(username, avatar_url, is_official)')
-          .in('id', memberIds.map(m => m.community_id));
+          .in('id', memberIds.map((m: any) => m.community_id));
         if (mErr) throw mErr;
         memberComm = mComm || [];
       }
@@ -961,58 +964,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Combine & deduplicate
       const allComm = [...(creatorComm || []), ...memberComm];
       const uniqueMap = new Map(allComm.map(c => [c.id, c]));
-      
-      // Get all creator IDs and fetch their profiles for is_official
+
+      // Fetch creator profiles for is_official
       const creatorIds = Array.from(uniqueMap.values()).map((c: any) => c.created_by);
-      let creatorProfiles: any = {};
-      
-      // Initialize all as false first
-      creatorIds.forEach(id => {
-        creatorProfiles[id] = false;
-      });
-      
+      let creatorProfiles: Record<string, boolean> = {};
+
       if (creatorIds.length > 0) {
-        try {
-          // Use raw SQL to bypass any Supabase client issues
-          const { data: sqlResult, error: sqlErr } = await getDb(req).rpc('get_profiles_official', {
-            p_ids: creatorIds
-          });
-          
-          if (sqlErr || !sqlResult) {
-            // Fallback if RPC doesn't exist
-            const { data: fallbackProfiles, error: fallbackErr } = await getDb(req)
-              .from('profiles')
-              .select('id, is_official')
-              .in('id', creatorIds);
-            
-            if (!fallbackErr && fallbackProfiles) {
-              fallbackProfiles.forEach((p: any) => {
-                const rawValue = p.is_official;
-                // STRICT: Only true if database value is EXACTLY true/1/t
-                const isTrue = rawValue === true || rawValue === 1 || rawValue === 't';
-                creatorProfiles[p.id] = isTrue;
-              });
-            }
-          } else {
-            sqlResult.forEach((p: any) => {
-              creatorProfiles[p.id] = p.is_official === true;
-            });
-          }
-        } catch (err) {
-          console.error("Error fetching profiles - keeping all false:", err);
-        }
+        const { data: profileData } = await adminDb
+          .from('profiles')
+          .select('id, is_official')
+          .in('id', creatorIds);
+
+        (profileData || []).forEach((p: any) => {
+          creatorProfiles[p.id] = p.is_official === true;
+        });
       }
-      
+
       const communities = Array.from(uniqueMap.values()).map((c: any) => ({
         ...c,
         member_count: c.members_count,
         creator_username: c.profiles?.username,
         creator_avatar: c.profiles?.avatar_url,
-        creator_is_official: creatorProfiles[c.created_by] === true
+        creator_is_official: creatorProfiles[c.created_by] === true,
       }));
 
       console.log(`✅ Fetched ${communities.length} communities from Supabase`);
-      console.log('Creator profiles:', creatorProfiles);
       res.json({ data: communities });
     } catch (error) {
       console.error("Get communities error:", error);
@@ -1257,24 +1233,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'User ID and invite code required' });
       }
 
-      // Find community by invite code
-      const { data: community, error: commErr } = await getDb(req)
+      if (!adminDb) {
+        return res.status(500).json({ error: 'Server configuration error' });
+      }
+
+      // Use adminDb (service role) to bypass RLS when looking up by invite code
+      const { data: community, error: commErr } = await adminDb
         .from('communities')
         .select('id, name, created_by')
-        .eq('invite_code', inviteCode)
+        .eq('invite_code', inviteCode.trim())
         .single();
 
       if (commErr || !community) {
+        console.log(`❌ Invalid invite code "${inviteCode}": ${commErr?.message}`);
         return res.status(404).json({ error: 'Invalid invite code' });
       }
 
       // Check if user is already kicked from this community 👢
-      const { data: existingMember, error: existingErr } = await getDb(req)
+      const { data: existingMember } = await adminDb
         .from('community_members')
         .select('kicked_at')
         .eq('community_id', community.id)
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       // If user is kicked, prevent rejoining
       if (existingMember && existingMember.kicked_at !== null) {
@@ -1285,8 +1266,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Add user to community
-      const { error: joinErr } = await getDb(req).from('community_members').upsert({
+      // Add user to community (adminDb bypasses RLS for the insert too)
+      const { error: joinErr } = await adminDb.from('community_members').upsert({
         id: crypto.randomUUID(),
         community_id: community.id,
         user_id: userId,
@@ -1296,17 +1277,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         onConflict: 'community_id,user_id'
       });
 
-      if (joinErr && joinErr.code !== '23505') { // Ignore duplicate key error
+      if (joinErr && joinErr.code !== '23505') {
         throw joinErr;
       }
 
       // Update members count
-      const { data: memberCount } = await getDb(req)
+      const { data: memberCount } = await adminDb
         .from('community_members')
         .select('id', { count: 'exact' })
-        .eq('community_id', community.id);
+        .eq('community_id', community.id)
+        .is('kicked_at', null);
 
-      await getDb(req).from('communities')
+      await adminDb.from('communities')
         .update({ members_count: memberCount?.length || 1 })
         .eq('id', community.id);
 
