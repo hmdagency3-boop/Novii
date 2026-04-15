@@ -461,9 +461,9 @@ export function useStories() {
   return useQuery({
     queryKey: ['stories'],
     queryFn: () => api.getStories(),
-    staleTime: 3 * 60 * 1000,      // treat as fresh for 3 minutes
-    refetchOnWindowFocus: false,
-    refetchInterval: false,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60 * 1000,
   });
 }
 
@@ -494,12 +494,12 @@ export function useCreateStory() {
     }) =>
       api.createStory(mediaUrl, mediaType, music, filterName),
     onSuccess: () => {
-      // Immediately refetch stories for real-time updates
-      queryClient.refetchQueries({ queryKey: ['stories'], type: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['stories'] });
+      queryClient.refetchQueries({ queryKey: ['stories'] });
       
-      // Refetch user's own stories
       if (currentProfile?.id) {
-        queryClient.refetchQueries({ queryKey: ['userStories', currentProfile.id], type: 'active' });
+        queryClient.invalidateQueries({ queryKey: ['userStories', currentProfile.id] });
+        queryClient.refetchQueries({ queryKey: ['userStories', currentProfile.id] });
       }
       
       toast({

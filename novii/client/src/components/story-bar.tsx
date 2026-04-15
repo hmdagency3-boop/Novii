@@ -22,13 +22,14 @@ interface StoryBarProps {
 }
 
 export default function StoryBar({ stories, followingUsers = [], currentUserAvatar, onAddStoryClick, onStoryClick, onViewOwnStories, currentUserId, closeFriendIds, isRTL }: StoryBarProps) {
-  // Group stories by user_id and get the first (most recent) story for each user
   const groupedStories = useMemo(() => {
     const grouped = new Map<string, Story>();
     
     stories.forEach((story) => {
-      // Only add if we don't have a story for this user yet (keeps the most recent one)
-      if (!grouped.has(story.user_id)) {
+      const existing = grouped.get(story.user_id);
+      if (!existing) {
+        grouped.set(story.user_id, story);
+      } else if (!story.is_viewed && existing.is_viewed) {
         grouped.set(story.user_id, story);
       }
     });
@@ -36,20 +37,13 @@ export default function StoryBar({ stories, followingUsers = [], currentUserAvat
     return Array.from(grouped.values());
   }, [stories]);
 
-  // تحقق إذا كان المستخدم الحالي عنده استوري
-  const currentUserStory = groupedStories.find(story => story.user_id === currentUserId);
+  const currentUserStory = currentUserId
+    ? groupedStories.find(story => story.user_id === currentUserId)
+    : undefined;
   
-  // إذا كان المستخدم الحالي عنده استوري، ضعه في البداية
-  // وإلا عرض صورة الإضافة
   const displayStories = useMemo(() => {
-    if (currentUserStory) {
-      // المستخدم عنده استوري - عرض استوريات الجميع بدون الزر +
-      return groupedStories;
-    } else {
-      // المستخدم بدون استوري - عرض الاستوريات الأخرى فقط
-      return groupedStories.filter(story => story.user_id !== currentUserId);
-    }
-  }, [groupedStories, currentUserId, currentUserStory]);
+    return groupedStories.filter(story => story.user_id !== currentUserId);
+  }, [groupedStories, currentUserId]);
 
   const hasOwnStory = !!currentUserStory;
 
@@ -108,9 +102,7 @@ export default function StoryBar({ stories, followingUsers = [], currentUserAvat
         )}
 
         {/* Other Stories - One per user */}
-        {displayStories
-          .filter(story => story.user_id !== currentUserId) // لا تعرض استوري المستخدم الحالي هنا
-          .map((story) => {
+        {displayStories.map((story) => {
             const userId = story.user_id;
             const isUnviewed = !story.is_viewed;
             const isCloseFriend = closeFriendIds?.has(userId);
