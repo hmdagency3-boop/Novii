@@ -8,7 +8,7 @@ const actionIcons: Record<string, React.ReactNode> = {
   delete_user: <User className="w-3.5 h-3.5 text-red-600" />,
   update_user: <User className="w-3.5 h-3.5 text-blue-500" />,
   delete_post: <FileText className="w-3.5 h-3.5 text-red-500" />,
-  add_admin: <Shield className="w-3.5 h-3.5 text-purple-500" />,
+  add_admin: <Shield className="w-3.5 h-3.5 text-[#0095f6]" />,
   update_admin: <Shield className="w-3.5 h-3.5 text-blue-500" />,
   remove_admin: <Shield className="w-3.5 h-3.5 text-red-500" />,
   update_setting: <Settings className="w-3.5 h-3.5 text-teal-500" />,
@@ -47,7 +47,7 @@ export default function LogsPage() {
     <div className="p-6 space-y-4" dir="rtl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">سجل العمليات</h1>
+          <h1 className="text-[22px] font-semibold text-[#262626]">سجل العمليات</h1>
           <p className="text-sm text-gray-500 mt-1">آخر {logs.length} عملية</p>
         </div>
         <button onClick={loadLogs} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
@@ -55,7 +55,7 @@ export default function LogsPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white border border-[#dbdbdb] rounded-lg overflow-hidden">
         <div className="divide-y divide-gray-50">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => (

@@ -47,14 +47,10 @@ function AdminPanel() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[hsl(224,30%,12%)] via-[hsl(250,25%,18%)] to-[hsl(224,30%,14%)]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center animate-pulse">
-            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-          </div>
-          <p className="text-slate-400 text-sm">جاري التحميل...</p>
+      <div className="min-h-screen flex items-center justify-center bg-[#fafafa]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-[3px] border-[#dbdbdb] border-t-[#262626] rounded-full animate-spin" />
+          <p className="text-[#8e8e8e] text-[14px]">جاري التحميل...</p>
         </div>
       </div>
     );
@@ -67,7 +63,7 @@ function AdminPanel() {
   const ActivePage = pageComponents[activeTab] || DashboardPage;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[hsl(220,20%,97%)]">
+    <div className="flex h-screen overflow-hidden bg-[#fafafa]">
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -81,7 +77,7 @@ function AdminPanel() {
           onTabChange={setActiveTab}
           onCloseTab={handleCloseTab}
         />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto bg-[#fafafa]">
           <ActivePage />
         </main>
       </div>

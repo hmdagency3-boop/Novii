@@ -9,13 +9,11 @@ import {
 } from "@/lib/admin-api";
 import {
   Search,
-  MoreHorizontal,
   Ban,
   Trash2,
   CheckCircle,
   XCircle,
   Crown,
-  Star,
   Sparkles,
   Eye,
   UserCog,
@@ -29,6 +27,10 @@ import {
   FlaskConical,
   Bug,
   LogOut,
+  X,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 export default function UsersPage() {
@@ -41,6 +43,7 @@ export default function UsersPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [actionUser, setActionUser] = useState<UserProfile | null>(null);
+  const [actionMenu, setActionMenu] = useState<string | null>(null);
 
   const loadUsers = () => {
     setLoading(true);
@@ -52,6 +55,12 @@ export default function UsersPage() {
 
   useEffect(() => {
     loadUsers();
+  }, []);
+
+  useEffect(() => {
+    const close = () => setActionMenu(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
   }, []);
 
   const filtered = useMemo(() => {
@@ -71,147 +80,192 @@ export default function UsersPage() {
     return result;
   }, [users, search, filter]);
 
+  const filters = [
+    { key: "all" as const, label: "الكل", count: users.length },
+    { key: "verified" as const, label: "موثقين", count: users.filter(u => u.is_verified).length },
+    { key: "banned" as const, label: "محظورين", count: users.filter(u => u.is_banned).length },
+    { key: "creators" as const, label: "صناع محتوى", count: users.filter(u => u.is_creator).length },
+  ];
+
   return (
-    <div className="p-6 space-y-4" dir="rtl">
-      <div className="flex items-center justify-between">
+    <div className="p-6 max-w-[1400px] mx-auto" dir="rtl">
+      <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">إدارة المستخدمين</h1>
-          <p className="text-sm text-gray-500 mt-1">{users.length} مستخدم مسجل</p>
+          <h1 className="text-[22px] font-semibold text-[#262626]">إدارة المستخدمين</h1>
+          <p className="text-[14px] text-[#8e8e8e] mt-0.5">{users.length} مستخدم مسجل</p>
         </div>
-        <button onClick={loadUsers} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
-          <RefreshCw className="w-5 h-5 text-gray-500" />
+        <button
+          onClick={loadUsers}
+          className="p-2 rounded-full hover:bg-[#f5f5f5] transition-colors"
+          title="تحديث"
+        >
+          <RefreshCw className={`w-5 h-5 text-[#262626] ${loading ? "animate-spin" : ""}`} strokeWidth={1.5} />
         </button>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 min-w-[280px]">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8e8e8e]" />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="بحث بالاسم أو اسم المستخدم..."
-            className="w-full pr-10 pl-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-all"
+            placeholder="بحث..."
+            className="w-full pr-10 pl-4 py-2 bg-[#efefef] border-none rounded-lg text-[14px] text-[#262626] placeholder-[#8e8e8e] focus:outline-none focus:bg-[#dbdbdb]/60 transition-colors"
             dir="rtl"
           />
         </div>
-        <div className="flex gap-1.5 bg-white border border-gray-200 rounded-xl p-1">
-          {(["all", "verified", "banned", "creators"] as const).map((f) => (
+        <div className="flex gap-1">
+          {filters.map((f) => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                filter === f ? "bg-purple-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`px-3 py-1.5 rounded-full text-[13px] font-medium transition-all duration-150 ${
+                filter === f.key
+                  ? "bg-[#262626] text-white"
+                  : "bg-[#efefef] text-[#262626] hover:bg-[#dbdbdb]"
               }`}
             >
-              {f === "all" ? "الكل" : f === "verified" ? "موثقين" : f === "banned" ? "محظورين" : "صناع محتوى"}
+              {f.label}
+              <span className={`mr-1 text-[11px] ${filter === f.key ? "text-white/70" : "text-[#8e8e8e]"}`}>
+                {f.count}
+              </span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white border border-[#dbdbdb] rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50/80">
-                <th className="text-right px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">المستخدم</th>
-                <th className="text-right px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">الشارات</th>
-                <th className="text-right px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">الحالة</th>
-                <th className="text-right px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">المتابعين</th>
-                <th className="text-right px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">المنشورات</th>
-                <th className="text-right px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">التاريخ</th>
-                <th className="text-center px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">إجراءات</th>
+              <tr className="border-b border-[#efefef]">
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#8e8e8e] uppercase tracking-wide">المستخدم</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#8e8e8e] uppercase tracking-wide">الشارات</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#8e8e8e] uppercase tracking-wide">الحالة</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#8e8e8e] uppercase tracking-wide">المتابعين</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#8e8e8e] uppercase tracking-wide">المنشورات</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#8e8e8e] uppercase tracking-wide">التاريخ</th>
+                <th className="text-center px-4 py-3 text-[12px] font-semibold text-[#8e8e8e] uppercase tracking-wide w-[50px]"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody>
               {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>
-                    <td colSpan={7} className="px-5 py-4"><div className="h-10 bg-gray-100 rounded-lg animate-pulse" /></td>
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} className="border-b border-[#efefef] last:border-0">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#efefef] animate-pulse" />
+                        <div className="space-y-1.5">
+                          <div className="h-3.5 w-24 bg-[#efefef] rounded animate-pulse" />
+                          <div className="h-3 w-16 bg-[#f5f5f5] rounded animate-pulse" />
+                        </div>
+                      </div>
+                    </td>
+                    <td colSpan={5} className="px-4 py-3"><div className="h-4 bg-[#f5f5f5] rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-6 bg-[#f5f5f5] rounded animate-pulse mx-auto" /></td>
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-gray-400">لا توجد نتائج</td>
+                  <td colSpan={7} className="px-4 py-16 text-center">
+                    <p className="text-[14px] text-[#8e8e8e]">لا توجد نتائج</p>
+                  </td>
                 </tr>
               ) : (
                 filtered.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-5 py-3.5">
+                  <tr key={user.id} className="border-b border-[#efefef] last:border-0 hover:bg-[#fafafa] transition-colors">
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-sm font-bold shrink-0 overflow-hidden">
-                          {user.avatar_url ? (
-                            <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            (user.username || "?").charAt(0).toUpperCase()
-                          )}
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#833AB4] via-[#E1306C] to-[#F77737] p-[1.5px] shrink-0">
+                          <div className="w-full h-full rounded-full bg-white overflow-hidden flex items-center justify-center">
+                            {user.avatar_url ? (
+                              <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[12px] font-semibold text-[#262626]">
+                                {(user.username || "?").charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-gray-800 truncate">{user.display_name || user.username}</p>
-                          <p className="text-xs text-gray-400" dir="ltr">@{user.username}</p>
+                          <div className="flex items-center gap-1">
+                            <p className="text-[14px] font-semibold text-[#262626] truncate">{user.display_name || user.username}</p>
+                            {user.is_verified && <CheckCircle className="w-3.5 h-3.5 text-[#0095f6] shrink-0" fill="#0095f6" stroke="white" strokeWidth={3} />}
+                          </div>
+                          <p className="text-[12px] text-[#8e8e8e]" dir="ltr">@{user.username}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-4 py-3">
                       <div className="flex gap-1 flex-wrap">
-                        {user.is_verified && <CheckCircle className="w-4 h-4 text-blue-500" title="موثق" />}
-                        {user.is_official && <Shield className="w-4 h-4 text-purple-500" title="رسمي" />}
-                        {user.is_creator && <Sparkles className="w-4 h-4 text-amber-500" title="صانع محتوى" />}
-                        {user.is_premium && <Crown className="w-4 h-4 text-yellow-500" title="مميز" />}
-                        {user.is_popular && <Flame className="w-4 h-4 text-pink-500" title="مشهور" />}
-                        {user.is_active && <Zap className="w-4 h-4 text-green-500" title="نشط" />}
-                        {user.is_gold_early_member && <Trophy className="w-4 h-4 text-yellow-400" title="عضو ذهبي مبكر" />}
-                        {user.is_silver_early_member && <Medal className="w-4 h-4 text-slate-400" title="عضو فضي مبكر" />}
-                        {user.is_bronze_early_member && <Award className="w-4 h-4 text-orange-600" title="عضو برونزي مبكر" />}
-                        {user.is_beta_tester && <FlaskConical className="w-4 h-4 text-violet-500" title="مختبر بيتا" />}
-                        {user.is_bug_hunter && <Bug className="w-4 h-4 text-lime-500" title="باك هانتر" />}
+                        {user.is_official && <BadgeTag icon={<Shield className="w-3 h-3" />} color="#833AB4" title="رسمي" />}
+                        {user.is_creator && <BadgeTag icon={<Sparkles className="w-3 h-3" />} color="#ff9500" title="صانع محتوى" />}
+                        {user.is_premium && <BadgeTag icon={<Crown className="w-3 h-3" />} color="#ffc107" title="مميز" />}
+                        {user.is_popular && <BadgeTag icon={<Flame className="w-3 h-3" />} color="#E1306C" title="مشهور" />}
+                        {user.is_active && <BadgeTag icon={<Zap className="w-3 h-3" />} color="#00c853" title="نشط" />}
+                        {user.is_gold_early_member && <BadgeTag icon={<Trophy className="w-3 h-3" />} color="#ffc107" title="ذهبي" />}
+                        {user.is_silver_early_member && <BadgeTag icon={<Medal className="w-3 h-3" />} color="#90a4ae" title="فضي" />}
+                        {user.is_bronze_early_member && <BadgeTag icon={<Award className="w-3 h-3" />} color="#e65100" title="برونزي" />}
+                        {user.is_beta_tester && <BadgeTag icon={<FlaskConical className="w-3 h-3" />} color="#7c4dff" title="بيتا" />}
+                        {user.is_bug_hunter && <BadgeTag icon={<Bug className="w-3 h-3" />} color="#76ff03" title="باك هانتر" />}
                       </div>
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-4 py-3">
                       {user.is_banned ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-600">
-                          <Ban className="w-3 h-3" /> محظور
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#ed4956]/10 text-[#ed4956]">
+                          محظور
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-600">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#00c853]/10 text-[#00c853]">
                           نشط
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600">{(user.followers_count || 0).toLocaleString()}</td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600">{(user.posts_count || 0).toLocaleString()}</td>
-                    <td className="px-5 py-3.5 text-xs text-gray-400">{new Date(user.created_at).toLocaleDateString("ar-EG")}</td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => setSelectedUser(user)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="عرض">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => { setActionUser(user); setShowEditModal(true); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-blue-600 transition-colors" title="تعديل">
-                          <UserCog className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => { setActionUser(user); setShowBanModal(true); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-amber-600 transition-colors" title={user.is_banned ? "إلغاء حظر" : "حظر"}>
-                          <Ban className="w-4 h-4" />
-                        </button>
+                    <td className="px-4 py-3 text-[14px] text-[#262626] font-medium tabular-nums">{(user.followers_count || 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-[14px] text-[#262626] font-medium tabular-nums">{(user.posts_count || 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-[12px] text-[#8e8e8e]">{new Date(user.created_at).toLocaleDateString("ar-EG")}</td>
+                    <td className="px-4 py-3">
+                      <div className="relative">
                         <button
-                          onClick={async () => {
-                            if (confirm(`إنهاء جميع جلسات @${user.username}؟`)) {
-                              try {
-                                const result = await forceLogoutUser(user.id);
-                                alert(`تم إنهاء ${result.sessions_terminated} جلسة`);
-                              } catch (e) {
-                                alert("فشل في إنهاء الجلسات");
-                              }
-                            }
-                          }}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-orange-600 transition-colors"
-                          title="إنهاء الجلسات"
+                          onClick={(e) => { e.stopPropagation(); setActionMenu(actionMenu === user.id ? null : user.id); }}
+                          className="p-1.5 rounded-full hover:bg-[#efefef] transition-colors mx-auto block"
                         >
-                          <LogOut className="w-4 h-4" />
+                          <MoreHorizontal className="w-5 h-5 text-[#262626]" />
                         </button>
-                        <button onClick={() => { setActionUser(user); setShowDeleteModal(true); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-red-600 transition-colors" title="حذف">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {actionMenu === user.id && (
+                          <div className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.15)] border border-[#dbdbdb] py-1.5 z-50 min-w-[180px]" dir="rtl">
+                            <ActionMenuItem icon={<Eye className="w-4 h-4" />} label="عرض التفاصيل" onClick={() => { setSelectedUser(user); setActionMenu(null); }} />
+                            <ActionMenuItem icon={<UserCog className="w-4 h-4" />} label="تعديل" onClick={() => { setActionUser(user); setShowEditModal(true); setActionMenu(null); }} />
+                            <ActionMenuItem
+                              icon={<Ban className="w-4 h-4" />}
+                              label={user.is_banned ? "إلغاء الحظر" : "حظر"}
+                              onClick={() => { setActionUser(user); setShowBanModal(true); setActionMenu(null); }}
+                              variant={user.is_banned ? "success" : "warning"}
+                            />
+                            <ActionMenuItem
+                              icon={<LogOut className="w-4 h-4" />}
+                              label="إنهاء الجلسات"
+                              onClick={async () => {
+                                setActionMenu(null);
+                                if (confirm(`إنهاء جميع جلسات @${user.username}؟`)) {
+                                  try {
+                                    const result = await forceLogoutUser(user.id);
+                                    alert(`تم إنهاء ${result.sessions_terminated} جلسة`);
+                                  } catch { alert("فشل في إنهاء الجلسات"); }
+                                }
+                              }}
+                              variant="warning"
+                            />
+                            <div className="h-px bg-[#efefef] my-1" />
+                            <ActionMenuItem
+                              icon={<Trash2 className="w-4 h-4" />}
+                              label="حذف الحساب"
+                              onClick={() => { setActionUser(user); setShowDeleteModal(true); setActionMenu(null); }}
+                              variant="danger"
+                            />
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -230,51 +284,114 @@ export default function UsersPage() {
   );
 }
 
+function BadgeTag({ icon, color, title }: { icon: React.ReactNode; color: string; title: string }) {
+  return (
+    <span
+      className="inline-flex items-center justify-center w-6 h-6 rounded-full transition-transform hover:scale-110"
+      style={{ backgroundColor: `${color}15`, color }}
+      title={title}
+    >
+      {icon}
+    </span>
+  );
+}
+
+function ActionMenuItem({ icon, label, onClick, variant }: { icon: React.ReactNode; label: string; onClick: () => void; variant?: "danger" | "warning" | "success" }) {
+  const colorClass = variant === "danger" ? "text-[#ed4956] hover:bg-[#ed4956]/5"
+    : variant === "warning" ? "text-[#ff9500] hover:bg-[#ff9500]/5"
+    : variant === "success" ? "text-[#00c853] hover:bg-[#00c853]/5"
+    : "text-[#262626] hover:bg-[#fafafa]";
+
+  return (
+    <button onClick={onClick} className={`w-full flex items-center gap-2.5 px-4 py-2 text-[14px] transition-colors ${colorClass}`}>
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}
+
 function ViewUserModal({ user, onClose }: { user: UserProfile; onClose: () => void }) {
   return (
     <ModalWrapper onClose={onClose} title="تفاصيل المستخدم">
-      <div className="space-y-4" dir="rtl">
+      <div className="space-y-5" dir="rtl">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-xl font-bold overflow-hidden">
-            {user.avatar_url ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" /> : (user.username || "?").charAt(0).toUpperCase()}
+          <div className="w-[77px] h-[77px] rounded-full bg-gradient-to-br from-[#833AB4] via-[#E1306C] to-[#F77737] p-[3px] shrink-0">
+            <div className="w-full h-full rounded-full bg-white overflow-hidden flex items-center justify-center">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-[22px] font-semibold text-[#262626]">{(user.username || "?").charAt(0).toUpperCase()}</span>
+              )}
+            </div>
           </div>
-          <div>
-            <h3 className="text-lg font-bold text-gray-800">{user.display_name || user.username}</h3>
-            <p className="text-sm text-gray-400" dir="ltr">@{user.username}</p>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-[20px] font-light text-[#262626]">{user.username}</h3>
+              {user.is_verified && <CheckCircle className="w-4 h-4 text-[#0095f6]" fill="#0095f6" stroke="white" strokeWidth={3} />}
+            </div>
+            {user.display_name && <p className="text-[14px] font-semibold text-[#262626] mt-0.5">{user.display_name}</p>}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <InfoBox label="المتابعين" value={user.followers_count || 0} />
-          <InfoBox label="يتابع" value={user.following_count || 0} />
-          <InfoBox label="المنشورات" value={user.posts_count || 0} />
-          <InfoBox label="تاريخ التسجيل" value={new Date(user.created_at).toLocaleDateString("ar-EG")} />
+
+        <div className="flex border-t border-b border-[#efefef] py-3">
+          <StatItem label="منشورات" value={user.posts_count || 0} />
+          <StatItem label="متابعين" value={user.followers_count || 0} />
+          <StatItem label="يتابع" value={user.following_count || 0} />
         </div>
-        {user.bio && <div className="bg-gray-50 rounded-xl p-3"><p className="text-sm text-gray-600">{user.bio}</p></div>}
-        <div className="flex flex-wrap gap-2">
-          {user.is_verified && <Badge color="blue">موثق</Badge>}
-          {user.is_official && <Badge color="purple">رسمي</Badge>}
-          {user.is_creator && <Badge color="amber">صانع محتوى</Badge>}
-          {user.is_premium && <Badge color="yellow">مميز</Badge>}
-          {user.is_popular && <Badge color="pink">مشهور</Badge>}
-          {user.is_active && <Badge color="green">نشط</Badge>}
-          {user.is_gold_early_member && <Badge color="yellow">عضو ذهبي مبكر</Badge>}
-          {user.is_silver_early_member && <Badge color="slate">عضو فضي مبكر</Badge>}
-          {user.is_bronze_early_member && <Badge color="orange">عضو برونزي مبكر</Badge>}
-          {user.is_beta_tester && <Badge color="violet">مختبر بيتا</Badge>}
-          {user.is_bug_hunter && <Badge color="lime">باك هانتر</Badge>}
-          {user.is_banned && <Badge color="red">محظور</Badge>}
+
+        {user.bio && <p className="text-[14px] text-[#262626] leading-relaxed">{user.bio}</p>}
+
+        <div className="flex flex-wrap gap-1.5">
+          {user.is_verified && <UserBadge color="#0095f6">موثق</UserBadge>}
+          {user.is_official && <UserBadge color="#833AB4">رسمي</UserBadge>}
+          {user.is_creator && <UserBadge color="#ff9500">صانع محتوى</UserBadge>}
+          {user.is_premium && <UserBadge color="#ffc107">مميز</UserBadge>}
+          {user.is_popular && <UserBadge color="#E1306C">مشهور</UserBadge>}
+          {user.is_active && <UserBadge color="#00c853">نشط</UserBadge>}
+          {user.is_gold_early_member && <UserBadge color="#ffc107">عضو ذهبي مبكر</UserBadge>}
+          {user.is_silver_early_member && <UserBadge color="#90a4ae">عضو فضي مبكر</UserBadge>}
+          {user.is_bronze_early_member && <UserBadge color="#e65100">عضو برونزي مبكر</UserBadge>}
+          {user.is_beta_tester && <UserBadge color="#7c4dff">مختبر بيتا</UserBadge>}
+          {user.is_bug_hunter && <UserBadge color="#76ff03">باك هانتر</UserBadge>}
+          {user.is_banned && <UserBadge color="#ed4956">محظور</UserBadge>}
         </div>
+
+        <div className="bg-[#fafafa] rounded-lg p-3">
+          <p className="text-[12px] text-[#8e8e8e]">تاريخ التسجيل</p>
+          <p className="text-[14px] text-[#262626] font-medium">{new Date(user.created_at).toLocaleDateString("ar-EG", { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+
         {user.is_banned && (user.ban_reason || user.banned_reason) && (
-          <div className="bg-red-50 border border-red-100 rounded-xl p-3">
-            <p className="text-xs font-semibold text-red-600 mb-1">سبب الحظر:</p>
-            <p className="text-sm text-red-500">{user.ban_reason || user.banned_reason}</p>
+          <div className="bg-[#ed4956]/5 border border-[#ed4956]/15 rounded-lg p-3">
+            <p className="text-[12px] font-semibold text-[#ed4956] mb-1">سبب الحظر</p>
+            <p className="text-[14px] text-[#262626]">{user.ban_reason || user.banned_reason}</p>
             {(user.ban_expires_at || user.ban_until) && (
-              <p className="text-xs text-red-400 mt-1">ينتهي: {new Date(user.ban_expires_at || user.ban_until!).toLocaleString("ar-EG")}</p>
+              <p className="text-[12px] text-[#8e8e8e] mt-1">ينتهي: {new Date(user.ban_expires_at || user.ban_until!).toLocaleString("ar-EG")}</p>
             )}
           </div>
         )}
       </div>
     </ModalWrapper>
+  );
+}
+
+function StatItem({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex-1 text-center">
+      <p className="text-[18px] font-semibold text-[#262626]">{value.toLocaleString()}</p>
+      <p className="text-[14px] text-[#8e8e8e]">{label}</p>
+    </div>
+  );
+}
+
+function UserBadge({ children, color }: { children: React.ReactNode; color: string }) {
+  return (
+    <span
+      className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold"
+      style={{ backgroundColor: `${color}15`, color }}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -344,23 +461,23 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
     return (
       <ModalWrapper onClose={onClose} title="إلغاء حظر المستخدم">
         <div className="space-y-4" dir="rtl">
-          <div className="flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl p-3">
-            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-lg">✅</div>
+          <div className="flex items-center gap-3 p-4 bg-[#00c853]/5 border border-[#00c853]/15 rounded-lg">
+            <div className="w-10 h-10 rounded-full bg-[#00c853]/10 flex items-center justify-center text-lg">✅</div>
             <div>
-              <p className="text-sm font-semibold text-green-700">رفع الحظر عن @{user.username}</p>
-              <p className="text-xs text-green-600">سيتمكن المستخدم من استخدام المنصة بشكل طبيعي</p>
+              <p className="text-[14px] font-semibold text-[#262626]">رفع الحظر عن @{user.username}</p>
+              <p className="text-[12px] text-[#8e8e8e]">سيتمكن المستخدم من استخدام المنصة بشكل طبيعي</p>
             </div>
           </div>
           {(user.ban_reason || user.banned_reason) && (
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-500 mb-1">سبب الحظر الحالي:</p>
-              <p className="text-sm text-gray-700">{user.ban_reason || user.banned_reason}</p>
+            <div className="bg-[#fafafa] rounded-lg p-3">
+              <p className="text-[12px] text-[#8e8e8e] mb-1">سبب الحظر الحالي:</p>
+              <p className="text-[14px] text-[#262626]">{user.ban_reason || user.banned_reason}</p>
             </div>
           )}
-          {error && <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}
-          <div className="flex gap-2 justify-end">
-            <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">إلغاء</button>
-            <button onClick={handleBan} disabled={busy} className="px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50">
+          {error && <div className="bg-[#ed4956]/5 border border-[#ed4956]/15 rounded-lg px-4 py-3 text-[13px] text-[#ed4956]">{error}</div>}
+          <div className="flex gap-2 justify-end pt-1">
+            <button onClick={onClose} className="px-4 py-2 rounded-lg text-[14px] font-medium text-[#262626] hover:bg-[#fafafa] transition-colors">إلغاء</button>
+            <button onClick={handleBan} disabled={busy} className="px-5 py-2 rounded-lg text-[14px] font-semibold text-white bg-[#0095f6] hover:bg-[#1877f2] transition-colors disabled:opacity-50">
               {busy ? "جاري..." : "رفع الحظر"}
             </button>
           </div>
@@ -369,44 +486,50 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
     );
   }
 
+  const stepIndex = step === "reason" ? 0 : step === "duration" ? 1 : 2;
+
   return (
     <ModalWrapper onClose={onClose} title="حظر المستخدم">
       <div className="space-y-4" dir="rtl">
-        <div className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-xl p-3">
-          <img src={user.avatar_url || ""} alt="" className="w-10 h-10 rounded-full object-cover bg-gray-200" />
+        <div className="flex items-center gap-3 p-3 bg-[#fafafa] rounded-lg">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#833AB4] via-[#E1306C] to-[#F77737] p-[1.5px] shrink-0">
+            <div className="w-full h-full rounded-full bg-white overflow-hidden flex items-center justify-center">
+              {user.avatar_url ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[11px] font-semibold">{(user.username||"?")[0].toUpperCase()}</span>}
+            </div>
+          </div>
           <div>
-            <p className="text-sm font-semibold text-gray-800">{user.display_name || user.username}</p>
-            <p className="text-xs text-gray-500">@{user.username}</p>
+            <p className="text-[14px] font-semibold text-[#262626]">{user.display_name || user.username}</p>
+            <p className="text-[12px] text-[#8e8e8e]">@{user.username}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 mb-2">
-          {["reason", "duration", "confirm"].map((s, i) => (
-            <div key={s} className="flex items-center gap-1 flex-1">
-              <div className={`h-1.5 rounded-full flex-1 transition-colors ${
-                (s === "reason" && step !== "reason" ? true : s === "duration" && step === "confirm" ? true : s === step) ? "bg-red-500" : "bg-gray-200"
-              }`} />
-              {i < 2 && <div className="w-1" />}
-            </div>
+        <div className="flex gap-1">
+          {[0, 1, 2].map(i => (
+            <div key={i} className={`h-[3px] flex-1 rounded-full transition-colors duration-300 ${i <= stepIndex ? "bg-[#ed4956]" : "bg-[#efefef]"}`} />
           ))}
         </div>
 
         {step === "reason" && (
           <div className="space-y-3">
-            <p className="text-sm font-medium text-gray-700">اختر سبب الحظر:</p>
-            <div className="grid grid-cols-1 gap-1.5 max-h-60 overflow-y-auto">
+            <p className="text-[14px] font-semibold text-[#262626]">لماذا تريد حظر هذا الحساب؟</p>
+            <div className="space-y-1 max-h-[280px] overflow-y-auto scrollbar-thin">
               {BAN_REASONS.map(r => (
                 <button
                   key={r.id}
                   onClick={() => setSelectedReason(r.id)}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-right transition-all ${
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[14px] text-right transition-all ${
                     selectedReason === r.id
-                      ? "bg-red-50 border-2 border-red-400 text-red-700 font-medium"
-                      : "bg-gray-50 border-2 border-transparent hover:bg-gray-100 text-gray-700"
+                      ? "bg-[#ed4956]/5 text-[#ed4956] font-medium"
+                      : "hover:bg-[#fafafa] text-[#262626]"
                   }`}
                 >
-                  <span className="text-base">{r.icon}</span>
-                  <span>{r.label}</span>
+                  <span className="text-[16px] shrink-0">{r.icon}</span>
+                  <span className="flex-1">{r.label}</span>
+                  {selectedReason === r.id && (
+                    <div className="w-5 h-5 rounded-full bg-[#ed4956] flex items-center justify-center shrink-0">
+                      <CheckCircle className="w-3 h-3 text-white" />
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -415,16 +538,16 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
                 value={customReason}
                 onChange={(e) => setCustomReason(e.target.value)}
                 placeholder="اكتب سبب الحظر..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 resize-none"
+                className="w-full px-3 py-2.5 border border-[#dbdbdb] rounded-lg text-[14px] text-[#262626] focus:outline-none focus:border-[#8e8e8e] resize-none placeholder-[#8e8e8e] transition-colors"
                 rows={2}
               />
             )}
-            <div className="flex gap-2 justify-end">
-              <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">إلغاء</button>
+            <div className="flex gap-2 justify-end pt-1">
+              <button onClick={onClose} className="px-4 py-2 rounded-lg text-[14px] font-medium text-[#262626] hover:bg-[#fafafa] transition-colors">إلغاء</button>
               <button
                 onClick={() => setStep("duration")}
                 disabled={!selectedReason || (selectedReason === "other" && !customReason.trim())}
-                className="px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+                className="px-5 py-2 rounded-lg text-[14px] font-semibold text-white bg-[#ed4956] hover:bg-[#dc3545] transition-colors disabled:opacity-30"
               >
                 التالي
               </button>
@@ -434,20 +557,16 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
 
         {step === "duration" && (
           <div className="space-y-3">
-            <p className="text-sm font-medium text-gray-700">اختر مدة الحظر:</p>
-            <div className="grid grid-cols-2 gap-1.5 max-h-60 overflow-y-auto">
+            <p className="text-[14px] font-semibold text-[#262626]">ما مدة الحظر؟</p>
+            <div className="grid grid-cols-2 gap-1.5 max-h-[240px] overflow-y-auto scrollbar-thin">
               {BAN_DURATIONS.map(d => (
                 <button
                   key={d.value}
                   onClick={() => setSelectedDuration(d.value)}
-                  className={`px-3 py-2.5 rounded-xl text-sm text-center transition-all ${
+                  className={`px-3 py-2.5 rounded-lg text-[13px] text-center transition-all ${
                     selectedDuration === d.value
-                      ? d.value === "permanent"
-                        ? "bg-red-100 border-2 border-red-500 text-red-700 font-bold"
-                        : "bg-red-50 border-2 border-red-400 text-red-700 font-medium"
-                      : d.value === "permanent"
-                        ? "bg-red-50/50 border-2 border-transparent hover:bg-red-50 text-red-600"
-                        : "bg-gray-50 border-2 border-transparent hover:bg-gray-100 text-gray-700"
+                      ? d.value === "permanent" ? "bg-[#ed4956] text-white font-bold" : "bg-[#ed4956]/10 text-[#ed4956] font-semibold border border-[#ed4956]/30"
+                      : d.value === "permanent" ? "bg-[#fafafa] text-[#ed4956] font-medium hover:bg-[#ed4956]/5" : "bg-[#fafafa] text-[#262626] hover:bg-[#efefef]"
                   }`}
                 >
                   {d.label}
@@ -455,22 +574,22 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
               ))}
             </div>
 
-            <label className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors border border-gray-100">
+            <label className="flex items-center gap-3 p-3 rounded-lg bg-[#fafafa] cursor-pointer transition-colors hover:bg-[#efefef]">
               <input
                 type="checkbox"
                 checked={terminateSessions}
                 onChange={(e) => setTerminateSessions(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                className="w-4 h-4 rounded border-[#dbdbdb] text-[#ed4956] focus:ring-[#ed4956]/20 accent-[#ed4956]"
               />
               <div>
-                <span className="text-sm text-gray-700 font-medium">إنهاء جميع الجلسات</span>
-                <p className="text-xs text-gray-500">تسجيل خروج المستخدم من جميع الأجهزة فوراً</p>
+                <span className="text-[14px] text-[#262626] font-medium">إنهاء جميع الجلسات</span>
+                <p className="text-[12px] text-[#8e8e8e]">تسجيل خروج فوري من جميع الأجهزة</p>
               </div>
             </label>
 
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setStep("reason")} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">رجوع</button>
-              <button onClick={() => setStep("confirm")} className="px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors">
+            <div className="flex gap-2 justify-end pt-1">
+              <button onClick={() => setStep("reason")} className="px-4 py-2 rounded-lg text-[14px] font-medium text-[#262626] hover:bg-[#fafafa] transition-colors">رجوع</button>
+              <button onClick={() => setStep("confirm")} className="px-5 py-2 rounded-lg text-[14px] font-semibold text-white bg-[#ed4956] hover:bg-[#dc3545] transition-colors">
                 التالي
               </button>
             </div>
@@ -479,43 +598,31 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
 
         {step === "confirm" && !user.is_banned && (
           <div className="space-y-3">
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
-              <p className="text-sm font-bold text-red-700 mb-2">ملخص الحظر:</p>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">المستخدم:</span>
-                  <span className="font-medium text-gray-800">@{user.username}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">السبب:</span>
-                  <span className="font-medium text-gray-800">{finalReason}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">المدة:</span>
-                  <span className={`font-medium ${selectedDuration === "permanent" ? "text-red-600" : "text-gray-800"}`}>{durationLabel}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">إنهاء الجلسات:</span>
-                  <span className="font-medium text-gray-800">{terminateSessions ? "نعم ✓" : "لا"}</span>
-                </div>
+            <div className="bg-[#fafafa] rounded-lg p-4 space-y-3">
+              <p className="text-[14px] font-bold text-[#262626]">مراجعة قبل الحظر</p>
+              <div className="space-y-2.5 text-[14px]">
+                <ConfirmRow label="المستخدم" value={`@${user.username}`} />
+                <ConfirmRow label="السبب" value={finalReason} />
+                <ConfirmRow label="المدة" value={durationLabel} highlight={selectedDuration === "permanent"} />
+                <ConfirmRow label="إنهاء الجلسات" value={terminateSessions ? "نعم" : "لا"} />
               </div>
             </div>
 
             {selectedDuration === "permanent" && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex items-start gap-2">
-                <span className="text-yellow-500 mt-0.5">⚠️</span>
-                <p className="text-xs text-yellow-700">الحظر الدائم يمنع المستخدم من الوصول للمنصة نهائياً. يمكن رفعه لاحقاً بواسطة مسؤول.</p>
+              <div className="bg-[#ff9500]/5 border border-[#ff9500]/15 rounded-lg p-3 flex items-start gap-2">
+                <span className="text-[14px] mt-0.5">⚠️</span>
+                <p className="text-[12px] text-[#262626]">الحظر الدائم يمنع المستخدم من الوصول للمنصة نهائياً. يمكن رفعه لاحقاً بواسطة مسؤول.</p>
               </div>
             )}
 
-            {error && <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}
+            {error && <div className="bg-[#ed4956]/5 border border-[#ed4956]/15 rounded-lg px-4 py-3 text-[13px] text-[#ed4956]">{error}</div>}
 
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setStep("duration")} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">رجوع</button>
+            <div className="flex gap-2 justify-end pt-1">
+              <button onClick={() => setStep("duration")} className="px-4 py-2 rounded-lg text-[14px] font-medium text-[#262626] hover:bg-[#fafafa] transition-colors">رجوع</button>
               <button
                 onClick={handleBan}
                 disabled={busy}
-                className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+                className="px-5 py-2 rounded-lg text-[14px] font-bold text-white bg-[#ed4956] hover:bg-[#dc3545] transition-colors disabled:opacity-50"
               >
                 {busy ? "جاري التنفيذ..." : "تأكيد الحظر"}
               </button>
@@ -524,6 +631,15 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
         )}
       </div>
     </ModalWrapper>
+  );
+}
+
+function ConfirmRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="flex justify-between items-center">
+      <span className="text-[#8e8e8e]">{label}</span>
+      <span className={`font-medium ${highlight ? "text-[#ed4956]" : "text-[#262626]"}`}>{value}</span>
+    </div>
   );
 }
 
@@ -546,13 +662,13 @@ function DeleteModal({ user, onClose, onDone }: { user: UserProfile; onClose: ()
   return (
     <ModalWrapper onClose={onClose} title="حذف المستخدم">
       <div className="space-y-4" dir="rtl">
-        <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-          <p className="text-sm text-red-600 font-medium">تحذير: هذا الإجراء لا يمكن التراجع عنه!</p>
-          <p className="text-sm text-red-500 mt-1">سيتم حذف حساب @{user.username} نهائياً.</p>
+        <div className="bg-[#ed4956]/5 border border-[#ed4956]/15 rounded-lg p-4">
+          <p className="text-[14px] text-[#ed4956] font-semibold">تحذير: هذا الإجراء لا يمكن التراجع عنه!</p>
+          <p className="text-[13px] text-[#262626] mt-1">سيتم حذف حساب @{user.username} نهائياً.</p>
         </div>
-        <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">إلغاء</button>
-          <button onClick={handleDelete} disabled={busy} className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50">
+        <div className="flex gap-2 justify-end pt-1">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-[14px] font-medium text-[#262626] hover:bg-[#fafafa] transition-colors">إلغاء</button>
+          <button onClick={handleDelete} disabled={busy} className="px-5 py-2 rounded-lg text-[14px] font-semibold text-white bg-[#ed4956] hover:bg-[#dc3545] transition-colors disabled:opacity-50">
             {busy ? "جاري الحذف..." : "حذف نهائي"}
           </button>
         </div>
@@ -591,38 +707,57 @@ function EditModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =
     }
   };
 
+  const badgeList: [string, string][] = [
+    ["is_verified", "موثق ✓"],
+    ["is_official", "رسمي 🛡"],
+    ["is_creator", "صانع محتوى ✨"],
+    ["is_premium", "مميز 👑"],
+    ["is_popular", "مشهور 🔥"],
+    ["is_active", "نشط ⚡"],
+    ["is_gold_early_member", "عضو ذهبي مبكر 🏆"],
+    ["is_silver_early_member", "عضو فضي مبكر 🥈"],
+    ["is_bronze_early_member", "عضو برونزي مبكر 🥉"],
+    ["is_beta_tester", "مختبر بيتا 🧪"],
+    ["is_bug_hunter", "باك هانتر 🐛"],
+  ];
+
   return (
     <ModalWrapper onClose={onClose} title={`تعديل @${user.username}`}>
-      <div className="space-y-4" dir="rtl">
+      <div className="space-y-5" dir="rtl">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">النبذة</label>
+          <label className="block text-[14px] font-semibold text-[#262626] mb-1.5">النبذة</label>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 resize-none"
+            className="w-full px-3 py-2.5 border border-[#dbdbdb] rounded-lg text-[14px] text-[#262626] focus:outline-none focus:border-[#8e8e8e] resize-none placeholder-[#8e8e8e] transition-colors"
             rows={2}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">الشارات</label>
-          <div className="space-y-2">
-            {Object.entries({ is_verified: "موثق ✓", is_official: "رسمي 🛡", is_creator: "صانع محتوى ✨", is_premium: "مميز 👑", is_popular: "مشهور 🔥", is_active: "نشط ⚡", is_gold_early_member: "عضو ذهبي مبكر 🏆", is_silver_early_member: "عضو فضي مبكر 🥈", is_bronze_early_member: "عضو برونزي مبكر 🥉", is_beta_tester: "مختبر بيتا 🧪", is_bug_hunter: "باك هانتر 🐛" }).map(([key, label]) => (
-              <label key={key} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
+          <label className="block text-[14px] font-semibold text-[#262626] mb-2">الشارات</label>
+          <div className="space-y-0.5 max-h-[300px] overflow-y-auto scrollbar-thin">
+            {badgeList.map(([key, label]) => (
+              <label key={key} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-[#fafafa] cursor-pointer transition-colors">
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${badges[key as keyof typeof badges] ? "bg-[#0095f6] border-[#0095f6]" : "border-[#dbdbdb]"}`}>
+                  {badges[key as keyof typeof badges] && (
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  )}
+                </div>
                 <input
                   type="checkbox"
                   checked={badges[key as keyof typeof badges]}
                   onChange={(e) => setBadges({ ...badges, [key]: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  className="sr-only"
                 />
-                <span className="text-sm text-gray-700">{label}</span>
+                <span className="text-[14px] text-[#262626]">{label}</span>
               </label>
             ))}
           </div>
         </div>
-        <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">إلغاء</button>
-          <button onClick={handleSave} disabled={busy} className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors disabled:opacity-50">
-            {busy ? "جاري الحفظ..." : "حفظ"}
+        <div className="flex gap-2 justify-end pt-1">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-[14px] font-medium text-[#262626] hover:bg-[#fafafa] transition-colors">إلغاء</button>
+          <button onClick={handleSave} disabled={busy} className="px-5 py-2 rounded-lg text-[14px] font-semibold text-white bg-[#0095f6] hover:bg-[#1877f2] transition-colors disabled:opacity-50">
+            {busy ? "جاري الحفظ..." : "حفظ التغييرات"}
           </button>
         </div>
       </div>
@@ -632,46 +767,16 @@ function EditModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =
 
 function ModalWrapper({ children, onClose, title }: { children: React.ReactNode; onClose: () => void; title: string }) {
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-800">{title}</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
-            <XCircle className="w-5 h-5 text-gray-400" />
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[400px] max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#efefef]">
+          <h2 className="text-[16px] font-semibold text-[#262626] flex-1 text-center">{title}</h2>
+          <button onClick={onClose} className="absolute left-4 p-0.5 hover:opacity-60 transition-opacity">
+            <X className="w-5 h-5 text-[#262626]" />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-4 overflow-y-auto scrollbar-thin flex-1">{children}</div>
       </div>
     </div>
-  );
-}
-
-function InfoBox({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="bg-gray-50 rounded-xl p-3">
-      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-      <p className="text-sm font-semibold text-gray-700">{typeof value === "number" ? value.toLocaleString() : value}</p>
-    </div>
-  );
-}
-
-function Badge({ children, color }: { children: React.ReactNode; color: string }) {
-  const colors: Record<string, string> = {
-    blue: "bg-blue-50 text-blue-600",
-    purple: "bg-purple-50 text-purple-600",
-    amber: "bg-amber-50 text-amber-600",
-    yellow: "bg-yellow-50 text-yellow-600",
-    pink: "bg-pink-50 text-pink-600",
-    red: "bg-red-50 text-red-600",
-    green: "bg-green-50 text-green-600",
-    slate: "bg-slate-100 text-slate-600",
-    orange: "bg-orange-50 text-orange-600",
-    violet: "bg-violet-50 text-violet-600",
-    lime: "bg-lime-50 text-lime-600",
-  };
-  return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${colors[color] || colors.blue}`}>
-      {children}
-    </span>
   );
 }

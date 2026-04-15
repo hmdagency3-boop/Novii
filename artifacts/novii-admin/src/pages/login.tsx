@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { Lock, Mail, ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -22,64 +23,66 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[hsl(224,30%,12%)] via-[hsl(250,25%,18%)] to-[hsl(224,30%,14%)]">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/5 rounded-full blur-3xl" />
-      </div>
-
-      <div className="relative w-full max-w-md mx-4">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 mb-4 shadow-lg shadow-purple-500/20">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
+    <div className="min-h-screen flex items-center justify-center bg-[#fafafa]">
+      <div className="w-full max-w-[350px] mx-4">
+        <div className="bg-white border border-[#dbdbdb] rounded-sm p-10 mb-2.5">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 mb-4">
+              <img
+                src={`${import.meta.env.BASE_URL}novii_logo_transparent.png`}
+                alt="Novii"
+                className="w-16 h-16 object-contain"
+                onError={(e) => {
+                  const el = e.target as HTMLImageElement;
+                  el.style.display = 'none';
+                  el.parentElement!.innerHTML = '<div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#833AB4] via-[#E1306C] to-[#F77737] flex items-center justify-center"><span class="text-white text-2xl font-bold">N</span></div>';
+                }}
+              />
+            </div>
+            <h1 className="text-[28px] font-light text-[#262626] tracking-tight mb-1">Novii Admin</h1>
+            <p className="text-[13px] text-[#8e8e8e] font-normal">لوحة تحكم المنصة</p>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Novii Admin</h1>
-          <p className="text-slate-400 mt-1 text-sm">لوحة تحكم المنصة</p>
-        </div>
 
-        <div className="bg-[hsl(224,25%,17%)] border border-[hsl(224,20%,22%)] rounded-2xl p-8 shadow-2xl shadow-black/20">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">البريد الإلكتروني</label>
+          <form onSubmit={handleSubmit} className="space-y-2">
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8e8e8e]" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-[hsl(224,25%,13%)] border border-[hsl(224,20%,25%)] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500/50 transition-all"
-                placeholder="admin@novii.app"
+                className="w-full pl-10 pr-3 py-[9px] bg-[#fafafa] border border-[#dbdbdb] rounded-[3px] text-[12px] text-[#262626] placeholder-[#8e8e8e] focus:outline-none focus:border-[#a8a8a8] transition-colors"
+                placeholder="البريد الإلكتروني"
                 required
                 dir="ltr"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">كلمة المرور</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8e8e8e]" />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-[hsl(224,25%,13%)] border border-[hsl(224,20%,25%)] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500/50 transition-all"
-                placeholder="••••••••"
+                className="w-full pl-10 pr-3 py-[9px] bg-[#fafafa] border border-[#dbdbdb] rounded-[3px] text-[12px] text-[#262626] placeholder-[#8e8e8e] focus:outline-none focus:border-[#a8a8a8] transition-colors"
+                placeholder="كلمة المرور"
                 required
                 dir="ltr"
               />
             </div>
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">
+              <div className="bg-[#ed4956]/5 border border-[#ed4956]/20 rounded-[3px] px-3 py-2.5 text-[12px] text-[#ed4956] text-center">
                 {error}
               </div>
             )}
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading || !email || !password}
+              className="w-full py-[7px] px-4 bg-[#0095f6] hover:bg-[#1877f2] text-white text-[14px] font-semibold rounded-lg transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed mt-2"
             >
               {loading ? (
-                <span className="inline-flex items-center gap-2">
+                <span className="inline-flex items-center gap-2 justify-center">
                   <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -93,8 +96,14 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-slate-500 text-xs mt-6">
-          Novii Admin Panel v1.0 &mdash; Authorized Personnel Only
+        <div className="bg-white border border-[#dbdbdb] rounded-sm p-5 text-center">
+          <p className="text-[14px] text-[#262626]">
+            <span className="text-[#8e8e8e]">Novii Admin Panel</span>
+          </p>
+        </div>
+
+        <p className="text-center text-[#8e8e8e] text-[12px] mt-6">
+          &copy; {new Date().getFullYear()} Novii. Authorized Personnel Only.
         </p>
       </div>
     </div>

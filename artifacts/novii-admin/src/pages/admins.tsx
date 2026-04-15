@@ -38,14 +38,14 @@ export default function AdminsPage() {
     <div className="p-6 space-y-4" dir="rtl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">إدارة المشرفين</h1>
+          <h1 className="text-[22px] font-semibold text-[#262626]">إدارة المشرفين</h1>
           <p className="text-sm text-gray-500 mt-1">{admins.length} مشرف</p>
         </div>
         <div className="flex gap-2">
           <button onClick={loadAdmins} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
             <RefreshCw className="w-5 h-5 text-gray-500" />
           </button>
-          <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm">
+          <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-[#0095f6] hover:bg-[#1877f2] text-white text-sm font-medium rounded-lg transition-colors">
             <Plus className="w-4 h-4" /> إضافة مشرف
           </button>
         </div>
@@ -54,7 +54,7 @@ export default function AdminsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {loading ? (
           Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
+            <div key={i} className="bg-white border border-[#dbdbdb] rounded-lg p-5 animate-pulse">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-full bg-gray-200" />
                 <div className="flex-1"><div className="h-4 bg-gray-200 rounded w-24 mb-2" /><div className="h-3 bg-gray-100 rounded w-16" /></div>
@@ -65,10 +65,10 @@ export default function AdminsPage() {
           <div className="col-span-full text-center py-12 text-gray-400">لا يوجد مشرفين</div>
         ) : (
           admins.map((admin) => (
-            <div key={admin.id} className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
+            <div key={admin.id} className="bg-white border border-[#dbdbdb] rounded-lg p-5 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white font-bold">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#833AB4] via-[#E1306C] to-[#F77737] flex items-center justify-center text-white font-bold">
                     {(admin.username || admin.user_id || "A").charAt(0).toUpperCase()}
                   </div>
                   <div>
@@ -113,7 +113,7 @@ export default function AdminsPage() {
 
 function RoleBadge({ role }: { role: string }) {
   const styles: Record<string, string> = {
-    super_admin: "bg-purple-100 text-purple-700",
+    super_admin: "bg-[#0095f6]/10 text-[#0095f6]",
     admin: "bg-blue-50 text-blue-600",
     moderator: "bg-teal-50 text-teal-600",
   };
@@ -186,7 +186,7 @@ function AddAdminModal({ onClose, onDone }: { onClose: () => void; onDone: () =>
             value={searchUser}
             onChange={(e) => setSearchUser(e.target.value)}
             placeholder="اسم المستخدم..."
-            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0095f6]/20"
           />
           {searchUser && filteredUsers.length > 0 && (
             <div className="mt-2 max-h-40 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-50">
@@ -194,9 +194,9 @@ function AddAdminModal({ onClose, onDone }: { onClose: () => void; onDone: () =>
                 <button
                   key={u.id}
                   onClick={() => { setSelectedUserId(u.id); setSearchUser(`@${u.username}`); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${selectedUserId === u.id ? "bg-purple-50" : ""}`}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${selectedUserId === u.id ? "bg-blue-50" : ""}`}
                 >
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#833AB4] via-[#E1306C] to-[#F77737] flex items-center justify-center text-white text-xs font-bold shrink-0">
                     {(u.username || "?").charAt(0).toUpperCase()}
                   </div>
                   <span className="truncate">@{u.username}</span>
@@ -211,7 +211,7 @@ function AddAdminModal({ onClose, onDone }: { onClose: () => void; onDone: () =>
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0095f6]/20"
           >
             <option value="moderator">مراقب</option>
             <option value="admin">مشرف</option>
@@ -227,7 +227,7 @@ function AddAdminModal({ onClose, onDone }: { onClose: () => void; onDone: () =>
                   type="checkbox"
                   checked={permissions[key]}
                   onChange={(e) => setPermissions({ ...permissions, [key]: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  className="w-4 h-4 rounded border-gray-300 text-[#0095f6] focus:ring-[#0095f6]"
                 />
                 <span className="text-sm text-gray-700">{label}</span>
               </label>
@@ -237,7 +237,7 @@ function AddAdminModal({ onClose, onDone }: { onClose: () => void; onDone: () =>
 
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">إلغاء</button>
-          <button onClick={handleAdd} disabled={busy || !selectedUserId} className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors disabled:opacity-50">
+          <button onClick={handleAdd} disabled={busy || !selectedUserId} className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#0095f6] hover:bg-[#1877f2] transition-colors disabled:opacity-50">
             {busy ? "جاري الإضافة..." : "إضافة"}
           </button>
         </div>
@@ -287,7 +287,7 @@ function EditAdminModal({ admin, onClose, onDone }: { admin: AdminRecord; onClos
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0095f6]/20"
             disabled={admin.role === "super_admin"}
           >
             <option value="moderator">مراقب</option>
@@ -305,7 +305,7 @@ function EditAdminModal({ admin, onClose, onDone }: { admin: AdminRecord; onClos
                   type="checkbox"
                   checked={permissions[key]}
                   onChange={(e) => setPermissions({ ...permissions, [key]: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  className="w-4 h-4 rounded border-gray-300 text-[#0095f6] focus:ring-[#0095f6]"
                   disabled={admin.role === "super_admin"}
                 />
                 <span className="text-sm text-gray-700">{label}</span>
@@ -316,7 +316,7 @@ function EditAdminModal({ admin, onClose, onDone }: { admin: AdminRecord; onClos
 
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">إلغاء</button>
-          <button onClick={handleSave} disabled={busy} className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors disabled:opacity-50">
+          <button onClick={handleSave} disabled={busy} className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#0095f6] hover:bg-[#1877f2] transition-colors disabled:opacity-50">
             {busy ? "جاري الحفظ..." : "حفظ"}
           </button>
         </div>

@@ -203,8 +203,8 @@ export default function ReportsPage() {
     <div className="p-6 space-y-5" dir="rtl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">البلاغات</h1>
-          <p className="text-sm text-gray-500 mt-1">إدارة ومعالجة بلاغات المستخدمين</p>
+          <h1 className="text-[22px] font-semibold text-[#262626]">البلاغات</h1>
+          <p className="text-sm text-[#8e8e8e] mt-1">إدارة ومعالجة بلاغات المستخدمين</p>
         </div>
         <button onClick={loadReports} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium transition-colors">
           <RefreshCw className="w-4 h-4" />
@@ -267,10 +267,10 @@ export default function ReportsPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white border border-[#dbdbdb] rounded-lg overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50/80">
+            <tr className="border-b border-[#efefef]">
               <th className="text-right px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">المُبلِّغ</th>
               <th className="text-right px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">المُبلَّغ عنه</th>
               <th className="text-right px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">السبب</th>

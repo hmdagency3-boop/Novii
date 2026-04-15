@@ -22,27 +22,29 @@ interface TabBarProps {
 
 export default function TabBar({ openTabs, activeTab, onTabChange, onCloseTab }: TabBarProps) {
   return (
-    <div className="flex items-center bg-[hsl(220,18%,95%)] border-b border-[hsl(220,15%,88%)] h-10 px-1 overflow-x-auto scrollbar-thin">
+    <div className="flex items-center bg-white border-b border-[#dbdbdb] h-[44px] px-2 overflow-x-auto scrollbar-thin gap-0.5">
       {openTabs.map((tab) => {
         const isActive = tab === activeTab;
         return (
           <div
             key={tab}
-            className={`group flex items-center gap-2 px-4 h-9 rounded-t-lg cursor-pointer transition-all duration-150 min-w-0 shrink-0 ${
+            className={`group flex items-center gap-1.5 px-3.5 h-[34px] rounded-md cursor-pointer transition-all duration-150 min-w-0 shrink-0 select-none ${
               isActive
-                ? "bg-white border border-b-0 border-[hsl(220,15%,88%)] -mb-px text-gray-800"
-                : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
+                ? "bg-[#efefef] text-[#262626]"
+                : "text-[#8e8e8e] hover:text-[#262626] hover:bg-[#fafafa]"
             }`}
             onClick={() => onTabChange(tab)}
           >
-            <span className="text-[13px] font-medium truncate">{tabLabels[tab]}</span>
+            <span className={`text-[13px] truncate ${isActive ? "font-semibold" : "font-normal"}`}>
+              {tabLabels[tab]}
+            </span>
             {tab !== "dashboard" && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onCloseTab(tab);
                 }}
-                className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-200 transition-all"
+                className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[#dbdbdb] transition-all"
               >
                 <X className="w-3 h-3" />
               </button>

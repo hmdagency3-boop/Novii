@@ -8,10 +8,10 @@ import {
   Settings,
   ScrollText,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
   BadgeCheck,
   UsersRound,
+  ChevronRight,
+  Menu,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -54,23 +54,44 @@ export default function Sidebar({ activeTab, onTabChange, onOpenTab }: SidebarPr
 
   return (
     <div
-      className={`flex flex-col h-screen bg-[hsl(224,30%,14%)] border-r border-[hsl(224,25%,20%)] transition-all duration-300 ${
-        collapsed ? "w-[72px]" : "w-[260px]"
+      className={`flex flex-col h-screen bg-white border-r border-[#dbdbdb] transition-all duration-200 ${
+        collapsed ? "w-[72px]" : "w-[245px]"
       }`}
     >
-      <div className="flex items-center gap-3 px-5 h-16 border-b border-[hsl(224,25%,20%)]">
-        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shrink-0">
-          <Shield className="w-5 h-5 text-white" />
-        </div>
-        {!collapsed && (
-          <div className="flex flex-col min-w-0">
-            <span className="text-white font-bold text-sm tracking-tight">Novii Admin</span>
-            <span className="text-[10px] text-slate-500 leading-none">Control Panel</span>
-          </div>
+      <div className="flex items-center gap-3 px-5 h-[60px] border-b border-[#efefef]">
+        {collapsed ? (
+          <button
+            onClick={() => setCollapsed(false)}
+            className="w-full flex items-center justify-center"
+          >
+            <Menu className="w-5 h-5 text-[#262626]" />
+          </button>
+        ) : (
+          <>
+            <img
+              src={`${import.meta.env.BASE_URL}novii_logo_transparent.png`}
+              alt="Novii"
+              className="w-7 h-7 object-contain shrink-0"
+              onError={(e) => {
+                const el = e.target as HTMLImageElement;
+                el.style.display = 'none';
+              }}
+            />
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-[#262626] font-semibold text-[15px] leading-tight">Novii</span>
+              <span className="text-[11px] text-[#8e8e8e] leading-tight">Admin Panel</span>
+            </div>
+            <button
+              onClick={() => setCollapsed(true)}
+              className="p-1 rounded-md hover:bg-[#f5f5f5] transition-colors"
+            >
+              <ChevronRight className="w-4 h-4 text-[#8e8e8e] rotate-180" />
+            </button>
+          </>
         )}
       </div>
 
-      <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto scrollbar-thin">
+      <nav className="flex-1 py-2 px-3 space-y-0.5 overflow-y-auto scrollbar-thin">
         {menuItems.map((item) => {
           if (!hasPermission(item.permission)) return null;
           const Icon = item.icon;
@@ -80,52 +101,58 @@ export default function Sidebar({ activeTab, onTabChange, onOpenTab }: SidebarPr
             <button
               key={item.id}
               onClick={() => handleClick(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 group relative ${
                 isActive
-                  ? "bg-purple-600/15 text-purple-400"
-                  : "text-slate-400 hover:bg-[hsl(224,25%,18%)] hover:text-slate-200"
+                  ? "bg-[#f5f5f5] text-[#262626] font-semibold"
+                  : "text-[#262626] hover:bg-[#fafafa]"
               }`}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? item.labelAr : undefined}
             >
-              <Icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? "text-purple-400" : "text-slate-500 group-hover:text-slate-300"}`} />
-              {!collapsed && (
-                <span className="text-[13px] font-medium truncate">{item.labelAr}</span>
+              {isActive && (
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#262626] rounded-l-full" />
               )}
-              {isActive && !collapsed && (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-purple-400" />
+              <Icon
+                className={`w-[22px] h-[22px] shrink-0 transition-all ${
+                  isActive
+                    ? "text-[#262626]"
+                    : "text-[#262626] group-hover:scale-105"
+                }`}
+                strokeWidth={isActive ? 2.5 : 1.5}
+              />
+              {!collapsed && (
+                <span className={`text-[14px] truncate ${isActive ? "font-semibold" : "font-normal"}`}>
+                  {item.labelAr}
+                </span>
               )}
             </button>
           );
         })}
       </nav>
 
-      <div className="border-t border-[hsl(224,25%,20%)] p-3">
+      <div className="border-t border-[#efefef] p-3">
         {!collapsed && (
-          <div className="flex items-center gap-3 px-3 py-2 mb-2 rounded-xl bg-[hsl(224,25%,17%)]">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-              {(admin?.username || user?.email || "A").charAt(0).toUpperCase()}
+          <div className="flex items-center gap-3 px-3 py-2.5 mb-1">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#833AB4] via-[#E1306C] to-[#F77737] p-[2px] shrink-0">
+              <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                <span className="text-[11px] font-semibold text-[#262626]">
+                  {(admin?.username || user?.email || "A").charAt(0).toUpperCase()}
+                </span>
+              </div>
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-white text-xs font-semibold truncate">{admin?.username || user?.email}</span>
-              <span className="text-[10px] text-purple-400 capitalize">{admin?.role?.replace("_", " ") || "Admin"}</span>
+              <span className="text-[13px] font-semibold text-[#262626] truncate">{admin?.username || user?.email}</span>
+              <span className="text-[11px] text-[#8e8e8e] capitalize">{admin?.role?.replace("_", " ") || "Admin"}</span>
             </div>
           </div>
         )}
 
         <button
           onClick={logout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
-          title="Logout"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#262626] hover:bg-[#fafafa] transition-colors"
+          title="تسجيل خروج"
         >
-          <LogOut className="w-[18px] h-[18px] shrink-0" />
-          {!collapsed && <span className="text-[13px] font-medium">تسجيل خروج</span>}
-        </button>
-
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-center gap-3 px-3 py-2 mt-1 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-[hsl(224,25%,18%)] transition-all"
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          <LogOut className="w-[22px] h-[22px] shrink-0" strokeWidth={1.5} />
+          {!collapsed && <span className="text-[14px]">تسجيل خروج</span>}
         </button>
       </div>
     </div>

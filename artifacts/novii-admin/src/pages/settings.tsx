@@ -55,23 +55,23 @@ export default function SettingsPage() {
     <div className="p-6 space-y-4" dir="rtl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">إعدادات المنصة</h1>
+          <h1 className="text-[22px] font-semibold text-[#262626]">إعدادات المنصة</h1>
           <p className="text-sm text-gray-500 mt-1">إدارة إعدادات النظام</p>
         </div>
         <div className="flex gap-2">
           <button onClick={loadSettings} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
             <RefreshCw className="w-5 h-5 text-gray-500" />
           </button>
-          <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm">
+          <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-[#0095f6] hover:bg-[#1877f2] text-white text-sm font-medium rounded-lg transition-colors">
             <Plus className="w-4 h-4" /> إضافة إعداد
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white border border-[#dbdbdb] rounded-lg overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50/80">
+            <tr className="border-b border-[#efefef]">
               <th className="text-right px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">المفتاح</th>
               <th className="text-right px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">القيمة</th>
               <th className="text-right px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">آخر تحديث</th>
@@ -100,10 +100,10 @@ export default function SettingsPage() {
                         <input
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
-                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0095f6]/20"
                           autoFocus
                         />
-                        <button onClick={() => handleSave(s.key, editValue)} disabled={saving} className="p-1.5 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors disabled:opacity-50">
+                        <button onClick={() => handleSave(s.key, editValue)} disabled={saving} className="p-1.5 rounded-lg bg-[#0095f6] text-white hover:bg-[#1877f2] transition-colors disabled:opacity-50">
                           <Save className="w-4 h-4" />
                         </button>
                         <button onClick={() => setEditKey(null)} className="p-1.5 rounded-lg hover:bg-gray-100">
@@ -143,7 +143,7 @@ export default function SettingsPage() {
                 <input
                   value={newKey}
                   onChange={(e) => setNewKey(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0095f6]/20"
                   placeholder="setting_key"
                   dir="ltr"
                 />
@@ -153,13 +153,13 @@ export default function SettingsPage() {
                 <textarea
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 resize-none"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0095f6]/20 resize-none"
                   rows={3}
                 />
               </div>
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setShowAdd(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">إلغاء</button>
-                <button onClick={handleAdd} disabled={saving || !newKey.trim()} className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors disabled:opacity-50">
+                <button onClick={handleAdd} disabled={saving || !newKey.trim()} className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#0095f6] hover:bg-[#1877f2] transition-colors disabled:opacity-50">
                   {saving ? "جاري الحفظ..." : "حفظ"}
                 </button>
               </div>
