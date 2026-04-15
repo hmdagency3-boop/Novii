@@ -98,13 +98,38 @@ export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerP
   const startCamera = useCallback(async () => {
     try {
       setError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 1280 },
-          height: { ideal: 1280 },
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError(isRTL
+          ? "الكاميرا غير متاحة في هذا المتصفح. استخدم خيار رفع الصورة."
+          : "Camera not available in this browser. Use the upload option instead.");
+        return;
+      }
+
+      let stream: MediaStream | null = null;
+
+      const constraints = [
+        { video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 1280 } } },
+        { video: { facingMode: "user" } },
+        { video: true },
+      ];
+
+      for (const constraint of constraints) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraint);
+          break;
+        } catch {
+          continue;
         }
-      });
+      }
+
+      if (!stream) {
+        setError(isRTL
+          ? "لا يمكن الوصول للكاميرا. تحقق من الأذونات أو استخدم خيار رفع الصورة."
+          : "Cannot access camera. Check permissions or use the upload option.");
+        return;
+      }
+
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -114,7 +139,9 @@ export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerP
         };
       }
     } catch {
-      setError(isRTL ? "لا يمكن الوصول للكاميرا الأمامية." : "Cannot access front camera.");
+      setError(isRTL
+        ? "لا يمكن الوصول للكاميرا. تحقق من الأذونات أو استخدم خيار رفع الصورة."
+        : "Cannot access camera. Check permissions or use the upload option.");
     }
   }, [isRTL]);
 
@@ -200,8 +227,14 @@ export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerP
 
       {error ? (
         <div className="text-center py-8 space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-2">
+            <X className="w-8 h-8 text-red-500" />
+          </div>
           <p className="text-red-500 text-sm">{error}</p>
-          <Button variant="outline" onClick={startCamera}>{isRTL ? "حاول مرة أخرى" : "Try Again"}</Button>
+          <div className="flex gap-3 justify-center">
+            <Button variant="outline" onClick={startCamera}>{isRTL ? "حاول مرة أخرى" : "Try Again"}</Button>
+            <Button variant="default" onClick={onCancel}>{isRTL ? "رفع صورة بدلاً من ذلك" : "Upload photo instead"}</Button>
+          </div>
         </div>
       ) : capturedImage ? (
         <div className="space-y-3">
