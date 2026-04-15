@@ -3114,6 +3114,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (error) throw error;
 
+      if (status === 'approved') {
+        const { error: notifErr } = await adminDb!.from('notifications').insert({
+          user_id: request.user_id,
+          type: 'badge_awarded',
+          content: 'تهانينا! 🎉 تم توثيق حسابك بنجاح. أصبح حسابك موثقاً الآن.',
+        });
+        if (notifErr) console.error('⚠️ Failed to send verification approved notification:', notifErr);
+      } else {
+        const noteText = admin_note ? ` السبب: ${admin_note}` : '';
+        const { error: notifErr } = await adminDb!.from('notifications').insert({
+          user_id: request.user_id,
+          type: 'security',
+          content: `تم رفض طلب التوثيق الخاص بك.${noteText} يمكنك تقديم طلب جديد من الإعدادات.`,
+        });
+        if (notifErr) console.error('⚠️ Failed to send verification rejected notification:', notifErr);
+      }
+
       await logAdminAction(req, status === 'approved' ? 'verify_user' : 'reject_verification', 'user', request.user_id, admin_note || undefined);
 
       res.json({ success: true });
