@@ -1,5 +1,5 @@
 import { useLocation, useSearch } from "wouter";
-import { ArrowLeft, Search, MessageCircle } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,11 +20,6 @@ import { PopularBadge } from "@/components/ui/popular-badge";
 import { ActiveBadge } from "@/components/ui/active-badge";
 import { useState, useMemo } from "react";
 
-interface FollowersDetailPageProps {
-  userId?: string;
-  username?: string;
-}
-
 export default function FollowersDetailPage() {
   const [, setLocation] = useLocation();
   const search = useSearch();
@@ -32,24 +27,22 @@ export default function FollowersDetailPage() {
   const { direction } = useLanguage();
   const isRTL = direction === "rtl";
   
-  // Get params from URL
   const params = new URLSearchParams(search);
   const userId = params.get("id") || currentUser?.id || "";
   const username = params.get("username") || "";
   const initialTab = (params.get("tab") || "followers") as "followers" | "following";
+  const isOwnList = currentUser?.id === userId;
   
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"followers" | "following">(initialTab);
   
-  const { data: followersData, isLoading: loadingFollowers } = useFollowers(userId);
-  const { data: followingData, isLoading: loadingFollowing } = useFollowing(userId);
+  const { data: followersData, isLoading: loadingFollowers, refetch: refetchFollowers } = useFollowers(userId);
+  const { data: followingData, isLoading: loadingFollowing, refetch: refetchFollowing } = useFollowing(userId);
   const toggleFollow = useToggleFollow();
   
-  // Ensure data is always an array
   const followers = Array.isArray(followersData) ? followersData : [];
   const following = Array.isArray(followingData) ? followingData : [];
   
-  // Filter by search query
   const filteredFollowers = useMemo(() => {
     if (!searchQuery.trim()) return followers;
     const query = searchQuery.toLowerCase();
@@ -67,14 +60,71 @@ export default function FollowersDetailPage() {
       (user.full_name && user.full_name.toLowerCase().includes(query))
     );
   }, [following, searchQuery]);
-  
-  const handleFollowClick = (targetUserId: string, isFollowingNow?: boolean) => {
-    toggleFollow.mutate({ targetUserId, isFollowingNow });
+
+  const [localFollowState, setLocalFollowState] = useState<Record<string, boolean>>({});
+
+  const handleFollowClick = (targetUserId: string, currentlyFollowing: boolean) => {
+    setLocalFollowState(prev => ({ ...prev, [targetUserId]: !currentlyFollowing }));
+    toggleFollow.mutate(
+      { targetUserId, isFollowingNow: currentlyFollowing },
+      {
+        onSettled: () => {
+          refetchFollowers();
+          refetchFollowing();
+        },
+      }
+    );
+  };
+
+  const getFollowState = (user: Profile): boolean => {
+    if (localFollowState[user.id] !== undefined) return localFollowState[user.id];
+    return user.is_following ?? false;
   };
   
-  const UserListItem = ({ user, showFollowButton, isFollowersTab }: { user: Profile; showFollowButton: boolean; isFollowersTab: boolean }) => {
+  const UserListItem = ({ user, isFollowersTab }: { user: Profile; isFollowersTab: boolean }) => {
     const isCurrentUser = currentUser?.id === user.id;
-    const isFollowing = user.is_following ?? false;
+    const amFollowing = getFollowState(user);
+
+    const getButtonContent = () => {
+      if (isCurrentUser) return null;
+
+      if (amFollowing) {
+        return (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => handleFollowClick(user.id, true)}
+            disabled={toggleFollow.isPending}
+            className="h-8 px-4 text-xs font-bold"
+          >
+            {toggleFollow.isPending ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              isRTL ? "متابَع" : "Following"
+            )}
+          </Button>
+        );
+      }
+
+      const isFollowBack = isFollowersTab && isOwnList;
+      return (
+        <Button
+          size="sm"
+          variant="default"
+          onClick={() => handleFollowClick(user.id, false)}
+          disabled={toggleFollow.isPending}
+          className="h-8 px-4 text-xs font-bold"
+        >
+          {toggleFollow.isPending ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : isFollowBack ? (
+            isRTL ? "متابعة بالمقابل" : "Follow back"
+          ) : (
+            isRTL ? "متابعة" : "Follow"
+          )}
+        </Button>
+      );
+    };
     
     return (
       <div className={cn(
@@ -104,55 +154,13 @@ export default function FollowersDetailPage() {
           </div>
         </Link>
         
-        {showFollowButton && !isCurrentUser && isFollowing && (
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-8 px-4 text-xs font-bold"
-          >
-            <MessageCircle className="w-3 h-3 mr-1.5" />
-            {isRTL ? "رسالة" : "Message"}
-          </Button>
-        )}
-        
-        {showFollowButton && !isCurrentUser && !isFollowing && isFollowersTab && (
-          <Button
-            size="sm"
-            variant="default"
-            onClick={() => handleFollowClick(user.id, false)}
-            disabled={toggleFollow.isPending}
-            className="h-8 px-4 text-xs font-bold"
-          >
-            {toggleFollow.isPending ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              isRTL ? "متابعة مقابل" : "Follow back"
-            )}
-          </Button>
-        )}
-        
-        {showFollowButton && !isCurrentUser && !isFollowing && !isFollowersTab && (
-          <Button
-            size="sm"
-            variant="default"
-            onClick={() => handleFollowClick(user.id, false)}
-            disabled={toggleFollow.isPending}
-            className="h-8 px-4 text-xs font-bold"
-          >
-            {toggleFollow.isPending ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              isRTL ? "متابعة" : "Follow"
-            )}
-          </Button>
-        )}
+        {getButtonContent()}
       </div>
     );
   };
   
   return (
     <div className="w-full h-screen flex flex-col bg-background" dir={direction}>
-      {/* Header */}
       <div className={cn(
         "flex items-center justify-between gap-4 p-4 border-b border-border sticky top-0 z-10 bg-background/80 backdrop-blur-sm",
         isRTL && "flex-row-reverse"
@@ -164,10 +172,9 @@ export default function FollowersDetailPage() {
           <ArrowLeft className="w-6 h-6" />
         </button>
         <h1 className="text-lg font-bold flex-1 text-center">{username}</h1>
-        <div className="w-10" /> {/* Spacer for alignment */}
+        <div className="w-10" />
       </div>
       
-      {/* Search Bar */}
       <div className={cn(
         "flex items-center gap-2 p-4 border-b border-border",
         isRTL && "flex-row-reverse"
@@ -182,7 +189,6 @@ export default function FollowersDetailPage() {
         />
       </div>
       
-      {/* Tabs */}
       <div className="border-b border-border px-4 pt-4">
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "followers" | "following")} className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-transparent p-0 h-auto">
@@ -221,7 +227,6 @@ export default function FollowersDetailPage() {
                       <UserListItem 
                         key={follower.id} 
                         user={follower} 
-                        showFollowButton={currentUser?.id !== userId}
                         isFollowersTab={true}
                       />
                     ))}
@@ -252,7 +257,6 @@ export default function FollowersDetailPage() {
                       <UserListItem 
                         key={followedUser.id} 
                         user={followedUser} 
-                        showFollowButton={currentUser?.id !== userId}
                         isFollowersTab={false}
                       />
                     ))}

@@ -3,7 +3,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, MessageCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import { useFollowers, useFollowing, useToggleFollow } from "@/hooks/use-data";
 import { useLanguage } from "@/lib/language-context";
@@ -15,6 +15,8 @@ import { CreatorBadge } from "@/components/ui/creator-badge";
 import { PremiumBadge } from "@/components/ui/premium-badge";
 import { PopularBadge } from "@/components/ui/popular-badge";
 import { ActiveBadge } from "@/components/ui/active-badge";
+import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
 
 interface FollowersDialogProps {
   open: boolean;
@@ -31,29 +33,85 @@ export function FollowersDialog({
   userId, 
   username,
   initialTab = "followers",
-  currentUserId 
+  currentUserId: propCurrentUserId 
 }: FollowersDialogProps) {
   const { direction } = useLanguage();
   const isRTL = direction === "rtl";
+  const { user: authUser } = useAuth();
+  const currentUserId = propCurrentUserId || authUser?.id;
+  const isOwnList = currentUserId === userId;
   
-  const { data: followersData, isLoading: loadingFollowers } = useFollowers(userId);
-  const { data: followingData, isLoading: loadingFollowing } = useFollowing(userId);
+  const { data: followersData, isLoading: loadingFollowers, refetch: refetchFollowers } = useFollowers(userId);
+  const { data: followingData, isLoading: loadingFollowing, refetch: refetchFollowing } = useFollowing(userId);
   const toggleFollow = useToggleFollow();
 
-  // Ensure data is always an array
   const followers = Array.isArray(followersData) ? followersData : [];
   const following = Array.isArray(followingData) ? followingData : [];
-  
-  console.log('🔍 Followers Dialog - Followers Data:', followers);
-  console.log('🔍 Followers Dialog - First follower is_following:', followers[0]?.is_following);
 
-  const handleFollowClick = (targetUserId: string, isFollowingNow?: boolean) => {
-    toggleFollow.mutate({ targetUserId, isFollowingNow });
+  const [localFollowState, setLocalFollowState] = useState<Record<string, boolean>>({});
+
+  const handleFollowClick = (targetUserId: string, currentlyFollowing: boolean) => {
+    setLocalFollowState(prev => ({ ...prev, [targetUserId]: !currentlyFollowing }));
+    toggleFollow.mutate(
+      { targetUserId, isFollowingNow: currentlyFollowing },
+      {
+        onSettled: () => {
+          refetchFollowers();
+          refetchFollowing();
+        },
+      }
+    );
   };
 
-  const UserListItem = ({ user, showFollowButton, isFollowersTab }: { user: Profile; showFollowButton: boolean; isFollowersTab: boolean }) => {
+  const getFollowState = (user: Profile): boolean => {
+    if (localFollowState[user.id] !== undefined) return localFollowState[user.id];
+    return user.is_following ?? false;
+  };
+
+  const UserListItem = ({ user, isFollowersTab }: { user: Profile; isFollowersTab: boolean }) => {
     const isCurrentUser = currentUserId === user.id;
-    const isFollowing = user.is_following ?? false;
+    const amFollowing = getFollowState(user);
+
+    const getButtonContent = () => {
+      if (isCurrentUser) return null;
+
+      if (amFollowing) {
+        return (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => handleFollowClick(user.id, true)}
+            disabled={toggleFollow.isPending}
+            className="h-8 px-4 text-xs font-bold"
+          >
+            {toggleFollow.isPending ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              isRTL ? "متابَع" : "Following"
+            )}
+          </Button>
+        );
+      }
+
+      const isFollowBack = isFollowersTab && isOwnList;
+      return (
+        <Button
+          size="sm"
+          variant="default"
+          onClick={() => handleFollowClick(user.id, false)}
+          disabled={toggleFollow.isPending}
+          className="h-8 px-4 text-xs font-bold"
+        >
+          {toggleFollow.isPending ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : isFollowBack ? (
+            isRTL ? "متابعة بالمقابل" : "Follow back"
+          ) : (
+            isRTL ? "متابعة" : "Follow"
+          )}
+        </Button>
+      );
+    };
     
     return (
       <div className={cn(
@@ -83,48 +141,7 @@ export function FollowersDialog({
           </div>
         </Link>
         
-        {showFollowButton && !isCurrentUser && isFollowing && (
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-8 px-4 text-xs font-bold"
-          >
-            <MessageCircle className="w-3 h-3 mr-1.5" />
-            {isRTL ? "رسالة" : "Message"}
-          </Button>
-        )}
-        
-        {showFollowButton && !isCurrentUser && !isFollowing && isFollowersTab && (
-          <Button
-            size="sm"
-            variant="default"
-            onClick={() => handleFollowClick(user.id, false)}
-            disabled={toggleFollow.isPending}
-            className="h-8 px-4 text-xs font-bold"
-          >
-            {toggleFollow.isPending ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              isRTL ? "متابعة مقابل" : "Follow back"
-            )}
-          </Button>
-        )}
-        
-        {showFollowButton && !isCurrentUser && !isFollowing && !isFollowersTab && (
-          <Button
-            size="sm"
-            variant="default"
-            onClick={() => handleFollowClick(user.id, false)}
-            disabled={toggleFollow.isPending}
-            className="h-8 px-4 text-xs font-bold"
-          >
-            {toggleFollow.isPending ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              isRTL ? "متابعة" : "Follow"
-            )}
-          </Button>
-        )}
+        {getButtonContent()}
       </div>
     );
   };
@@ -170,7 +187,6 @@ export function FollowersDialog({
                     <UserListItem 
                       key={follower.id} 
                       user={follower} 
-                      showFollowButton={currentUserId !== userId}
                       isFollowersTab={true}
                     />
                   ))}
@@ -195,7 +211,6 @@ export function FollowersDialog({
                     <UserListItem 
                       key={followedUser.id} 
                       user={followedUser} 
-                      showFollowButton={currentUserId !== userId}
                       isFollowersTab={false}
                     />
                   ))}
