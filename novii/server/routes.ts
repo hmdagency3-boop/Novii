@@ -4602,7 +4602,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates: any = {};
       if (is_banned !== undefined) updates.is_banned = is_banned;
       if (is_pinned !== undefined) updates.is_pinned = is_pinned;
-      updates.updated_at = new Date().toISOString();
 
       const { error } = await adminDb!
         .from('hashtags')
