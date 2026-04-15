@@ -4048,12 +4048,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const postIds = postHashtags.map((ph: any) => ph.post_id);
       const { data: posts } = await queryDb
         .from('posts')
-        .select('*, profiles!posts_user_id_fkey(id, username, full_name, avatar_url, is_verified, is_official)')
+        .select('*, profiles!posts_user_id_fkey(id, username, full_name, avatar_url, is_verified, is_official, is_creator, is_premium, is_popular, is_active, verified_at)')
         .in('id', postIds)
         .neq('is_deleted', true)
         .order('created_at', { ascending: false });
 
-      res.json(posts || []);
+      const mapped = (posts || []).map((p: any) => ({
+        ...p,
+        profile: p.profiles,
+      }));
+      res.json(mapped);
     } catch (error) {
       console.error('Hashtag posts error:', error);
       res.status(500).json({ error: 'Failed to fetch hashtag posts' });
