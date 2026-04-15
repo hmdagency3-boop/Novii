@@ -77,7 +77,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const goingLeft = dx < 0;
     if ((goingRight && !isRTL && atStart) || (goingLeft && !isRTL && atEnd) ||
         (goingLeft && isRTL && atStart) || (goingRight && isRTL && atEnd)) {
-      setSwipeOffset(dx * 0.15);
       return;
     }
     setSwipeOffset(dx * 0.4);
