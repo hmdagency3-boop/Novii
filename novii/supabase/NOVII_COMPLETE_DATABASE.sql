@@ -1,7 +1,8 @@
 -- ============================================================================
 -- NOVII SOCIAL MEDIA PLATFORM - COMPLETE DATABASE SCHEMA
 -- ============================================================================
--- نسخة شاملة وكاملة لإنشاء قاعدة بيانات Novii من الصفر
+-- النسخة الشاملة النهائية المحدّثة - تاريخ: 2026-04-15
+-- تشمل كل الجداول والسياسات والفهارس والدوال والمشغّلات
 -- قم بتشغيل هذا الملف كاملاً في Supabase SQL Editor
 -- ============================================================================
 -- الترتيب المتبع:
@@ -12,9 +13,10 @@
 --   5.  دوال مساعدة لـ RLS (SECURITY DEFINER)
 --   6.  السياسات (Policies)
 --   7.  الدوال والمشغّلات (Functions & Triggers)
---   8.  الصلاحيات (Grants)
---   9.  Storage Buckets
---   10. البيانات الأساسية (Seed Data)
+--   8.  Views
+--   9.  الصلاحيات (Grants)
+--   10. Storage Buckets
+--   11. البيانات الأساسية (Seed Data)
 -- ============================================================================
 
 
@@ -55,6 +57,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   is_banned                     BOOLEAN DEFAULT FALSE,
   banned_reason                 TEXT,
   ban_until                     TIMESTAMP WITH TIME ZONE,
+  show_ban_duration             BOOLEAN DEFAULT FALSE,
   role                          TEXT DEFAULT 'user' CHECK (role IN ('user', 'admin')),
 
   -- ميداليات العضوية المبكرة
@@ -66,6 +69,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   bronze_early_member_at        TIMESTAMP WITH TIME ZONE,
   is_beta_tester                BOOLEAN DEFAULT FALSE,
   beta_tester_at                TIMESTAMP WITH TIME ZONE,
+  is_bug_hunter                 BOOLEAN DEFAULT FALSE,
+  bug_hunter_at                 TIMESTAMP WITH TIME ZONE,
 
   -- عدادات
   followers_count               INTEGER DEFAULT 0,
@@ -106,6 +111,8 @@ CREATE TABLE IF NOT EXISTS posts (
   is_pinned        BOOLEAN DEFAULT FALSE,
   hide_likes       BOOLEAN DEFAULT FALSE,
   replies_disabled BOOLEAN DEFAULT FALSE,
+  is_featured      BOOLEAN DEFAULT FALSE,
+  featured_at      TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   is_deleted       BOOLEAN DEFAULT FALSE,
   deleted_at       TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -148,13 +155,15 @@ CREATE TABLE IF NOT EXISTS stories (
   media_type        TEXT DEFAULT 'image' CHECK (media_type IN ('image', 'video')),
   views_count       INTEGER DEFAULT 0,
   expires_at        TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '24 hours'),
-  created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   music_url         TEXT,
   music_title       TEXT,
   music_artist      TEXT,
   music_artwork_url TEXT,
   music_start_time  INTEGER DEFAULT 0,
-  filter_name       TEXT DEFAULT 'normal'
+  filter_name       TEXT DEFAULT 'normal',
+  is_deleted        BOOLEAN DEFAULT FALSE,
+  deleted_at        TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+  created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- -----------------------------------------------------------------------
@@ -174,7 +183,7 @@ CREATE TABLE IF NOT EXISTS story_views (
 CREATE TABLE IF NOT EXISTS comments (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id           UUID REFERENCES posts(id) ON DELETE CASCADE,
-  reel_id           UUID,   -- سيُضاف المرجع بعد جدول reels
+  reel_id           UUID,
   user_id           UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   parent_comment_id UUID REFERENCES comments(id) ON DELETE CASCADE,
   content           TEXT NOT NULL,
@@ -193,7 +202,7 @@ CREATE TABLE IF NOT EXISTS likes (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id    UUID REFERENCES posts(id) ON DELETE CASCADE,
   comment_id UUID REFERENCES comments(id) ON DELETE CASCADE,
-  reel_id    UUID,   -- سيُضاف المرجع بعد جدول reels
+  reel_id    UUID,
   user_id    UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(post_id, user_id),
@@ -219,13 +228,14 @@ CREATE TABLE IF NOT EXISTS reels (
   comments_count INTEGER DEFAULT 0,
   views_count    INTEGER DEFAULT 0,
   is_private     BOOLEAN DEFAULT FALSE,
+  is_featured    BOOLEAN DEFAULT FALSE,
   is_deleted     BOOLEAN DEFAULT FALSE,
   deleted_at     TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   created_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- إضافة مراجع reel_id
+-- إضافة مراجع reel_id بعد إنشاء جدول reels
 ALTER TABLE likes    ADD CONSTRAINT fk_likes_reel_id    FOREIGN KEY (reel_id) REFERENCES reels(id) ON DELETE CASCADE;
 ALTER TABLE comments ADD CONSTRAINT fk_comments_reel_id FOREIGN KEY (reel_id) REFERENCES reels(id) ON DELETE CASCADE;
 
@@ -357,7 +367,7 @@ CREATE TABLE IF NOT EXISTS admins (
 );
 
 -- -----------------------------------------------------------------------
--- 2.17b ADMIN ACTIVITY LOGS
+-- 2.18 ADMIN ACTIVITY LOGS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS admin_logs (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -371,7 +381,7 @@ CREATE TABLE IF NOT EXISTS admin_logs (
 );
 
 -- -----------------------------------------------------------------------
--- 2.17c PLATFORM SETTINGS
+-- 2.19 PLATFORM SETTINGS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS platform_settings (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -382,7 +392,24 @@ CREATE TABLE IF NOT EXISTS platform_settings (
 );
 
 -- -----------------------------------------------------------------------
--- 2.18 BADGES
+-- 2.20 REPORTS
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS reports (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reporter_id      UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  reported_user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  reported_post_id UUID,
+  reason           TEXT NOT NULL,
+  description      TEXT,
+  status           TEXT DEFAULT 'pending',
+  resolved_by      UUID,
+  resolved_at      TIMESTAMP WITH TIME ZONE,
+  admin_note       TEXT,
+  created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- -----------------------------------------------------------------------
+-- 2.21 BADGES
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS badges (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -399,7 +426,7 @@ CREATE TABLE IF NOT EXISTS badges (
 );
 
 -- -----------------------------------------------------------------------
--- 2.19 USER BADGES
+-- 2.22 USER BADGES
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS user_badges (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -412,7 +439,7 @@ CREATE TABLE IF NOT EXISTS user_badges (
 );
 
 -- -----------------------------------------------------------------------
--- 2.20 COMMUNITIES
+-- 2.23 COMMUNITIES
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS communities (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -428,7 +455,7 @@ CREATE TABLE IF NOT EXISTS communities (
 );
 
 -- -----------------------------------------------------------------------
--- 2.21 COMMUNITY MEMBERS
+-- 2.24 COMMUNITY MEMBERS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS community_members (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -445,25 +472,26 @@ CREATE TABLE IF NOT EXISTS community_members (
 );
 
 -- -----------------------------------------------------------------------
--- 2.22 COMMUNITY MESSAGES
+-- 2.25 COMMUNITY MESSAGES
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS community_messages (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  community_id UUID NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
-  sender_id    UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  content      TEXT NOT NULL CHECK (length(content) >= 1),
-  image_url    TEXT,
-  is_edited    BOOLEAN DEFAULT FALSE,
-  edited_at    TIMESTAMP WITH TIME ZONE,
-  is_deleted   BOOLEAN DEFAULT FALSE NOT NULL,
-  deleted_by   UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  deleted_at   TIMESTAMP WITH TIME ZONE,
-  created_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  community_id      UUID NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+  sender_id         UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  content           TEXT NOT NULL CHECK (length(content) >= 1),
+  image_url         TEXT,
+  is_edited         BOOLEAN DEFAULT FALSE,
+  edited_at         TIMESTAMP WITH TIME ZONE,
+  is_deleted        BOOLEAN DEFAULT FALSE NOT NULL,
+  deleted_by        UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  deleted_at        TIMESTAMP WITH TIME ZONE,
+  is_system_message BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- -----------------------------------------------------------------------
--- 2.23 MODERATION LOGS
+-- 2.26 MODERATION LOGS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS moderation_logs (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -477,7 +505,7 @@ CREATE TABLE IF NOT EXISTS moderation_logs (
 );
 
 -- -----------------------------------------------------------------------
--- 2.24 TYPING INDICATORS (composite PK: community_id + user_id)
+-- 2.27 TYPING INDICATORS (composite PK: community_id + user_id)
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS typing_indicators (
   community_id UUID NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
@@ -490,7 +518,7 @@ CREATE TABLE IF NOT EXISTS typing_indicators (
 );
 
 -- -----------------------------------------------------------------------
--- 2.25 USER DEVICES
+-- 2.28 USER DEVICES
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS user_devices (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -522,7 +550,7 @@ CREATE TABLE IF NOT EXISTS user_devices (
 );
 
 -- -----------------------------------------------------------------------
--- 2.26 USER SETTINGS
+-- 2.29 USER SETTINGS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS user_settings (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -560,7 +588,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
 );
 
 -- -----------------------------------------------------------------------
--- 2.27 BLOCKED USERS
+-- 2.30 BLOCKED USERS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS blocked_users (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -571,7 +599,7 @@ CREATE TABLE IF NOT EXISTS blocked_users (
 );
 
 -- -----------------------------------------------------------------------
--- 2.28 CLOSE FRIENDS
+-- 2.31 CLOSE FRIENDS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS close_friends (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -582,7 +610,7 @@ CREATE TABLE IF NOT EXISTS close_friends (
 );
 
 -- -----------------------------------------------------------------------
--- 2.29 MUTED USERS
+-- 2.32 MUTED USERS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS muted_users (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -596,7 +624,7 @@ CREATE TABLE IF NOT EXISTS muted_users (
 );
 
 -- -----------------------------------------------------------------------
--- 2.30 RESTRICTED USERS
+-- 2.33 RESTRICTED USERS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS restricted_users (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -607,7 +635,7 @@ CREATE TABLE IF NOT EXISTS restricted_users (
 );
 
 -- -----------------------------------------------------------------------
--- 2.31 FAVORITE USERS
+-- 2.34 FAVORITE USERS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS favorite_users (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -618,7 +646,7 @@ CREATE TABLE IF NOT EXISTS favorite_users (
 );
 
 -- -----------------------------------------------------------------------
--- 2.32 CONVERSATIONS (دردشة جماعية)
+-- 2.35 CONVERSATIONS (دردشة جماعية)
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS conversations (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -631,7 +659,7 @@ CREATE TABLE IF NOT EXISTS conversations (
 );
 
 -- -----------------------------------------------------------------------
--- 2.33 CONVERSATION MEMBERS
+-- 2.36 CONVERSATION MEMBERS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS conversation_members (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -642,7 +670,7 @@ CREATE TABLE IF NOT EXISTS conversation_members (
 );
 
 -- -----------------------------------------------------------------------
--- 2.34 MUTED CONVERSATIONS (كتم محادثة مباشرة)
+-- 2.37 MUTED CONVERSATIONS (كتم محادثة مباشرة)
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS muted_conversations (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -653,7 +681,7 @@ CREATE TABLE IF NOT EXISTS muted_conversations (
 );
 
 -- -----------------------------------------------------------------------
--- 2.35 HIGHLIGHTS
+-- 2.38 HIGHLIGHTS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS highlights (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -665,7 +693,7 @@ CREATE TABLE IF NOT EXISTS highlights (
 );
 
 -- -----------------------------------------------------------------------
--- 2.36 HIGHLIGHT STORIES
+-- 2.39 HIGHLIGHT STORIES
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS highlight_stories (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -676,19 +704,21 @@ CREATE TABLE IF NOT EXISTS highlight_stories (
 );
 
 -- -----------------------------------------------------------------------
--- 2.37 HASHTAGS
+-- 2.40 HASHTAGS
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS hashtags (
-  id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
-  name        TEXT    NOT NULL UNIQUE,
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL UNIQUE,
   posts_count INTEGER DEFAULT 0,
   reels_count INTEGER DEFAULT 0,
+  is_banned   BOOLEAN DEFAULT FALSE,
+  is_pinned   BOOLEAN DEFAULT FALSE,
   created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS post_hashtags (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  post_id    UUID NOT NULL REFERENCES posts(id)    ON DELETE CASCADE,
+  post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   hashtag_id UUID NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(post_id, hashtag_id)
@@ -696,14 +726,14 @@ CREATE TABLE IF NOT EXISTS post_hashtags (
 
 CREATE TABLE IF NOT EXISTS reel_hashtags (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  reel_id    UUID NOT NULL REFERENCES reels(id)    ON DELETE CASCADE,
+  reel_id    UUID NOT NULL REFERENCES reels(id) ON DELETE CASCADE,
   hashtag_id UUID NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(reel_id, hashtag_id)
 );
 
 -- -----------------------------------------------------------------------
--- 2.38 USER WARNINGS / STRIKES
+-- 2.41 USER WARNINGS / STRIKES
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS user_warnings (
   id           UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -717,7 +747,7 @@ CREATE TABLE IF NOT EXISTS user_warnings (
 );
 
 -- -----------------------------------------------------------------------
--- 2.39 FEED SCORES (خوارزمية الـ Feed)
+-- 2.42 FEED SCORES (خوارزمية الـ Feed)
 -- -----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS feed_scores (
   id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -731,6 +761,87 @@ CREATE TABLE IF NOT EXISTS feed_scores (
   CONSTRAINT check_feed_one_target CHECK (
     (post_id IS NOT NULL)::int + (reel_id IS NOT NULL)::int = 1
   )
+);
+
+-- -----------------------------------------------------------------------
+-- 2.43 VERIFICATION REQUESTS
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS verification_requests (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  full_name    TEXT NOT NULL DEFAULT '',
+  reason       TEXT NOT NULL DEFAULT '',
+  category     TEXT NOT NULL DEFAULT 'personal'
+    CHECK (category IN ('personal', 'creator', 'business', 'public_figure', 'organization')),
+  social_links JSONB DEFAULT '{}',
+  id_card_url  TEXT,
+  selfie_url   TEXT,
+  status       TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'approved', 'rejected')),
+  admin_note   TEXT,
+  reviewed_by  UUID,
+  reviewed_at  TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- -----------------------------------------------------------------------
+-- 2.44 BAN APPEALS
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ban_appeals (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewing', 'approved', 'rejected')),
+  id_front_url TEXT NOT NULL,
+  id_back_url  TEXT NOT NULL,
+  selfie_url   TEXT NOT NULL,
+  message      TEXT,
+  admin_note   TEXT,
+  reviewed_by  UUID REFERENCES profiles(id),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reviewed_at  TIMESTAMPTZ
+);
+
+-- -----------------------------------------------------------------------
+-- 2.45 BANNED WORDS (فلتر المحتوى التلقائي)
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS banned_words (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  word       TEXT NOT NULL UNIQUE,
+  severity   TEXT DEFAULT 'warning',
+  is_active  BOOLEAN DEFAULT TRUE,
+  created_by UUID REFERENCES profiles(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- -----------------------------------------------------------------------
+-- 2.46 IP BANS
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ip_bans (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ip_address TEXT NOT NULL,
+  reason     TEXT,
+  banned_by  UUID REFERENCES profiles(id),
+  expires_at TIMESTAMPTZ,
+  is_active  BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- -----------------------------------------------------------------------
+-- 2.47 ANNOUNCEMENTS / BANNERS
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS announcements (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title      TEXT NOT NULL,
+  content    TEXT NOT NULL,
+  type       TEXT DEFAULT 'info',
+  target     TEXT DEFAULT 'all',
+  is_active  BOOLEAN DEFAULT TRUE,
+  is_banner  BOOLEAN DEFAULT FALSE,
+  created_by UUID REFERENCES profiles(id),
+  starts_at  TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 
@@ -749,6 +860,7 @@ CREATE INDEX IF NOT EXISTS idx_posts_user_id              ON posts(user_id);
 CREATE INDEX IF NOT EXISTS idx_posts_created_at           ON posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_user_created         ON posts(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_pinned               ON posts(user_id, is_pinned) WHERE is_pinned = TRUE;
+CREATE INDEX IF NOT EXISTS idx_posts_not_deleted           ON posts(user_id, created_at DESC) WHERE is_deleted = FALSE;
 
 -- Follows
 CREATE INDEX IF NOT EXISTS idx_follows_follower           ON follows(follower_id);
@@ -776,6 +888,7 @@ CREATE INDEX IF NOT EXISTS idx_comments_created_at        ON comments(created_at
 CREATE INDEX IF NOT EXISTS idx_comments_parent_id         ON comments(parent_comment_id);
 CREATE INDEX IF NOT EXISTS idx_comments_parent_created    ON comments(parent_comment_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_comments_gif_url           ON comments(gif_url) WHERE gif_url IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_comments_not_deleted        ON comments(post_id) WHERE is_deleted = FALSE;
 
 -- Likes
 CREATE INDEX IF NOT EXISTS idx_likes_post_id              ON likes(post_id);
@@ -787,6 +900,7 @@ CREATE INDEX IF NOT EXISTS idx_likes_reel_id              ON likes(reel_id);
 CREATE INDEX IF NOT EXISTS idx_reels_user_id              ON reels(user_id);
 CREATE INDEX IF NOT EXISTS idx_reels_created_at           ON reels(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reels_user_created         ON reels(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reels_not_deleted           ON reels(user_id, created_at DESC) WHERE is_deleted = FALSE;
 
 -- Messages
 CREATE INDEX IF NOT EXISTS idx_messages_sender_id         ON messages(sender_id);
@@ -845,6 +959,7 @@ CREATE INDEX IF NOT EXISTS idx_community_msgs_created     ON community_messages(
 CREATE INDEX IF NOT EXISTS idx_community_msgs_comm_crtd   ON community_messages(community_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_community_msgs_deleted     ON community_messages(community_id, is_deleted);
 CREATE INDEX IF NOT EXISTS idx_community_msgs_deleted_at  ON community_messages(deleted_at) WHERE is_deleted = TRUE;
+CREATE INDEX IF NOT EXISTS idx_community_msgs_system      ON community_messages(community_id, is_system_message) WHERE is_system_message = TRUE;
 
 -- Moderation Logs
 CREATE INDEX IF NOT EXISTS idx_mod_logs_community_id      ON moderation_logs(community_id);
@@ -860,10 +975,12 @@ CREATE INDEX IF NOT EXISTS idx_user_devices_user_id       ON user_devices(user_i
 CREATE INDEX IF NOT EXISTS idx_user_devices_ip            ON user_devices(ip_address);
 CREATE INDEX IF NOT EXISTS idx_user_devices_last_active   ON user_devices(last_active_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_devices_user_active   ON user_devices(user_id, last_active_at DESC);
-CREATE INDEX IF NOT EXISTS idx_user_devices_fingerprint   ON user_devices(device_fingerprint);
+CREATE INDEX IF NOT EXISTS idx_user_devices_fp            ON user_devices(device_fingerprint);
 CREATE INDEX IF NOT EXISTS idx_user_devices_session       ON user_devices(session_token) WHERE session_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_user_devices_status        ON user_devices(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_user_devices_trusted       ON user_devices(user_id, is_trusted) WHERE is_trusted = TRUE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_devices_user_fingerprint
+  ON user_devices(user_id, device_fingerprint) WHERE device_fingerprint IS NOT NULL AND status = 'active';
 
 -- User Settings / extra tables
 CREATE INDEX IF NOT EXISTS idx_user_settings_user_id           ON user_settings(user_id);
@@ -878,15 +995,6 @@ CREATE INDEX IF NOT EXISTS idx_highlights_user_id              ON highlights(use
 CREATE INDEX IF NOT EXISTS idx_highlight_stories_highlight_id  ON highlight_stories(highlight_id);
 CREATE INDEX IF NOT EXISTS idx_muted_conversations_user_id     ON muted_conversations(user_id);
 
--- Soft delete indexes
-CREATE INDEX IF NOT EXISTS idx_posts_not_deleted    ON posts(user_id, created_at DESC)    WHERE is_deleted = FALSE;
-CREATE INDEX IF NOT EXISTS idx_comments_not_deleted ON comments(post_id)                  WHERE is_deleted = FALSE;
-CREATE INDEX IF NOT EXISTS idx_reels_not_deleted    ON reels(user_id, created_at DESC)    WHERE is_deleted = FALSE;
-
--- User Devices fingerprint (unique per user, not globally)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_user_devices_user_fingerprint
-  ON user_devices(user_id, device_fingerprint) WHERE device_fingerprint IS NOT NULL AND status = 'active';
-
 -- Hashtags
 CREATE INDEX IF NOT EXISTS idx_hashtags_name           ON hashtags(name);
 CREATE INDEX IF NOT EXISTS idx_hashtags_posts_count    ON hashtags(posts_count DESC);
@@ -897,6 +1005,7 @@ CREATE INDEX IF NOT EXISTS idx_reel_hashtags_hashtag   ON reel_hashtags(hashtag_
 
 -- User Warnings
 CREATE INDEX IF NOT EXISTS idx_user_warnings_user_id   ON user_warnings(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_warnings_type      ON user_warnings(warning_type);
 CREATE INDEX IF NOT EXISTS idx_user_warnings_active    ON user_warnings(is_active) WHERE is_active = TRUE;
 
 -- Feed Scores
@@ -904,94 +1013,90 @@ CREATE INDEX IF NOT EXISTS idx_feed_scores_user_score  ON feed_scores(user_id, s
 CREATE INDEX IF NOT EXISTS idx_feed_scores_post_id     ON feed_scores(post_id);
 CREATE INDEX IF NOT EXISTS idx_feed_scores_reel_id     ON feed_scores(reel_id);
 
+-- Reports
+CREATE INDEX IF NOT EXISTS idx_reports_status           ON reports(status);
+CREATE INDEX IF NOT EXISTS idx_reports_post             ON reports(reported_post_id);
+CREATE INDEX IF NOT EXISTS idx_reports_reporter         ON reports(reporter_id);
+
+-- Verification Requests
+CREATE INDEX IF NOT EXISTS idx_vr_user                  ON verification_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_vr_status                ON verification_requests(status);
+
+-- Ban Appeals
+CREATE INDEX IF NOT EXISTS idx_ban_appeals_user_id      ON ban_appeals(user_id);
+CREATE INDEX IF NOT EXISTS idx_ban_appeals_status       ON ban_appeals(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ban_appeals_one_active_per_user
+  ON ban_appeals(user_id) WHERE status IN ('pending', 'reviewing');
+
+-- Admin Logs
+CREATE INDEX IF NOT EXISTS idx_admin_logs_admin         ON admin_logs(admin_user_id);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_action        ON admin_logs(action);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_created       ON admin_logs(created_at DESC);
+
+-- Platform Settings
+CREATE INDEX IF NOT EXISTS idx_platform_settings_key    ON platform_settings(key);
+
+-- IP Bans
+CREATE INDEX IF NOT EXISTS idx_ip_bans_ip              ON ip_bans(ip_address);
+
 
 -- ============================================================================
 -- 4. ROW LEVEL SECURITY
 -- ============================================================================
-ALTER TABLE profiles           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE posts              ENABLE ROW LEVEL SECURITY;
-ALTER TABLE follows            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE follow_requests    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stories            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE story_views        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comments           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE likes              ENABLE ROW LEVEL SECURITY;
-ALTER TABLE reels              ENABLE ROW LEVEL SECURITY;
-ALTER TABLE messages           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE message_reactions  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE saved_posts        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE post_views         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE post_insights      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_statistics    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE admins             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE admin_logs         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE platform_settings  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE badges             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_badges        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE communities        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE community_members  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE community_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE moderation_logs    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE typing_indicators  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_devices       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_settings      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE blocked_users      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE close_friends      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE muted_users        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE restricted_users   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE favorite_users     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE conversations      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE conversation_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE muted_conversations  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE highlights         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE highlight_stories  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE hashtags           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE post_hashtags      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE reel_hashtags      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_warnings      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE feed_scores        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE posts                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE follows               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE follow_requests       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stories               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE story_views           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE comments              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE likes                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reels                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE message_reactions     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE saved_posts           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_views            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_insights         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_statistics       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admins                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_logs            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_settings     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reports               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE badges                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_badges           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE communities           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE community_members     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE community_messages    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE moderation_logs       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE typing_indicators     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_devices          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_settings         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE blocked_users         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE close_friends         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE muted_users           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE restricted_users      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE favorite_users        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversation_members  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE muted_conversations   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE highlights            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE highlight_stories     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hashtags              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_hashtags         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reel_hashtags         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_warnings         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feed_scores           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE verification_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE banned_words          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ip_bans               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE announcements         ENABLE ROW LEVEL SECURITY;
 
-
--- ============================================================================
--- 4.b ADMIN SYSTEM RLS POLICIES
--- ============================================================================
-
-CREATE POLICY "Admins can insert logs"
-  ON admin_logs FOR INSERT
-  WITH CHECK (
-    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE)
-  );
-
-CREATE POLICY "Admins can view logs"
-  ON admin_logs FOR SELECT
-  USING (
-    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE)
-  );
-
-CREATE POLICY "Admins can view settings"
-  ON platform_settings FOR SELECT
-  USING (
-    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE)
-  );
-
-CREATE POLICY "Admins with settings permission can update"
-  ON platform_settings FOR UPDATE
-  USING (
-    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE AND admins.can_manage_settings = TRUE)
-  );
-
-CREATE POLICY "Admins with settings permission can insert"
-  ON platform_settings FOR INSERT
-  WITH CHECK (
-    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE AND admins.can_manage_settings = TRUE)
-  );
 
 -- ============================================================================
 -- 5. HELPER FUNCTIONS FOR RLS (SECURITY DEFINER - تكسر حلقة التكرار)
 -- ============================================================================
 
--- التحقق إذا كان المستخدم عضواً في المجتمع
 CREATE OR REPLACE FUNCTION auth_is_community_member(p_community_id UUID)
 RETURNS BOOLEAN AS $$
   SELECT EXISTS (
@@ -1000,7 +1105,6 @@ RETURNS BOOLEAN AS $$
   );
 $$ LANGUAGE SQL SECURITY DEFINER STABLE;
 
--- التحقق إذا كان المستخدم أدمناً أو مشرفاً في المجتمع
 CREATE OR REPLACE FUNCTION auth_is_community_admin(p_community_id UUID)
 RETURNS BOOLEAN AS $$
   SELECT EXISTS (
@@ -1017,42 +1121,57 @@ $$ LANGUAGE SQL SECURITY DEFINER STABLE;
 -- ============================================================================
 
 -- ---- PROFILES ----
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON profiles;
 CREATE POLICY "Public profiles are viewable by everyone"
   ON profiles FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
 CREATE POLICY "Users can insert own profile"
   ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 CREATE POLICY "Users can update own profile"
   ON profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
 -- ---- POSTS ----
+DROP POLICY IF EXISTS "Posts viewable by everyone" ON posts;
 CREATE POLICY "Posts viewable by everyone"
   ON posts FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Users can insert own posts" ON posts;
 CREATE POLICY "Users can insert own posts"
   ON posts FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own posts" ON posts;
 CREATE POLICY "Users can update own posts"
   ON posts FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own posts" ON posts;
 CREATE POLICY "Users can delete own posts"
   ON posts FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- FOLLOWS ----
+DROP POLICY IF EXISTS "Anyone can view follows" ON follows;
 CREATE POLICY "Anyone can view follows"
   ON follows FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Users can follow others" ON follows;
 CREATE POLICY "Users can follow others"
   ON follows FOR INSERT WITH CHECK (auth.uid() = follower_id);
+DROP POLICY IF EXISTS "Users can unfollow" ON follows;
 CREATE POLICY "Users can unfollow"
   ON follows FOR DELETE USING (auth.uid() = follower_id);
 
 -- ---- FOLLOW REQUESTS ----
+DROP POLICY IF EXISTS "Users can view their own follow requests" ON follow_requests;
 CREATE POLICY "Users can view their own follow requests"
   ON follow_requests FOR SELECT USING (auth.uid() = recipient_id OR auth.uid() = requester_id);
+DROP POLICY IF EXISTS "Users can create follow requests" ON follow_requests;
 CREATE POLICY "Users can create follow requests"
   ON follow_requests FOR INSERT WITH CHECK (auth.uid() = requester_id);
+DROP POLICY IF EXISTS "Recipients can update follow request status" ON follow_requests;
 CREATE POLICY "Recipients can update follow request status"
   ON follow_requests FOR UPDATE USING (auth.uid() = recipient_id) WITH CHECK (auth.uid() = recipient_id);
+DROP POLICY IF EXISTS "Requesters can delete their own requests" ON follow_requests;
 CREATE POLICY "Requesters can delete their own requests"
   ON follow_requests FOR DELETE USING (auth.uid() = requester_id);
 
 -- ---- STORIES ----
+DROP POLICY IF EXISTS "Active stories are viewable" ON stories;
 CREATE POLICY "Active stories are viewable"
   ON stories FOR SELECT USING (
     expires_at > NOW() AND (
@@ -1060,293 +1179,448 @@ CREATE POLICY "Active stories are viewable"
       user_id IN (SELECT following_id FROM follows WHERE follower_id = auth.uid())
     )
   );
+DROP POLICY IF EXISTS "Users can insert own stories" ON stories;
 CREATE POLICY "Users can insert own stories"
   ON stories FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own stories" ON stories;
 CREATE POLICY "Users can update own stories"
   ON stories FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own stories" ON stories;
 CREATE POLICY "Users can delete own stories"
   ON stories FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- STORY VIEWS ----
+DROP POLICY IF EXISTS "Story views are viewable" ON story_views;
 CREATE POLICY "Story views are viewable"
   ON story_views FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Users can insert story views" ON story_views;
 CREATE POLICY "Users can insert story views"
   ON story_views FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- ---- COMMENTS ----
+DROP POLICY IF EXISTS "Comments are viewable by everyone" ON comments;
 CREATE POLICY "Comments are viewable by everyone"
   ON comments FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Authenticated users can create comments" ON comments;
 CREATE POLICY "Authenticated users can create comments"
   ON comments FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own comments" ON comments;
 CREATE POLICY "Users can update own comments"
   ON comments FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own comments" ON comments;
 CREATE POLICY "Users can delete own comments"
   ON comments FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- LIKES ----
+DROP POLICY IF EXISTS "Likes are viewable by everyone" ON likes;
 CREATE POLICY "Likes are viewable by everyone"
   ON likes FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Users can insert own likes" ON likes;
 CREATE POLICY "Users can insert own likes"
   ON likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own likes" ON likes;
 CREATE POLICY "Users can delete own likes"
   ON likes FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- REELS ----
+DROP POLICY IF EXISTS "Reels are viewable by everyone" ON reels;
 CREATE POLICY "Reels are viewable by everyone"
   ON reels FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Users can insert own reels" ON reels;
 CREATE POLICY "Users can insert own reels"
   ON reels FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own reels" ON reels;
 CREATE POLICY "Users can update own reels"
   ON reels FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own reels" ON reels;
 CREATE POLICY "Users can delete own reels"
   ON reels FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- MESSAGES ----
+DROP POLICY IF EXISTS "Users can view own messages" ON messages;
 CREATE POLICY "Users can view own messages"
   ON messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+DROP POLICY IF EXISTS "Users can send messages" ON messages;
 CREATE POLICY "Users can send messages"
   ON messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+DROP POLICY IF EXISTS "Users can update own sent messages" ON messages;
 CREATE POLICY "Users can update own sent messages"
   ON messages FOR UPDATE USING (auth.uid() = sender_id);
 
 -- ---- MESSAGE REACTIONS ----
+DROP POLICY IF EXISTS "Message reactions are viewable" ON message_reactions;
 CREATE POLICY "Message reactions are viewable"
   ON message_reactions FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Users can add reactions" ON message_reactions;
 CREATE POLICY "Users can add reactions"
   ON message_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can remove their reactions" ON message_reactions;
 CREATE POLICY "Users can remove their reactions"
   ON message_reactions FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- NOTIFICATIONS ----
-CREATE POLICY "notifications_insert"  ON notifications FOR INSERT WITH CHECK (TRUE);
-CREATE POLICY "notifications_select"  ON notifications FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "notifications_update"  ON notifications FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "notifications_insert" ON notifications;
+CREATE POLICY "notifications_insert" ON notifications FOR INSERT WITH CHECK (TRUE);
+DROP POLICY IF EXISTS "notifications_select" ON notifications;
+CREATE POLICY "notifications_select" ON notifications FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "notifications_update" ON notifications;
+CREATE POLICY "notifications_update" ON notifications FOR UPDATE USING (auth.uid() = user_id);
 
 -- ---- SAVED POSTS ----
+DROP POLICY IF EXISTS "Users can read their saved posts" ON saved_posts;
 CREATE POLICY "Users can read their saved posts"
   ON saved_posts FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can save posts" ON saved_posts;
 CREATE POLICY "Users can save posts"
   ON saved_posts FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete their saved posts" ON saved_posts;
 CREATE POLICY "Users can delete their saved posts"
   ON saved_posts FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- POST VIEWS ----
+DROP POLICY IF EXISTS "Users can add post views" ON post_views;
 CREATE POLICY "Users can add post views"
   ON post_views FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can view post views" ON post_views;
 CREATE POLICY "Users can view post views"
   ON post_views FOR SELECT USING (TRUE);
 
 -- ---- POST INSIGHTS ----
+DROP POLICY IF EXISTS "Users can read post insights" ON post_insights;
 CREATE POLICY "Users can read post insights"
   ON post_insights FOR SELECT USING (TRUE);
 
 -- ---- USER STATISTICS ----
+DROP POLICY IF EXISTS "Users can view own statistics" ON user_statistics;
 CREATE POLICY "Users can view own statistics"
   ON user_statistics FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own statistics" ON user_statistics;
 CREATE POLICY "Users can insert own statistics"
   ON user_statistics FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own statistics" ON user_statistics;
 CREATE POLICY "Users can update own statistics"
   ON user_statistics FOR UPDATE USING (auth.uid() = user_id);
 
 -- ---- ADMINS ----
+DROP POLICY IF EXISTS "Admins table is viewable by authenticated" ON admins;
 CREATE POLICY "Admins table is viewable by authenticated"
   ON admins FOR SELECT USING (TRUE);
 
+-- ---- ADMIN LOGS ----
+DROP POLICY IF EXISTS "Admins can insert logs" ON admin_logs;
+CREATE POLICY "Admins can insert logs"
+  ON admin_logs FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE)
+  );
+DROP POLICY IF EXISTS "Admins can view logs" ON admin_logs;
+CREATE POLICY "Admins can view logs"
+  ON admin_logs FOR SELECT USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE)
+  );
+
+-- ---- PLATFORM SETTINGS ----
+DROP POLICY IF EXISTS "Admins can view settings" ON platform_settings;
+CREATE POLICY "Admins can view settings"
+  ON platform_settings FOR SELECT USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE)
+  );
+DROP POLICY IF EXISTS "Admins with settings permission can update" ON platform_settings;
+CREATE POLICY "Admins with settings permission can update"
+  ON platform_settings FOR UPDATE USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE AND admins.can_manage_settings = TRUE)
+  );
+DROP POLICY IF EXISTS "Admins with settings permission can insert" ON platform_settings;
+CREATE POLICY "Admins with settings permission can insert"
+  ON platform_settings FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM admins WHERE admins.user_id = auth.uid() AND admins.is_active = TRUE AND admins.can_manage_settings = TRUE)
+  );
+
+-- ---- REPORTS ----
+DROP POLICY IF EXISTS "Users can create reports" ON reports;
+CREATE POLICY "Users can create reports" ON reports
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = reporter_id);
+DROP POLICY IF EXISTS "Users can view own reports" ON reports;
+CREATE POLICY "Users can view own reports" ON reports
+  FOR SELECT TO authenticated USING (auth.uid() = reporter_id);
+
 -- ---- BADGES ----
+DROP POLICY IF EXISTS "Badges are viewable by everyone" ON badges;
 CREATE POLICY "Badges are viewable by everyone"
   ON badges FOR SELECT USING (TRUE);
 
 -- ---- USER BADGES ----
+DROP POLICY IF EXISTS "User badges are viewable by everyone" ON user_badges;
 CREATE POLICY "User badges are viewable by everyone"
   ON user_badges FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Admins can manage user badges" ON user_badges;
 CREATE POLICY "Admins can manage user badges"
   ON user_badges FOR ALL USING (TRUE);
 
 -- ---- COMMUNITIES (fixed - no recursion) ----
+DROP POLICY IF EXISTS "Users can view their communities" ON communities;
 CREATE POLICY "Users can view their communities"
   ON communities FOR SELECT
   USING (created_by = auth.uid() OR auth_is_community_member(id));
+DROP POLICY IF EXISTS "Authenticated users can create communities" ON communities;
 CREATE POLICY "Authenticated users can create communities"
-  ON communities FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+  ON communities FOR INSERT WITH CHECK (TRUE);
+DROP POLICY IF EXISTS "Only creator can update community" ON communities;
 CREATE POLICY "Only creator can update community"
-  ON communities FOR UPDATE USING (created_by = auth.uid());
+  ON communities FOR UPDATE USING (TRUE) WITH CHECK (TRUE);
+DROP POLICY IF EXISTS "Only creator can delete community" ON communities;
 CREATE POLICY "Only creator can delete community"
   ON communities FOR DELETE USING (created_by = auth.uid());
 
 -- ---- COMMUNITY MEMBERS (fixed - no recursion) ----
+DROP POLICY IF EXISTS "Users can view community members" ON community_members;
 CREATE POLICY "Users can view community members"
   ON community_members FOR SELECT
   USING (user_id = auth.uid() OR auth_is_community_member(community_id));
+DROP POLICY IF EXISTS "Admins can add members" ON community_members;
 CREATE POLICY "Admins can add members"
   ON community_members FOR INSERT WITH CHECK (TRUE);
+DROP POLICY IF EXISTS "Users can leave or be removed from community" ON community_members;
 CREATE POLICY "Users can leave or be removed from community"
   ON community_members FOR DELETE
   USING (user_id = auth.uid() OR auth_is_community_admin(community_id));
+DROP POLICY IF EXISTS "Admins can update member roles" ON community_members;
 CREATE POLICY "Admins can update member roles"
-  ON community_members FOR UPDATE USING (auth_is_community_admin(community_id));
+  ON community_members FOR UPDATE USING (TRUE) WITH CHECK (TRUE);
 
 -- ---- COMMUNITY MESSAGES (fixed - no recursion) ----
+DROP POLICY IF EXISTS "Users can view community messages" ON community_messages;
 CREATE POLICY "Users can view community messages"
   ON community_messages FOR SELECT
   USING (
     auth_is_community_member(community_id)
     OR community_id IN (SELECT id FROM communities WHERE created_by = auth.uid())
   );
+DROP POLICY IF EXISTS "Members can send messages" ON community_messages;
 CREATE POLICY "Members can send messages"
   ON community_messages FOR INSERT
   WITH CHECK (sender_id = auth.uid() AND auth_is_community_member(community_id));
+DROP POLICY IF EXISTS "Users can edit their messages" ON community_messages;
 CREATE POLICY "Users can edit their messages"
-  ON community_messages FOR UPDATE USING (TRUE);
+  ON community_messages FOR UPDATE USING (TRUE) WITH CHECK (TRUE);
+DROP POLICY IF EXISTS "Users can delete their messages" ON community_messages;
 CREATE POLICY "Users can delete their messages"
   ON community_messages FOR DELETE USING (sender_id = auth.uid());
 
 -- ---- MODERATION LOGS (fixed - no recursion) ----
+DROP POLICY IF EXISTS "Admins can read moderation logs" ON moderation_logs;
 CREATE POLICY "Admins can read moderation logs"
   ON moderation_logs FOR SELECT USING (auth_is_community_admin(community_id));
+DROP POLICY IF EXISTS "Admins can create moderation logs" ON moderation_logs;
 CREATE POLICY "Admins can create moderation logs"
   ON moderation_logs FOR INSERT WITH CHECK (auth_is_community_admin(community_id));
 
 -- ---- TYPING INDICATORS (fixed - no recursion) ----
+DROP POLICY IF EXISTS "Anyone can read typing indicators" ON typing_indicators;
 CREATE POLICY "Anyone can read typing indicators"
   ON typing_indicators FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Users can manage their own typing status" ON typing_indicators;
 CREATE POLICY "Users can manage their own typing status"
   ON typing_indicators FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update their own typing status" ON typing_indicators;
 CREATE POLICY "Users can update their own typing status"
   ON typing_indicators FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete their own typing status" ON typing_indicators;
 CREATE POLICY "Users can delete their own typing status"
   ON typing_indicators FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- USER DEVICES ----
+DROP POLICY IF EXISTS "Users can view their own devices" ON user_devices;
 CREATE POLICY "Users can view their own devices"
   ON user_devices FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "System can track devices" ON user_devices;
 CREATE POLICY "System can track devices"
   ON user_devices FOR INSERT WITH CHECK (TRUE);
+DROP POLICY IF EXISTS "Users can update their own devices" ON user_devices;
 CREATE POLICY "Users can update their own devices"
   ON user_devices FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users can delete their own devices" ON user_devices;
 CREATE POLICY "Users can delete their own devices"
   ON user_devices FOR DELETE USING (user_id = auth.uid());
 
 -- ---- USER SETTINGS ----
+DROP POLICY IF EXISTS "Users can view own settings" ON user_settings;
 CREATE POLICY "Users can view own settings"
   ON user_settings FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own settings" ON user_settings;
 CREATE POLICY "Users can insert own settings"
   ON user_settings FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own settings" ON user_settings;
 CREATE POLICY "Users can update own settings"
   ON user_settings FOR UPDATE USING (auth.uid() = user_id);
 
 -- ---- BLOCKED USERS ----
+DROP POLICY IF EXISTS "Users can view own blocked list" ON blocked_users;
 CREATE POLICY "Users can view own blocked list"
   ON blocked_users FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can block others" ON blocked_users;
 CREATE POLICY "Users can block others"
   ON blocked_users FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can unblock others" ON blocked_users;
 CREATE POLICY "Users can unblock others"
   ON blocked_users FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- CLOSE FRIENDS ----
+DROP POLICY IF EXISTS "Users can view own close friends" ON close_friends;
 CREATE POLICY "Users can view own close friends"
   ON close_friends FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can add close friends" ON close_friends;
 CREATE POLICY "Users can add close friends"
   ON close_friends FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can remove close friends" ON close_friends;
 CREATE POLICY "Users can remove close friends"
   ON close_friends FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- MUTED USERS ----
+DROP POLICY IF EXISTS "Users can view own muted list" ON muted_users;
 CREATE POLICY "Users can view own muted list"
   ON muted_users FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can mute others" ON muted_users;
 CREATE POLICY "Users can mute others"
   ON muted_users FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can unmute others" ON muted_users;
 CREATE POLICY "Users can unmute others"
   ON muted_users FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- RESTRICTED USERS ----
+DROP POLICY IF EXISTS "Users can view own restricted list" ON restricted_users;
 CREATE POLICY "Users can view own restricted list"
   ON restricted_users FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can restrict others" ON restricted_users;
 CREATE POLICY "Users can restrict others"
   ON restricted_users FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can unrestrict others" ON restricted_users;
 CREATE POLICY "Users can unrestrict others"
   ON restricted_users FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- FAVORITE USERS ----
+DROP POLICY IF EXISTS "Users can view own favorites" ON favorite_users;
 CREATE POLICY "Users can view own favorites"
   ON favorite_users FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can add favorites" ON favorite_users;
 CREATE POLICY "Users can add favorites"
   ON favorite_users FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can remove favorites" ON favorite_users;
 CREATE POLICY "Users can remove favorites"
   ON favorite_users FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- CONVERSATIONS ----
+DROP POLICY IF EXISTS "Members can view conversations" ON conversations;
 CREATE POLICY "Members can view conversations"
   ON conversations FOR SELECT USING (
     EXISTS (SELECT 1 FROM conversation_members WHERE conversation_id = conversations.id AND user_id = auth.uid())
   );
+DROP POLICY IF EXISTS "Users can create conversations" ON conversations;
 CREATE POLICY "Users can create conversations"
   ON conversations FOR INSERT WITH CHECK (auth.uid() = created_by);
 
 -- ---- CONVERSATION MEMBERS ----
+DROP POLICY IF EXISTS "Members can view conversation members" ON conversation_members;
 CREATE POLICY "Members can view conversation members"
   ON conversation_members FOR SELECT USING (
     EXISTS (SELECT 1 FROM conversation_members cm WHERE cm.conversation_id = conversation_members.conversation_id AND cm.user_id = auth.uid())
   );
+DROP POLICY IF EXISTS "Conversation creator can add members" ON conversation_members;
 CREATE POLICY "Conversation creator can add members"
   ON conversation_members FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM conversations WHERE id = conversation_id AND created_by = auth.uid())
   );
 
 -- ---- MUTED CONVERSATIONS ----
+DROP POLICY IF EXISTS "Users manage own mutes" ON muted_conversations;
 CREATE POLICY "Users manage own mutes"
   ON muted_conversations USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- ---- HIGHLIGHTS ----
+DROP POLICY IF EXISTS "Anyone can view highlights" ON highlights;
 CREATE POLICY "Anyone can view highlights"
   ON highlights FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Users can create own highlights" ON highlights;
 CREATE POLICY "Users can create own highlights"
   ON highlights FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own highlights" ON highlights;
 CREATE POLICY "Users can update own highlights"
   ON highlights FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own highlights" ON highlights;
 CREATE POLICY "Users can delete own highlights"
   ON highlights FOR DELETE USING (auth.uid() = user_id);
 
 -- ---- HIGHLIGHT STORIES ----
+DROP POLICY IF EXISTS "Anyone can view highlight stories" ON highlight_stories;
 CREATE POLICY "Anyone can view highlight stories"
   ON highlight_stories FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Highlight owner can add stories" ON highlight_stories;
 CREATE POLICY "Highlight owner can add stories"
   ON highlight_stories FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM highlights WHERE id = highlight_id AND user_id = auth.uid())
   );
+DROP POLICY IF EXISTS "Highlight owner can remove stories" ON highlight_stories;
 CREATE POLICY "Highlight owner can remove stories"
   ON highlight_stories FOR DELETE USING (
     EXISTS (SELECT 1 FROM highlights WHERE id = highlight_id AND user_id = auth.uid())
   );
 
 -- ---- HASHTAGS ----
+DROP POLICY IF EXISTS "Hashtags are public" ON hashtags;
 CREATE POLICY "Hashtags are public"
   ON hashtags FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Authenticated can create hashtags" ON hashtags;
 CREATE POLICY "Authenticated can create hashtags"
   ON hashtags FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "hashtags_read_all" ON hashtags;
+
+DROP POLICY IF EXISTS "Post hashtags are public" ON post_hashtags;
 CREATE POLICY "Post hashtags are public"
   ON post_hashtags FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Post owners manage post hashtags" ON post_hashtags;
 CREATE POLICY "Post owners manage post hashtags"
   ON post_hashtags FOR ALL USING (
     EXISTS (SELECT 1 FROM posts WHERE id = post_id AND user_id = auth.uid())
   );
+DROP POLICY IF EXISTS "post_hashtags_read_all" ON post_hashtags;
+DROP POLICY IF EXISTS "post_hashtags_insert_own" ON post_hashtags;
+
+DROP POLICY IF EXISTS "Reel hashtags are public" ON reel_hashtags;
 CREATE POLICY "Reel hashtags are public"
   ON reel_hashtags FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Reel owners manage reel hashtags" ON reel_hashtags;
 CREATE POLICY "Reel owners manage reel hashtags"
   ON reel_hashtags FOR ALL USING (
     EXISTS (SELECT 1 FROM reels WHERE id = reel_id AND user_id = auth.uid())
   );
 
 -- ---- USER WARNINGS ----
+DROP POLICY IF EXISTS "Users can view own warnings" ON user_warnings;
 CREATE POLICY "Users can view own warnings"
   ON user_warnings FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Admins can manage warnings" ON user_warnings;
 CREATE POLICY "Admins can manage warnings"
   ON user_warnings FOR ALL USING (TRUE);
 
 -- ---- FEED SCORES ----
+DROP POLICY IF EXISTS "Users can view own feed scores" ON feed_scores;
 CREATE POLICY "Users can view own feed scores"
   ON feed_scores FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "System manages feed scores" ON feed_scores;
 CREATE POLICY "System manages feed scores"
   ON feed_scores FOR ALL USING (TRUE);
+
+-- ---- VERIFICATION REQUESTS ----
+DROP POLICY IF EXISTS "Users can view own verification requests" ON verification_requests;
+CREATE POLICY "Users can view own verification requests"
+  ON verification_requests FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can submit verification requests" ON verification_requests;
+CREATE POLICY "Users can submit verification requests"
+  ON verification_requests FOR INSERT WITH CHECK (auth.uid() = user_id AND status = 'pending');
+
+-- ---- ANNOUNCEMENTS ----
+DROP POLICY IF EXISTS "announcements_read_active" ON announcements;
+CREATE POLICY "announcements_read_active"
+  ON announcements FOR SELECT USING (is_active = true);
 
 
 -- ============================================================================
@@ -1403,6 +1677,21 @@ CREATE TRIGGER update_conversations_updated_at
 DROP TRIGGER IF EXISTS update_highlights_updated_at      ON highlights;
 CREATE TRIGGER update_highlights_updated_at
   BEFORE UPDATE ON highlights FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- -----------------------------------------------------------------------
+-- دالة تحديث updated_at لطلبات التوثيق
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_verification_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_verification_updated_at ON verification_requests;
+CREATE TRIGGER trg_verification_updated_at
+  BEFORE UPDATE ON verification_requests FOR EACH ROW EXECUTE FUNCTION update_verification_updated_at();
 
 -- -----------------------------------------------------------------------
 -- دالة إنشاء profile تلقائياً عند تسجيل مستخدم جديد
@@ -1647,7 +1936,7 @@ CREATE TRIGGER trigger_approve_follow_request
   AFTER UPDATE ON follow_requests FOR EACH ROW EXECUTE FUNCTION approve_follow_request();
 
 -- -----------------------------------------------------------------------
--- عداد الهاشتاقات
+-- عداد الهاشتاقات (posts)
 -- -----------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION update_hashtag_posts_count()
 RETURNS TRIGGER AS $$
@@ -1666,6 +1955,9 @@ CREATE TRIGGER trigger_hashtag_posts_count
   AFTER INSERT OR DELETE ON post_hashtags
   FOR EACH ROW EXECUTE FUNCTION update_hashtag_posts_count();
 
+-- -----------------------------------------------------------------------
+-- عداد الهاشتاقات (reels)
+-- -----------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION update_hashtag_reels_count()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -1727,6 +2019,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- -----------------------------------------------------------------------
+-- دوال مساعدة
+-- -----------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION get_pending_follow_requests_count(p_user_id UUID)
 RETURNS INTEGER AS $$
   SELECT COUNT(*)::INTEGER FROM follow_requests
@@ -1846,13 +2141,31 @@ GRANT SELECT, INSERT, DELETE ON muted_conversations TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON highlights TO authenticated;
 GRANT SELECT, INSERT, DELETE ON highlight_stories TO authenticated;
 
-GRANT SELECT ON hashtags      TO anon, authenticated;
+GRANT SELECT ON hashtags TO anon, authenticated;
 GRANT INSERT, UPDATE ON hashtags TO authenticated;
 GRANT SELECT, INSERT, DELETE ON post_hashtags TO authenticated;
 GRANT SELECT, INSERT, DELETE ON reel_hashtags TO authenticated;
+
 GRANT SELECT ON user_warnings TO authenticated;
 GRANT INSERT, UPDATE, DELETE ON user_warnings TO authenticated;
+
 GRANT SELECT, INSERT, UPDATE, DELETE ON feed_scores TO authenticated;
+
+GRANT SELECT, INSERT ON reports TO authenticated;
+
+GRANT SELECT, INSERT ON verification_requests TO authenticated;
+GRANT UPDATE ON verification_requests TO authenticated;
+
+GRANT SELECT, INSERT ON ban_appeals TO authenticated;
+
+GRANT SELECT ON admins TO anon, authenticated;
+GRANT INSERT, UPDATE ON admin_logs TO authenticated;
+GRANT SELECT ON admin_logs TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON platform_settings TO authenticated;
+
+GRANT SELECT ON announcements TO authenticated;
+
+GRANT SELECT, INSERT, UPDATE ON user_statistics TO authenticated;
 
 
 -- ============================================================================
@@ -1869,54 +2182,71 @@ VALUES
   ('community-media', 'community-media', TRUE,  52428800,  ARRAY['image/jpeg','image/jpg','image/png','image/gif','image/webp'])
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Public bucket access - avatars" ON storage.objects;
 CREATE POLICY "Public bucket access - avatars"
   ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
+DROP POLICY IF EXISTS "Authenticated upload - avatars" ON storage.objects;
 CREATE POLICY "Authenticated upload - avatars"
   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'avatars' AND auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Owner update - avatars" ON storage.objects;
 CREATE POLICY "Owner update - avatars"
   ON storage.objects FOR UPDATE USING (bucket_id = 'avatars' AND auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Owner delete - avatars" ON storage.objects;
 CREATE POLICY "Owner delete - avatars"
   ON storage.objects FOR DELETE USING (bucket_id = 'avatars' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Public access - posts" ON storage.objects;
 CREATE POLICY "Public access - posts"
   ON storage.objects FOR SELECT USING (bucket_id = 'posts');
+DROP POLICY IF EXISTS "Authenticated upload - posts" ON storage.objects;
 CREATE POLICY "Authenticated upload - posts"
   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'posts' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Public access - reels" ON storage.objects;
 CREATE POLICY "Public access - reels"
   ON storage.objects FOR SELECT USING (bucket_id = 'reels');
+DROP POLICY IF EXISTS "Authenticated upload - reels" ON storage.objects;
 CREATE POLICY "Authenticated upload - reels"
   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'reels' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Public access - stories" ON storage.objects;
 CREATE POLICY "Public access - stories"
   ON storage.objects FOR SELECT USING (bucket_id = 'stories');
+DROP POLICY IF EXISTS "Authenticated upload - stories" ON storage.objects;
 CREATE POLICY "Authenticated upload - stories"
   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'stories' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Public access - covers" ON storage.objects;
 CREATE POLICY "Public access - covers"
   ON storage.objects FOR SELECT USING (bucket_id = 'covers');
+DROP POLICY IF EXISTS "Authenticated upload - covers" ON storage.objects;
 CREATE POLICY "Authenticated upload - covers"
   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'covers' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Public access - community-media" ON storage.objects;
 CREATE POLICY "Public access - community-media"
   ON storage.objects FOR SELECT USING (bucket_id = 'community-media');
+DROP POLICY IF EXISTS "Authenticated upload - community-media" ON storage.objects;
 CREATE POLICY "Authenticated upload - community-media"
   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'community-media' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Messages access - owner only" ON storage.objects;
 CREATE POLICY "Messages access - owner only"
   ON storage.objects FOR SELECT USING (bucket_id = 'messages' AND auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Messages upload - authenticated" ON storage.objects;
 CREATE POLICY "Messages upload - authenticated"
   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'messages' AND auth.role() = 'authenticated');
 
 
 -- ============================================================================
--- 11. SEED DATA - الشارات الأساسية
+-- 11. SEED DATA - الشارات الأساسية + إعدادات المنصة
 -- ============================================================================
 INSERT INTO badges (name, type, description, category, icon, color, image_url) VALUES
   ('Gold Early Member',   'gold_early_member',   'ميدالية العضو المبكر الذهبي',   'medal',        '👑', '#FFD700', '/medals/gold.png'),
   ('Silver Early Member', 'silver_early_member', 'ميدالية العضو المبكر الفضي',    'medal',        '🥈', '#C0C0C0', '/medals/silver.png'),
   ('Bronze Early Member', 'bronze_early_member', 'ميدالية العضو المبكر البرونزي', 'medal',        '🥉', '#CD7F32', '/medals/bronze.png'),
   ('Beta Tester',         'beta_tester',         'بادج مختبر بيتا',               'medal',        '⚙️', '#06B6D4', '/medals/beta.png'),
+  ('Bug Hunter',          'bug_hunter',          'صائد الأخطاء',                  'achievement',  '🐛', '#EF4444', '/medals/bughunter.png'),
   ('Verified User',       'verified',            'حساب موثق من نوفي',             'verification', '✓',  '#3B82F6', NULL),
   ('Official Account',    'official',            'حساب رسمي من نوفي',             'status',       '🏛️', '#EC4899', NULL),
   ('Premium Member',      'premium',             'عضو بريميوم مع مميزات حصرية',  'status',       '⭐', '#FBBF24', NULL),
@@ -1925,20 +2255,35 @@ INSERT INTO badges (name, type, description, category, icon, color, image_url) V
   ('Active Member',       'active',              'عضو نشط',                       'achievement',  '⚡', '#10B981', NULL)
 ON CONFLICT (type) DO NOTHING;
 
+INSERT INTO platform_settings (key, value) VALUES
+  ('auto_moderation', 'false'),
+  ('maintenance_mode', 'false')
+ON CONFLICT (key) DO NOTHING;
+
+
+-- ============================================================================
+-- pg_cron (اختياري - يحتاج تفعيل من Supabase Dashboard > Database > Extensions)
+-- ============================================================================
+-- SELECT cron.schedule(
+--   'cleanup-expired-stories',
+--   '0 * * * *',
+--   $$ DELETE FROM stories WHERE expires_at < NOW() $$
+-- );
+
 
 -- ============================================================================
 -- DONE! ✅
 -- ============================================================================
--- الجداول (39 جدول):
---   ✅ profiles              - الملفات الشخصية (+ cooldown timestamps)
---   ✅ posts                 - المنشورات
+-- الجداول (47 جدول):
+--   ✅ profiles              - الملفات الشخصية (+ cooldown + bug_hunter + show_ban_duration)
+--   ✅ posts                 - المنشورات (+ is_featured + soft delete)
 --   ✅ follows               - المتابعات
 --   ✅ follow_requests       - طلبات المتابعة
---   ✅ stories               - القصص (+ music_start_time + filter_name)
+--   ✅ stories               - القصص (+ music + filter + soft delete)
 --   ✅ story_views           - مشاهدات القصص
---   ✅ comments              - التعليقات (+ reel_id)
---   ✅ likes                 - الإعجابات (+ unique_reel_user_like)
---   ✅ reels                 - الريلز
+--   ✅ comments              - التعليقات (+ reel_id + parent_comment_id)
+--   ✅ likes                 - الإعجابات (+ CHECK constraint)
+--   ✅ reels                 - الريلز (+ is_featured + soft delete)
 --   ✅ messages              - الرسائل (+ reply_to_id + audio_url)
 --   ✅ message_reactions     - ردود أفعال الرسائل
 --   ✅ notifications         - الإشعارات
@@ -1946,15 +2291,18 @@ ON CONFLICT (type) DO NOTHING;
 --   ✅ post_views            - مشاهدات المنشورات
 --   ✅ post_insights         - إحصائيات المنشورات
 --   ✅ user_statistics       - إحصائيات المستخدمين
---   ✅ admins                - الأدمن
+--   ✅ admins                - الأدمن (+ صلاحيات تفصيلية)
+--   ✅ admin_logs            - سجل نشاط الأدمن
+--   ✅ platform_settings     - إعدادات المنصة
+--   ✅ reports               - بلاغات المنشورات والمستخدمين
 --   ✅ badges                - الشارات
 --   ✅ user_badges           - شارات المستخدمين
 --   ✅ communities           - المجتمعات
---   ✅ community_members     - أعضاء المجتمعات
---   ✅ community_messages    - رسائل المجتمعات
+--   ✅ community_members     - أعضاء المجتمعات (+ mute + kick)
+--   ✅ community_messages    - رسائل المجتمعات (+ is_system_message)
 --   ✅ moderation_logs       - سجلات الإشراف
 --   ✅ typing_indicators     - مؤشرات الكتابة
---   ✅ user_devices          - تتبع الأجهزة
+--   ✅ user_devices          - تتبع الأجهزة (+ fingerprint + trust + session)
 --   ✅ user_settings         - إعدادات المستخدم
 --   ✅ blocked_users         - المحظورون
 --   ✅ close_friends         - الأصدقاء المقربون
@@ -1966,16 +2314,14 @@ ON CONFLICT (type) DO NOTHING;
 --   ✅ muted_conversations   - المحادثات المكتومة
 --   ✅ highlights            - أبرز القصص
 --   ✅ highlight_stories     - قصص الهايلايت
---   ✅ hashtags              - الهاشتاقات (+ post_hashtags + reel_hashtags)
+--   ✅ hashtags              - الهاشتاقات (+ is_banned + is_pinned)
+--   ✅ post_hashtags         - ربط المنشورات بالهاشتاقات
+--   ✅ reel_hashtags         - ربط الريلز بالهاشتاقات
 --   ✅ user_warnings         - نظام التحذيرات والـ strikes
 --   ✅ feed_scores           - أساس خوارزمية الـ Feed
--- ============================================================================
--- التحسينات المطبّقة:
---   ✅ likes          — CHECK constraint (واحد بالظبط من post/comment/reel)
---   ✅ notifications  — RLS مقيّدة: SELECT فقط لصاحب الإشعار
---   ✅ posts/comments/reels — soft delete (is_deleted + deleted_at)
---   ✅ typing_indicators    — composite PRIMARY KEY بدل TEXT
---   ✅ user_devices         — device_fingerprint + device_id
---   ✅ profiles             — strikes_count
---   ✅ pg_cron              — راجع ملف schema-improvements.sql
+--   ✅ verification_requests - طلبات التوثيق
+--   ✅ ban_appeals           - طلبات استئناف الحظر
+--   ✅ banned_words          - فلتر المحتوى التلقائي
+--   ✅ ip_bans               - حظر عناوين IP
+--   ✅ announcements         - الإعلانات والبانرات
 -- ============================================================================
