@@ -27,9 +27,14 @@ CREATE INDEX IF NOT EXISTS idx_post_hashtags_hashtag ON post_hashtags(hashtag_id
 ALTER TABLE hashtags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE post_hashtags ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "hashtags_read_all" ON hashtags FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "post_hashtags_read_all" ON post_hashtags FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "post_hashtags_insert_own" ON post_hashtags FOR INSERT WITH CHECK (
+DROP POLICY IF EXISTS "hashtags_read_all" ON hashtags;
+CREATE POLICY "hashtags_read_all" ON hashtags FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "post_hashtags_read_all" ON post_hashtags;
+CREATE POLICY "post_hashtags_read_all" ON post_hashtags FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "post_hashtags_insert_own" ON post_hashtags;
+CREATE POLICY "post_hashtags_insert_own" ON post_hashtags FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM posts WHERE id = post_id AND user_id = auth.uid())
 );
 
@@ -81,7 +86,9 @@ CREATE TABLE IF NOT EXISTS announcements (
 );
 
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "announcements_read_active" ON announcements FOR SELECT USING (is_active = true);
+
+DROP POLICY IF EXISTS "announcements_read_active" ON announcements;
+CREATE POLICY "announcements_read_active" ON announcements FOR SELECT USING (is_active = true);
 
 -- ====================================
 -- Featured Content
