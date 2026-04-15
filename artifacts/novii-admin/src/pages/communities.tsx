@@ -32,6 +32,8 @@ import {
   Volume2,
   ChevronDown,
   Image as ImageIcon,
+  Copy,
+  Check,
 } from "lucide-react";
 
 export default function CommunitiesPage() {
@@ -245,6 +247,25 @@ function Avatar({ url, name, size = "md" }: { url?: string | null; name: string;
   );
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className={`p-1 rounded-lg transition-colors ${copied ? "text-green-500" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"}`}
+      title="نسخ"
+    >
+      {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
 function CommunityDetailModal({
   community,
   onClose,
@@ -267,10 +288,10 @@ function CommunityDetailModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0" dir="rtl">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <Avatar url={community.avatar_url} name={community.name} size="lg" />
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-bold text-gray-800">{community.name}</h2>
                 {community.is_private ? (
                   <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
@@ -282,12 +303,22 @@ function CommunityDetailModal({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 mt-0.5">
                 المنشئ: @{community.creator_username || "—"} · {community.members_count} عضو · {community.messages_count} رسالة
               </p>
+              {/* Invite code */}
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="text-[10px] text-gray-400 font-medium">كود الدعوة:</span>
+                <div className="flex items-center gap-1 bg-purple-50 border border-purple-100 rounded-lg px-2 py-0.5">
+                  <span className="text-xs font-mono font-bold text-purple-700 tracking-widest" dir="ltr">
+                    {community.invite_code}
+                  </span>
+                  <CopyButton text={community.invite_code} />
+                </div>
+              </div>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors shrink-0 mr-2">
             <X className="w-5 h-5" />
           </button>
         </div>
