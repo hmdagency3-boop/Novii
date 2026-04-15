@@ -3,10 +3,12 @@ import multer from "multer";
 import { Request, Response } from "express";
 
 // Configure Cloudinary
+const apiSecret = process.env.CLOUDINARY_API_SECRET;
+console.log(`[Cloudinary] Secret length: ${apiSecret?.length}, starts with: ${apiSecret?.substring(0, 3)}`);
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  api_secret: apiSecret,
   secure: true,
 });
 
