@@ -263,9 +263,11 @@ export default function Profile() {
             >
               <div className={cn(
                 "w-28 h-28 md:w-48 md:h-48 rounded-full p-1 shadow-xl group-hover:scale-105 transition-transform duration-300",
-                isOfficialProfile
-                  ? "bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500 ring-2 ring-purple-400/50 md:ring-purple-400/60"
-                  : "bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500"
+                userStories.length > 0
+                  ? (isOfficialProfile
+                      ? "bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500 ring-2 ring-purple-400/50 md:ring-purple-400/60"
+                      : "bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500")
+                  : "bg-border"
               )}>
                 <div className="w-full h-full rounded-full border-4 border-background overflow-hidden bg-background">
                   <img 
