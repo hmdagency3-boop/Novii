@@ -2996,6 +2996,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch {}
   })();
 
+  app.post("/api/verification/analyze", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const { id_card_url, selfie_url } = req.body;
+      if (!id_card_url || !selfie_url) {
+        return res.status(400).json({ error: 'Both ID card and selfie are required' });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        max_tokens: 1500,
+        messages: [
+          {
+            role: "system",
+            content: `You are an identity verification AI assistant. You analyze ID card images to extract information and compare faces between ID cards and selfies. 
+
+You MUST respond with valid JSON only, no markdown or extra text. Use this exact format:
+{
+  "id_card_data": {
+    "full_name": "extracted name or null",
+    "id_number": "extracted ID number or null", 
+    "date_of_birth": "extracted DOB or null",
+    "nationality": "extracted nationality or null",
+    "document_type": "national_id | passport | drivers_license | other",
+    "is_valid_document": true/false,
+    "document_quality": "good | fair | poor"
+  },
+  "face_match": {
+    "match_confidence": 0-100,
+    "match_result": "match | likely_match | no_match | unable_to_determine",
+    "details": "brief explanation"
+  },
+  "overall": {
+    "recommendation": "approve | review | reject",
+    "flags": ["array of any concerns"],
+    "summary": "brief summary"
+  }
+}`
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Analyze this ID card and selfie. Extract all readable information from the ID card (name, ID number, date of birth, nationality, document type). Then compare the face on the ID card with the selfie to determine if they are the same person. Provide your analysis in the required JSON format."
+              },
+              {
+                type: "image_url",
+                image_url: { url: id_card_url, detail: "high" }
+              },
+              {
+                type: "image_url",
+                image_url: { url: selfie_url, detail: "high" }
+              }
+            ]
+          }
+        ]
+      });
+
+      const content = response.choices[0]?.message?.content || '';
+      let analysis;
+      try {
+        const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        analysis = JSON.parse(cleaned);
+      } catch {
+        console.error('AI response parse error:', content);
+        analysis = {
+          id_card_data: { full_name: null, is_valid_document: false, document_quality: "poor" },
+          face_match: { match_confidence: 0, match_result: "unable_to_determine", details: "Analysis failed" },
+          overall: { recommendation: "review", flags: ["AI analysis could not be completed"], summary: "Manual review required" }
+        };
+      }
+
+      res.json({ analysis });
+    } catch (error: any) {
+      console.error('Verification analysis error:', error);
+      res.status(500).json({ error: 'Failed to analyze documents' });
+    }
+  });
+
   app.post("/api/verification/request", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId!;
@@ -3032,7 +3117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { data: existing } = await adminDb!.from('verification_requests').select('id, status').eq('user_id', userId).eq('status', 'pending').single();
       if (existing) return res.status(400).json({ error: 'You already have a pending request' });
 
-      const { data, error } = await adminDb!.from('verification_requests').insert({
+      const insertData: any = {
         user_id: userId,
         full_name: (full_name || profile?.username || '').slice(0, 100),
         reason: reason.trim().slice(0, 1000),
@@ -3040,7 +3125,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         social_links: sanitizedLinks,
         id_card_url,
         selfie_url,
-      }).select().single();
+      };
+
+      if (req.body.ai_analysis && typeof req.body.ai_analysis === 'object') {
+        insertData.ai_analysis = req.body.ai_analysis;
+      }
+
+      const { data, error } = await adminDb!.from('verification_requests').insert(insertData).select().single();
 
       if (error) throw error;
       res.status(201).json(data);
