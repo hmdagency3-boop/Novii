@@ -3152,5 +3152,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ─── Admin: Communities Management ─────────────────────────────────────────
+
+  app.get("/api/admin/communities", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { data: communities, error } = await adminDb!
+        .from('communities')
+        .select('*, profiles!communities_created_by_fkey(username, full_name, avatar_url)')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const ids = (communities || []).map((c: any) => c.id);
+      let memberCounts: Record<string, number> = {};
+      let messageCounts: Record<string, number> = {};
+
+      if (ids.length > 0) {
+        const { data: members } = await adminDb!
+          .from('community_members')
+          .select('community_id')
+          .in('community_id', ids)
+          .is('kicked_at', null);
+
+        (members || []).forEach((m: any) => {
+          memberCounts[m.community_id] = (memberCounts[m.community_id] || 0) + 1;
+        });
+
+        const { data: messages } = await adminDb!
+          .from('community_messages')
+          .select('community_id')
+          .in('community_id', ids)
+          .eq('is_deleted', false);
+
+        (messages || []).forEach((m: any) => {
+          messageCounts[m.community_id] = (messageCounts[m.community_id] || 0) + 1;
+        });
+      }
+
+      const result = (communities || []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        avatar_url: c.avatar_url,
+        invite_code: c.invite_code,
+        is_private: c.is_private,
+        created_at: c.created_at,
+        created_by: c.created_by,
+        creator_username: c.profiles?.username || null,
+        creator_display_name: c.profiles?.full_name || null,
+        creator_avatar: c.profiles?.avatar_url || null,
+        members_count: memberCounts[c.id] || 0,
+        messages_count: messageCounts[c.id] || 0,
+      }));
+
+      res.json(result);
+    } catch (error) {
+      console.error('Admin communities error:', error);
+      res.status(500).json({ error: 'Failed to fetch communities' });
+    }
+  });
+
+  app.get("/api/admin/communities/:communityId/members", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { communityId } = req.params;
+
+      const { data: members, error } = await adminDb!
+        .from('community_members')
+        .select('*, profiles!community_members_user_id_fkey(username, full_name, avatar_url, is_verified)')
+        .eq('community_id', communityId)
+        .order('joined_at', { ascending: false });
+
+      if (error) throw error;
+
+      const result = (members || []).map((m: any) => ({
+        id: m.id,
+        user_id: m.user_id,
+        community_id: m.community_id,
+        role: m.role,
+        is_muted: m.is_muted,
+        muted_until: m.muted_until,
+        kicked_at: m.kicked_at,
+        joined_at: m.joined_at,
+        username: m.profiles?.username || null,
+        display_name: m.profiles?.full_name || null,
+        avatar_url: m.profiles?.avatar_url || null,
+        is_verified: m.profiles?.is_verified || false,
+      }));
+
+      res.json(result);
+    } catch (error) {
+      console.error('Admin community members error:', error);
+      res.status(500).json({ error: 'Failed to fetch community members' });
+    }
+  });
+
+  app.delete("/api/admin/communities/:communityId", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { communityId } = req.params;
+
+      const { data: community } = await adminDb!.from('communities').select('id, name').eq('id', communityId).single();
+      if (!community) return res.status(404).json({ error: 'Community not found' });
+
+      await adminDb!.from('community_messages').delete().eq('community_id', communityId);
+      await adminDb!.from('community_members').delete().eq('community_id', communityId);
+      const { error } = await adminDb!.from('communities').delete().eq('id', communityId);
+      if (error) throw error;
+
+      await logAdminAction(req, 'delete_community', 'community', communityId, `Deleted community: ${community.name}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin delete community error:', error);
+      res.status(500).json({ error: 'Failed to delete community' });
+    }
+  });
+
+  app.post("/api/admin/communities/:communityId/kick-member", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { communityId } = req.params;
+      const { userId } = req.body;
+
+      if (!userId) return res.status(400).json({ error: 'userId required' });
+
+      const { error } = await adminDb!
+        .from('community_members')
+        .update({ kicked_at: new Date().toISOString() })
+        .eq('community_id', communityId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'kick_community_member', 'community', communityId, `Kicked user ${userId}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin kick member error:', error);
+      res.status(500).json({ error: 'Failed to kick member' });
+    }
+  });
+
   return httpServer;
 }

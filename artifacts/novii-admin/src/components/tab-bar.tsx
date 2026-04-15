@@ -5,6 +5,7 @@ const tabLabels: Record<TabId, string> = {
   dashboard: "لوحة التحكم",
   users: "المستخدمين",
   content: "المحتوى",
+  communities: "المجتمعات",
   admins: "المشرفين",
   reports: "البلاغات",
   verification: "طلبات التوثيق",

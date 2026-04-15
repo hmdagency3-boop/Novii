@@ -173,6 +173,25 @@ export async function updateSettings(
   });
 }
 
+export async function fetchCommunities(): Promise<CommunityRecord[]> {
+  return adminFetch("/communities");
+}
+
+export async function fetchCommunityMembers(communityId: string): Promise<CommunityMemberRecord[]> {
+  return adminFetch(`/communities/${communityId}/members`);
+}
+
+export async function deleteCommunity(communityId: string): Promise<unknown> {
+  return adminFetch(`/communities/${communityId}`, { method: "DELETE" });
+}
+
+export async function kickCommunityMember(communityId: string, userId: string): Promise<unknown> {
+  return adminFetch(`/communities/${communityId}/kick-member`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
 export interface PlatformStats {
   totalUsers: number;
   activeUsers: number;
@@ -290,4 +309,35 @@ export interface SettingRecord {
   key: string;
   value: string;
   updated_at: string;
+}
+
+export interface CommunityRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  avatar_url: string | null;
+  invite_code: string;
+  is_private: boolean;
+  created_at: string;
+  created_by: string;
+  creator_username: string | null;
+  creator_display_name: string | null;
+  creator_avatar: string | null;
+  members_count: number;
+  messages_count: number;
+}
+
+export interface CommunityMemberRecord {
+  id: string;
+  user_id: string;
+  community_id: string;
+  role: string;
+  is_muted: boolean;
+  muted_until: string | null;
+  kicked_at: string | null;
+  joined_at: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  is_verified: boolean;
 }

@@ -11,10 +11,11 @@ import {
   ChevronLeft,
   ChevronRight,
   BadgeCheck,
+  UsersRound,
 } from "lucide-react";
 import { useState } from "react";
 
-export type TabId = "dashboard" | "users" | "content" | "admins" | "reports" | "verification" | "settings" | "logs";
+export type TabId = "dashboard" | "users" | "content" | "communities" | "admins" | "reports" | "verification" | "settings" | "logs";
 
 interface SidebarProps {
   activeTab: TabId;
@@ -27,6 +28,7 @@ const menuItems: { id: TabId; label: string; labelAr: string; icon: React.Elemen
   { id: "dashboard", label: "Dashboard", labelAr: "لوحة التحكم", icon: LayoutDashboard },
   { id: "users", label: "Users", labelAr: "المستخدمين", icon: Users, permission: "can_manage_users" },
   { id: "content", label: "Content", labelAr: "المحتوى", icon: FileText, permission: "can_manage_content" },
+  { id: "communities", label: "Communities", labelAr: "المجتمعات", icon: UsersRound, permission: "can_manage_content" },
   { id: "admins", label: "Admins", labelAr: "المشرفين", icon: Shield, permission: "can_manage_admins" },
   { id: "reports", label: "Reports", labelAr: "البلاغات", icon: Flag, permission: "can_manage_reports" },
   { id: "verification", label: "Verification", labelAr: "طلبات التوثيق", icon: BadgeCheck, permission: "can_manage_users" },

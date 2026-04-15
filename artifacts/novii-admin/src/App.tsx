@@ -6,6 +6,7 @@ import TabBar from "@/components/tab-bar";
 import DashboardPage from "@/pages/dashboard";
 import UsersPage from "@/pages/users";
 import ContentPage from "@/pages/content";
+import CommunitiesPage from "@/pages/communities";
 import AdminsPage from "@/pages/admins";
 import ReportsPage from "@/pages/reports";
 import VerificationPage from "@/pages/verification";
@@ -16,6 +17,7 @@ const pageComponents: Record<TabId, React.FC> = {
   dashboard: DashboardPage,
   users: UsersPage,
   content: ContentPage,
+  communities: CommunitiesPage,
   admins: AdminsPage,
   reports: ReportsPage,
   verification: VerificationPage,
