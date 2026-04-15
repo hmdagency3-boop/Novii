@@ -3291,5 +3291,159 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/communities/:communityId/unkick-member", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { communityId } = req.params;
+      const { userId } = req.body;
+
+      if (!userId) return res.status(400).json({ error: 'userId required' });
+
+      const { error } = await adminDb!
+        .from('community_members')
+        .update({ kicked_at: null })
+        .eq('community_id', communityId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'unkick_community_member', 'community', communityId, `Unkicked user ${userId}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin unkick member error:', error);
+      res.status(500).json({ error: 'Failed to unkick member' });
+    }
+  });
+
+  app.post("/api/admin/communities/:communityId/mute-member", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { communityId } = req.params;
+      const { userId } = req.body;
+
+      if (!userId) return res.status(400).json({ error: 'userId required' });
+
+      const { error } = await adminDb!
+        .from('community_members')
+        .update({ is_muted: true, muted_until: null })
+        .eq('community_id', communityId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'mute_community_member', 'community', communityId, `Muted user ${userId}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin mute member error:', error);
+      res.status(500).json({ error: 'Failed to mute member' });
+    }
+  });
+
+  app.post("/api/admin/communities/:communityId/unmute-member", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { communityId } = req.params;
+      const { userId } = req.body;
+
+      if (!userId) return res.status(400).json({ error: 'userId required' });
+
+      const { error } = await adminDb!
+        .from('community_members')
+        .update({ is_muted: false, muted_until: null })
+        .eq('community_id', communityId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'unmute_community_member', 'community', communityId, `Unmuted user ${userId}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin unmute member error:', error);
+      res.status(500).json({ error: 'Failed to unmute member' });
+    }
+  });
+
+  app.post("/api/admin/communities/:communityId/set-role", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { communityId } = req.params;
+      const { userId, role } = req.body;
+
+      if (!userId || !role) return res.status(400).json({ error: 'userId and role required' });
+      if (!['member', 'moderator', 'admin'].includes(role)) {
+        return res.status(400).json({ error: 'Invalid role. Must be member, moderator, or admin' });
+      }
+
+      const { error } = await adminDb!
+        .from('community_members')
+        .update({ role })
+        .eq('community_id', communityId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'set_community_member_role', 'community', communityId, `Set user ${userId} role to ${role}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin set role error:', error);
+      res.status(500).json({ error: 'Failed to set role' });
+    }
+  });
+
+  app.get("/api/admin/communities/:communityId/messages", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { communityId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 100;
+
+      const { data: messages, error } = await adminDb!
+        .from('community_messages')
+        .select('*, profiles!community_messages_sender_id_fkey(username, full_name, avatar_url)')
+        .eq('community_id', communityId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+
+      const result = (messages || []).map((m: any) => ({
+        id: m.id,
+        community_id: m.community_id,
+        sender_id: m.sender_id,
+        content: m.content,
+        image_url: m.image_url,
+        is_deleted: m.is_deleted,
+        created_at: m.created_at,
+        sender_username: m.profiles?.username || null,
+        sender_display_name: m.profiles?.full_name || null,
+        sender_avatar: m.profiles?.avatar_url || null,
+      }));
+
+      res.json(result);
+    } catch (error) {
+      console.error('Admin community messages error:', error);
+      res.status(500).json({ error: 'Failed to fetch messages' });
+    }
+  });
+
+  app.delete("/api/admin/communities/:communityId/messages/:messageId", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { communityId, messageId } = req.params;
+
+      const { error } = await adminDb!
+        .from('community_messages')
+        .update({ is_deleted: true })
+        .eq('id', messageId)
+        .eq('community_id', communityId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'delete_community_message', 'community', communityId, `Deleted message ${messageId}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin delete message error:', error);
+      res.status(500).json({ error: 'Failed to delete message' });
+    }
+  });
+
   return httpServer;
 }

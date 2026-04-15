@@ -192,6 +192,42 @@ export async function kickCommunityMember(communityId: string, userId: string): 
   });
 }
 
+export async function unkickCommunityMember(communityId: string, userId: string): Promise<unknown> {
+  return adminFetch(`/communities/${communityId}/unkick-member`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function muteCommunityMember(communityId: string, userId: string): Promise<unknown> {
+  return adminFetch(`/communities/${communityId}/mute-member`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function unmuteCommunityMember(communityId: string, userId: string): Promise<unknown> {
+  return adminFetch(`/communities/${communityId}/unmute-member`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function setCommunityMemberRole(communityId: string, userId: string, role: string): Promise<unknown> {
+  return adminFetch(`/communities/${communityId}/set-role`, {
+    method: "POST",
+    body: JSON.stringify({ userId, role }),
+  });
+}
+
+export async function fetchCommunityMessages(communityId: string): Promise<CommunityMessageRecord[]> {
+  return adminFetch(`/communities/${communityId}/messages`);
+}
+
+export async function deleteCommunityMessage(communityId: string, messageId: string): Promise<unknown> {
+  return adminFetch(`/communities/${communityId}/messages/${messageId}`, { method: "DELETE" });
+}
+
 export interface PlatformStats {
   totalUsers: number;
   activeUsers: number;
@@ -340,4 +376,17 @@ export interface CommunityMemberRecord {
   display_name: string | null;
   avatar_url: string | null;
   is_verified: boolean;
+}
+
+export interface CommunityMessageRecord {
+  id: string;
+  community_id: string;
+  sender_id: string;
+  content: string;
+  image_url: string | null;
+  is_deleted: boolean;
+  created_at: string;
+  sender_username: string | null;
+  sender_display_name: string | null;
+  sender_avatar: string | null;
 }

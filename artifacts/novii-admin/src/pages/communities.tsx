@@ -2,10 +2,17 @@ import { useEffect, useState, useMemo } from "react";
 import {
   fetchCommunities,
   fetchCommunityMembers,
+  fetchCommunityMessages,
   deleteCommunity,
   kickCommunityMember,
+  unkickCommunityMember,
+  muteCommunityMember,
+  unmuteCommunityMember,
+  setCommunityMemberRole,
+  deleteCommunityMessage,
   type CommunityRecord,
   type CommunityMemberRecord,
+  type CommunityMessageRecord,
 } from "@/lib/admin-api";
 import {
   Search,
@@ -18,8 +25,13 @@ import {
   Globe,
   CheckCircle,
   UserX,
+  UserCheck,
   Crown,
   X,
+  VolumeX,
+  Volume2,
+  ChevronDown,
+  Image as ImageIcon,
 } from "lucide-react";
 
 export default function CommunitiesPage() {
@@ -151,7 +163,7 @@ export default function CommunitiesPage() {
                             (community.creator_username || "?").charAt(0).toUpperCase()
                           )}
                         </div>
-                        <span className="text-sm text-gray-600 dir-ltr">@{community.creator_username || "—"}</span>
+                        <span className="text-sm text-gray-600" dir="ltr">@{community.creator_username || "—"}</span>
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
@@ -184,8 +196,8 @@ export default function CommunitiesPage() {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => setSelectedCommunity(community)}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-                          title="عرض الأعضاء"
+                          className="p-1.5 rounded-lg hover:bg-purple-50 text-gray-400 hover:text-purple-600 transition-colors"
+                          title="إدارة المجتمع"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -207,7 +219,7 @@ export default function CommunitiesPage() {
       </div>
 
       {selectedCommunity && (
-        <MembersModal
+        <CommunityDetailModal
           community={selectedCommunity}
           onClose={() => setSelectedCommunity(null)}
           onRefresh={load}
@@ -224,7 +236,16 @@ export default function CommunitiesPage() {
   );
 }
 
-function MembersModal({
+function Avatar({ url, name, size = "md" }: { url?: string | null; name: string; size?: "sm" | "md" | "lg" }) {
+  const sizeClass = size === "sm" ? "w-7 h-7 text-xs" : size === "lg" ? "w-12 h-12 text-base" : "w-9 h-9 text-sm";
+  return (
+    <div className={`${sizeClass} rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white font-bold shrink-0 overflow-hidden`}>
+      {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
+function CommunityDetailModal({
   community,
   onClose,
   onRefresh,
@@ -233,63 +254,37 @@ function MembersModal({
   onClose: () => void;
   onRefresh: () => void;
 }) {
-  const [members, setMembers] = useState<CommunityMemberRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [kickingId, setKickingId] = useState<string | null>(null);
-
-  const loadMembers = () => {
-    setLoading(true);
-    fetchCommunityMembers(community.id)
-      .then(setMembers)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { loadMembers(); }, [community.id]);
-
-  const handleKick = async (member: CommunityMemberRecord) => {
-    setKickingId(member.user_id);
-    try {
-      await kickCommunityMember(community.id, member.user_id);
-      loadMembers();
-      onRefresh();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setKickingId(null);
-    }
-  };
-
-  const active = members.filter((m) => !m.kicked_at);
-  const kicked = members.filter((m) => m.kicked_at);
-
-  const roleLabel = (role: string) => {
-    if (role === "admin") return { label: "مدير", color: "text-purple-600 bg-purple-50" };
-    if (role === "moderator") return { label: "مشرف", color: "text-blue-600 bg-blue-50" };
-    return { label: "عضو", color: "text-gray-500 bg-gray-100" };
-  };
+  const [tab, setTab] = useState<"members" | "chat">("members");
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0" dir="rtl">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-sm font-bold overflow-hidden">
-              {community.avatar_url ? (
-                <img src={community.avatar_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                community.name.charAt(0).toUpperCase()
-              )}
-            </div>
+            <Avatar url={community.avatar_url} name={community.name} size="lg" />
             <div>
-              <h2 className="text-base font-bold text-gray-800">{community.name}</h2>
-              <p className="text-xs text-gray-400">{active.length} عضو نشط</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-gray-800">{community.name}</h2>
+                {community.is_private ? (
+                  <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
+                    <Lock className="w-2.5 h-2.5" /> خاص
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-600">
+                    <Globe className="w-2.5 h-2.5" /> عام
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">
+                المنشئ: @{community.creator_username || "—"} · {community.members_count} عضو · {community.messages_count} رسالة
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
@@ -297,94 +292,341 @@ function MembersModal({
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-4" dir="rtl">
-          {loading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />
-              ))}
-            </div>
-          ) : members.length === 0 ? (
-            <p className="text-center text-gray-400 py-8">لا يوجد أعضاء</p>
-          ) : (
-            <div className="space-y-4">
-              {active.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">الأعضاء النشطون ({active.length})</p>
-                  <div className="space-y-2">
-                    {active.map((member) => {
-                      const { label, color } = roleLabel(member.role);
-                      return (
-                        <div
-                          key={member.id}
-                          className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100/80 transition-colors"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-sm font-bold shrink-0 overflow-hidden">
-                              {member.avatar_url ? (
-                                <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
-                              ) : (
-                                (member.username || "?").charAt(0).toUpperCase()
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <p className="text-sm font-semibold text-gray-800 truncate">{member.display_name || member.username || "مجهول"}</p>
-                                {member.is_verified && <CheckCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />}
-                                {member.role === "admin" && <Crown className="w-3.5 h-3.5 text-purple-500 shrink-0" />}
-                              </div>
-                              <p className="text-xs text-gray-400" dir="ltr">@{member.username || "—"}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${color}`}>{label}</span>
-                            {member.is_muted && (
-                              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full text-orange-600 bg-orange-50">كتم</span>
-                            )}
-                            {member.role !== "admin" && (
-                              <button
-                                onClick={() => handleKick(member)}
-                                disabled={kickingId === member.user_id}
-                                className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50"
-                                title="طرد العضو"
-                              >
-                                <UserX className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+        {/* Tabs */}
+        <div className="flex border-b border-gray-100 shrink-0 px-6" dir="rtl">
+          <button
+            onClick={() => setTab("members")}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              tab === "members"
+                ? "border-purple-600 text-purple-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <Users className="w-4 h-4" /> الأعضاء
+          </button>
+          <button
+            onClick={() => setTab("chat")}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              tab === "chat"
+                ? "border-purple-600 text-purple-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" /> الشات
+          </button>
+        </div>
 
-              {kicked.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">الأعضاء المطرودون ({kicked.length})</p>
-                  <div className="space-y-2">
-                    {kicked.map((member) => (
-                      <div
-                        key={member.id}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-red-50/60 opacity-70"
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {tab === "members" ? (
+            <MembersTab community={community} onRefresh={onRefresh} />
+          ) : (
+            <ChatTab community={community} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MembersTab({ community, onRefresh }: { community: CommunityRecord; onRefresh: () => void }) {
+  const [members, setMembers] = useState<CommunityMemberRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [showKicked, setShowKicked] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    fetchCommunityMembers(community.id)
+      .then(setMembers)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [community.id]);
+
+  const act = async (fn: () => Promise<unknown>, userId: string) => {
+    setBusyId(userId);
+    try {
+      await fn();
+      load();
+      onRefresh();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const active = members.filter((m) => !m.kicked_at);
+  const kicked = members.filter((m) => m.kicked_at);
+
+  const roleConfig: Record<string, { label: string; color: string }> = {
+    admin: { label: "أدمن", color: "text-purple-600 bg-purple-50" },
+    moderator: { label: "مشرف", color: "text-blue-600 bg-blue-50" },
+    member: { label: "عضو", color: "text-gray-500 bg-gray-100" },
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-5 space-y-4" dir="rtl">
+      {active.length === 0 && kicked.length === 0 ? (
+        <p className="text-center text-gray-400 py-10">لا يوجد أعضاء</p>
+      ) : (
+        <>
+          {active.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                الأعضاء النشطون ({active.length})
+              </p>
+              {active.map((member) => {
+                const rc = roleConfig[member.role] || roleConfig.member;
+                const isCreator = member.user_id === community.created_by;
+                const busy = busyId === member.user_id;
+
+                return (
+                  <div
+                    key={member.id}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100/70 transition-colors"
+                  >
+                    <Avatar url={member.avatar_url} name={member.username || "?"} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-800">{member.display_name || member.username || "مجهول"}</p>
+                        {member.is_verified && <CheckCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />}
+                        {isCreator && <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" title="المنشئ" />}
+                      </div>
+                      <p className="text-xs text-gray-400" dir="ltr">@{member.username || "—"}</p>
+                    </div>
+
+                    {/* Role badge + change */}
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${rc.color}`}>
+                        {isCreator ? "منشئ" : rc.label}
+                      </span>
+
+                      {member.is_muted && (
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full text-orange-600 bg-orange-50">كتم</span>
+                      )}
+
+                      {/* Role selector */}
+                      {!isCreator && (
+                        <div className="relative">
+                          <select
+                            value={member.role}
+                            disabled={busy}
+                            onChange={(e) =>
+                              act(() => setCommunityMemberRole(community.id, member.user_id, e.target.value), member.user_id)
+                            }
+                            className="appearance-none text-[11px] font-medium px-2 py-0.5 rounded-lg border border-gray-200 bg-white text-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-purple-400 disabled:opacity-50 pl-5"
+                          >
+                            <option value="member">عضو</option>
+                            <option value="moderator">مشرف</option>
+                            <option value="admin">أدمن</option>
+                          </select>
+                          <ChevronDown className="w-3 h-3 text-gray-400 absolute left-1 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                      )}
+
+                      {/* Mute / Unmute */}
+                      <button
+                        onClick={() =>
+                          act(
+                            () =>
+                              member.is_muted
+                                ? unmuteCommunityMember(community.id, member.user_id)
+                                : muteCommunityMember(community.id, member.user_id),
+                            member.user_id
+                          )
+                        }
+                        disabled={busy}
+                        className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+                          member.is_muted
+                            ? "hover:bg-green-50 text-orange-500 hover:text-green-600"
+                            : "hover:bg-orange-50 text-gray-400 hover:text-orange-500"
+                        }`}
+                        title={member.is_muted ? "إلغاء الكتم" : "كتم"}
                       >
+                        {member.is_muted ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                      </button>
+
+                      {/* Kick */}
+                      <button
+                        onClick={() =>
+                          act(() => kickCommunityMember(community.id, member.user_id), member.user_id)
+                        }
+                        disabled={busy}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                        title="طرد"
+                      >
+                        <UserX className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {kicked.length > 0 && (
+            <div className="space-y-2">
+              <button
+                onClick={() => setShowKicked((v) => !v)}
+                className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition-colors"
+              >
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showKicked ? "rotate-180" : ""}`} />
+                الأعضاء المطرودون ({kicked.length})
+              </button>
+              {showKicked && (
+                <div className="space-y-2">
+                  {kicked.map((member) => {
+                    const busy = busyId === member.user_id;
+                    return (
+                      <div key={member.id} className="flex items-center gap-3 p-3 rounded-xl bg-red-50/60">
                         <div className="w-9 h-9 rounded-full bg-red-200 flex items-center justify-center text-red-600 text-sm font-bold shrink-0">
                           {(member.username || "?").charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-700 truncate">{member.display_name || member.username || "مجهول"}</p>
+                          <p className="text-sm font-semibold text-gray-700">{member.display_name || member.username || "مجهول"}</p>
                           <p className="text-xs text-gray-400" dir="ltr">@{member.username || "—"}</p>
                         </div>
-                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full text-red-600 bg-red-100">مطرود</span>
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full text-red-600 bg-red-100 shrink-0">مطرود</span>
+                        <button
+                          onClick={() =>
+                            act(() => unkickCommunityMember(community.id, member.user_id), member.user_id)
+                          }
+                          disabled={busy}
+                          className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-600 transition-colors disabled:opacity-50 shrink-0"
+                          title="إلغاء الطرد"
+                        >
+                          <UserCheck className="w-4 h-4" />
+                        </button>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
-        </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ChatTab({ community }: { community: CommunityRecord }) {
+  const [messages, setMessages] = useState<CommunityMessageRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    fetchCommunityMessages(community.id)
+      .then(setMessages)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [community.id]);
+
+  const handleDelete = async (msg: CommunityMessageRecord) => {
+    setDeletingId(msg.id);
+    try {
+      await deleteCommunityMessage(community.id, msg.id);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msg.id ? { ...m, is_deleted: true } : m))
+      );
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex gap-3">
+            <div className="w-8 h-8 rounded-full bg-gray-100 animate-pulse shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+              <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+            </div>
+          </div>
+        ))}
       </div>
+    );
+  }
+
+  if (messages.length === 0) {
+    return <p className="text-center text-gray-400 py-16">لا توجد رسائل</p>;
+  }
+
+  return (
+    <div className="p-5 space-y-3" dir="rtl">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-xs text-gray-400">{messages.length} رسالة (آخر 100)</p>
+        <button onClick={load} className="p-1 rounded hover:bg-gray-100 transition-colors">
+          <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
+        </button>
+      </div>
+
+      {messages.map((msg) => (
+        <div
+          key={msg.id}
+          className={`flex items-start gap-3 group p-2 rounded-xl transition-colors ${
+            msg.is_deleted ? "opacity-50 bg-red-50/40" : "hover:bg-gray-50"
+          }`}
+        >
+          <Avatar url={msg.sender_avatar} name={msg.sender_username || "?"} size="sm" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-0.5">
+              <span className="text-xs font-semibold text-gray-700">
+                {msg.sender_display_name || msg.sender_username || "مجهول"}
+              </span>
+              <span className="text-[10px] text-gray-400" dir="ltr">
+                {new Date(msg.created_at).toLocaleString("ar-EG")}
+              </span>
+              {msg.is_deleted && (
+                <span className="text-[10px] font-medium text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">محذوف</span>
+              )}
+            </div>
+
+            {msg.content && !msg.is_deleted && (
+              <p className="text-sm text-gray-700 break-words leading-relaxed">{msg.content}</p>
+            )}
+            {msg.content && msg.is_deleted && (
+              <p className="text-sm text-gray-400 italic line-through">{msg.content}</p>
+            )}
+            {msg.image_url && !msg.is_deleted && (
+              <a href={msg.image_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1.5 text-xs text-purple-600 hover:underline">
+                <ImageIcon className="w-3.5 h-3.5" /> عرض الصورة
+              </a>
+            )}
+          </div>
+
+          {!msg.is_deleted && (
+            <button
+              onClick={() => handleDelete(msg)}
+              disabled={deletingId === msg.id}
+              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all disabled:opacity-50 shrink-0"
+              title="حذف الرسالة"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
