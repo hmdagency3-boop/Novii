@@ -201,7 +201,7 @@ export const translations = {
       see_all: "عرض الكل",
       follow: "متابعة",
       footer_links: "حول • مساعدة • الصحافة • API • الوظائف • الخصوصية • الشروط",
-      copyright: "© 2025 نوفاي من ريبليت"
+      copyright: "© 2025 نوفي"
     },
     settings: {
       title: "الإعدادات",
