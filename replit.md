@@ -81,6 +81,14 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - Incoming request detection via `hasIncomingFollowRequest` query
 - Profile button shows: Accept / Following / Requested / Follow Back / Request / Follow
 
+### Image Cropping & Sizing
+- **Library**: `react-easy-crop` for interactive crop UI
+- **Crop utility**: `novii/client/src/lib/crop-utils.ts` — `getCroppedImg()` converts crop area to final File using Canvas API
+- **ImageCropper component**: `novii/client/src/components/image-cropper.tsx` — reusable cropper with aspect ratio selector and zoom slider
+- **Post images**: Cropped to standard ratios before upload — Square 1:1 (1080×1080), Portrait 4:5 (1080×1350), Landscape 16:9 (1080×608)
+- **Profile photos**: Circular crop at 1:1 ratio, output 500×500px (`avatar-uploader.tsx`)
+- **All uploads**: Cropped image (as JPEG, quality 0.92) is what gets uploaded to Cloudinary — not the original file
+
 ### Routing
 - `/reel/:id` maps to Reels page (for shared reel links)
 - `/post/:id` for individual posts

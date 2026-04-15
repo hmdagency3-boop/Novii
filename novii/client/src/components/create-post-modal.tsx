@@ -25,7 +25,6 @@ import {
   Upload,
   Share2,
   Plus,
-  Trash2,
   Settings,
   Film
 } from "lucide-react";
@@ -33,6 +32,10 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { ImageCropper } from "@/components/image-cropper";
+import { POST_ASPECT_RATIOS, getCroppedImg } from "@/lib/crop-utils";
+import type { AspectRatioOption } from "@/lib/crop-utils";
+import type { Area } from "react-easy-crop";
 
 interface CreatePostModalProps {
   open: boolean;
@@ -44,6 +47,7 @@ interface ImagePreview {
   url: string;
   file: File;
   filter?: string;
+  croppedAreaPixels?: Area;
 }
 
 interface ReelPreview {
@@ -53,7 +57,7 @@ interface ReelPreview {
 }
 
 type MediaType = 'post' | 'reel';
-type PostStep = 'select' | 'edit' | 'details';
+type PostStep = 'select' | 'crop' | 'filter' | 'details';
 
 const FILTERS = [
   { id: 'none', name: 'Original', nameAr: 'الأصل', cssClass: '' },
@@ -87,6 +91,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [hidelikeCount, setHideLikeCount] = useState(false);
   const [hideComments, setHideComments] = useState(false);
+  const [selectedAspect, setSelectedAspect] = useState<AspectRatioOption>(POST_ASPECT_RATIOS[0]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reelInputRef = useRef<HTMLInputElement>(null);
@@ -104,6 +109,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
       setSelectedFilter('none');
       setCurrentImageIndex(0);
       setShowAdvanced(false);
+      setSelectedAspect(POST_ASPECT_RATIOS[0]);
     }
   }, [open, initialMediaType]);
 
@@ -129,7 +135,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
         filter: 'none'
       }));
       setSelectedImages(newImages);
-      setCurrentStep('edit');
+      setCurrentStep('crop');
     }
   }, []);
 
@@ -142,7 +148,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
         filter: 'none'
       }));
       setSelectedImages(newImages);
-      setCurrentStep('edit');
+      setCurrentStep('crop');
     }
   };
 
@@ -164,16 +170,18 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
     }
   };
 
-  const removeImage = (index: number) => {
-    const newImages = selectedImages.filter((_, i) => i !== index);
-    setSelectedImages(newImages);
-    if (currentImageIndex >= newImages.length) {
-      setCurrentImageIndex(Math.max(0, newImages.length - 1));
-    }
-    if (newImages.length === 0) {
-      setCurrentStep('select');
-    }
-  };
+  const handleCropComplete = useCallback((_: Area, croppedAreaPixels: Area) => {
+    setSelectedImages(prev => {
+      const newImages = [...prev];
+      if (newImages[currentImageIndex]) {
+        newImages[currentImageIndex] = {
+          ...newImages[currentImageIndex],
+          croppedAreaPixels,
+        };
+      }
+      return newImages;
+    });
+  }, [currentImageIndex]);
 
   const handlePost = async () => {
     if (mediaType === 'reel') {
@@ -238,8 +246,23 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
 
       setIsLoading(true);
       try {
+        const img = selectedImages[0];
+        let fileToUpload: File;
+
+        if (img.croppedAreaPixels) {
+          fileToUpload = await getCroppedImg(
+            img.url,
+            img.croppedAreaPixels,
+            selectedAspect.outputWidth,
+            selectedAspect.outputHeight,
+            img.filter || selectedFilter
+          );
+        } else {
+          fileToUpload = img.file;
+        }
+
         const imageUrl = await api.uploadPostImage(
-          selectedImages[0].file,
+          fileToUpload,
           (progress) => setUploadProgress(progress)
         );
 
@@ -275,11 +298,42 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
     }
   };
 
-  const stepTitle = currentStep === 'select'
-    ? (t ? "إنشاء منشور جديد" : "Create new post")
-    : currentStep === 'edit'
-    ? (t ? "تعديل الصور" : "Edit")
-    : (t ? "مشاركة" : "Share");
+  const getStepTitle = () => {
+    switch (currentStep) {
+      case 'select': return t ? "إنشاء منشور جديد" : "Create new post";
+      case 'crop': return t ? "قص الصورة" : "Crop";
+      case 'filter': return t ? "تعديل" : "Edit";
+      case 'details': return t ? "منشور جديد" : "Create new post";
+    }
+  };
+
+  const getPrevStep = (): PostStep | null => {
+    switch (currentStep) {
+      case 'crop': return 'select';
+      case 'filter': return 'crop';
+      case 'details': return mediaType === 'reel' ? null : 'filter';
+      default: return null;
+    }
+  };
+
+  const getNextAction = () => {
+    switch (currentStep) {
+      case 'crop':
+        return { label: t ? "التالي" : "Next", action: () => setCurrentStep('filter') };
+      case 'filter':
+        return { label: t ? "التالي" : "Next", action: () => setCurrentStep('details') };
+      case 'details':
+        return {
+          label: isLoading ? null : (t ? "مشاركة" : "Share"),
+          action: handlePost,
+        };
+      default:
+        return null;
+    }
+  };
+
+  const prevStep = getPrevStep();
+  const nextAction = getNextAction();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -310,35 +364,12 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
         />
 
         <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
-          {currentStep !== 'select' ? (
+          {prevStep ? (
             <button
-              onClick={() => setCurrentStep(currentStep === 'details' ? 'edit' : 'select')}
+              onClick={() => setCurrentStep(prevStep)}
               className="p-1.5 hover:bg-muted rounded-full transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
-            </button>
-          ) : (
-            <div className="w-8" />
-          )}
-          <h2 className="text-base font-semibold">{stepTitle}</h2>
-          {currentStep === 'edit' ? (
-            <button
-              onClick={() => setCurrentStep('details')}
-              className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors px-2 py-1"
-            >
-              {t ? "التالي" : "Next"}
-            </button>
-          ) : currentStep === 'details' ? (
-            <button
-              onClick={handlePost}
-              disabled={isLoading}
-              className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors px-2 py-1 disabled:opacity-50"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                t ? "مشاركة" : "Share"
-              )}
             </button>
           ) : (
             <button
@@ -347,6 +378,22 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
             >
               <X className="w-5 h-5" />
             </button>
+          )}
+          <h2 className="text-base font-semibold">{getStepTitle()}</h2>
+          {nextAction ? (
+            <button
+              onClick={nextAction.action}
+              disabled={isLoading}
+              className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors px-2 py-1 disabled:opacity-50"
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                nextAction.label
+              )}
+            </button>
+          ) : (
+            <div className="w-8" />
           )}
         </div>
 
@@ -411,7 +458,46 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
             </div>
           )}
 
-          {currentStep === 'edit' && selectedImages.length > 0 && (
+          {currentStep === 'crop' && selectedImages.length > 0 && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0">
+                <ImageCropper
+                  imageSrc={selectedImages[currentImageIndex].url}
+                  aspectRatio={selectedAspect.ratio}
+                  aspectRatioOptions={POST_ASPECT_RATIOS}
+                  onAspectRatioChange={setSelectedAspect}
+                  selectedAspectId={selectedAspect.id}
+                  onCropComplete={handleCropComplete}
+                  isRTL={isRTL}
+                />
+              </div>
+
+              {selectedImages.length > 1 && (
+                <div className="flex items-center gap-1.5 p-3 border-t border-border overflow-x-auto flex-shrink-0">
+                  {selectedImages.map((img, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentImageIndex(idx)}
+                      className={cn(
+                        "w-12 h-12 rounded-md overflow-hidden border-2 flex-shrink-0 transition-all",
+                        currentImageIndex === idx ? "border-primary" : "border-transparent opacity-60"
+                      )}
+                    >
+                      <img src={img.url} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-12 h-12 rounded-md border-2 border-dashed border-muted-foreground/30 flex items-center justify-center flex-shrink-0 hover:border-primary/50 transition-all"
+                  >
+                    <Plus className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentStep === 'filter' && selectedImages.length > 0 && (
             <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
               <div className="flex-1 bg-black flex items-center justify-center relative min-h-[250px] sm:min-h-0">
                 <img
@@ -421,8 +507,10 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
                     "max-w-full max-h-full object-contain",
                     FILTERS.find(f => f.id === selectedFilter)?.cssClass
                   )}
+                  style={{
+                    aspectRatio: `${selectedAspect.ratio}`,
+                  }}
                 />
-
                 {selectedImages.length > 1 && (
                   <>
                     <button
@@ -437,17 +525,6 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>
-                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
-                      {selectedImages.map((_, idx) => (
-                        <div
-                          key={idx}
-                          className={cn(
-                            "w-1.5 h-1.5 rounded-full transition-all",
-                            idx === currentImageIndex ? "bg-white" : "bg-white/40"
-                          )}
-                        />
-                      ))}
-                    </div>
                   </>
                 )}
               </div>
@@ -494,40 +571,6 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
                     ))}
                   </div>
                 </div>
-
-                {selectedImages.length > 0 && (
-                  <div className="p-4 border-t border-border">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                      {t ? "الصور" : "Photos"} ({selectedImages.length})
-                    </p>
-                    <div className="flex gap-1.5 overflow-x-auto pb-1">
-                      {selectedImages.map((img, idx) => (
-                        <button
-                          key={idx}
-                          className={cn(
-                            "relative rounded-md overflow-hidden border-2 transition-all flex-shrink-0 w-14 h-14 group",
-                            currentImageIndex === idx ? "border-primary" : "border-transparent"
-                          )}
-                          onClick={() => setCurrentImageIndex(idx)}
-                        >
-                          <img src={img.url} alt="" className="w-full h-full object-cover" />
-                          <button
-                            onClick={(e) => { e.stopPropagation(); removeImage(idx); }}
-                            className="absolute top-0 right-0 bg-black/70 rounded-bl-md p-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex-shrink-0 w-14 h-14 rounded-md border-2 border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary/50 transition-all"
-                      >
-                        <Plus className="w-4 h-4 text-muted-foreground" />
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -546,7 +589,7 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
                     alt="Preview"
                     className={cn(
                       "max-w-full max-h-full object-contain",
-                      FILTERS.find(f => f.id === selectedImages[currentImageIndex]?.filter)?.cssClass
+                      FILTERS.find(f => f.id === selectedImages[currentImageIndex]?.filter || selectedFilter)?.cssClass
                     )}
                   />
                 )}

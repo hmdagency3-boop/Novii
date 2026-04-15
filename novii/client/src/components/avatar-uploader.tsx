@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { Upload, X, Image as ImageIcon, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ImageCropper } from "@/components/image-cropper";
+import { AVATAR_ASPECT_RATIO, getCroppedImg } from "@/lib/crop-utils";
+import type { Area } from "react-easy-crop";
 
 interface AvatarUploaderProps {
   currentAvatar?: string;
@@ -32,24 +34,31 @@ export function AvatarUploader({
   lang = "en",
 }: AvatarUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [rawImageUrl, setRawImageUrl] = useState<string | null>(null);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [isCropping, setIsCropping] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const txt = {
     en: {
-      hint: "Recommended: Square image, at least 200×200px",
+      hint: "Square image, cropped to 500×500px",
       clickUpload: "Click to upload",
       orDrop: " or drag and drop",
       drop: "Drop your image here",
-      formats: "PNG, JPG, GIF up to 5MB",
+      formats: "PNG, JPG up to 5MB",
       uploading: "Uploading...",
+      crop: "Crop & Save",
+      cancel: "Cancel",
     },
     ar: {
-      hint: "يُنصح باستخدام صورة مربعة، 200×200 بكسل على الأقل",
+      hint: "صورة مربعة، تُقص إلى 500×500 بكسل",
       clickUpload: "انقر للرفع",
       orDrop: " أو اسحب وأفلت",
       drop: "أفلت صورتك هنا",
-      formats: "PNG، JPG، GIF حتى 5 ميجابايت",
+      formats: "PNG، JPG حتى 5 ميجابايت",
       uploading: "جاري الرفع...",
+      crop: "قص وحفظ",
+      cancel: "إلغاء",
     },
   }[lang];
 
@@ -59,19 +68,80 @@ export function AvatarUploader({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation(); setIsDragging(false);
     const files = e.dataTransfer.files;
-    if (files && files[0]) onFileSelect(files[0]);
-  }, [onFileSelect]);
+    if (files && files[0]) {
+      const url = URL.createObjectURL(files[0]);
+      setRawImageUrl(url);
+      setIsCropping(true);
+    }
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files[0]) onFileSelect(files[0]);
+    if (files && files[0]) {
+      const url = URL.createObjectURL(files[0]);
+      setRawImageUrl(url);
+      setIsCropping(true);
+    }
+  };
+
+  const handleCropComplete = useCallback((_: Area, pixels: Area) => {
+    setCroppedAreaPixels(pixels);
+  }, []);
+
+  const handleCropConfirm = async () => {
+    if (!rawImageUrl || !croppedAreaPixels) return;
+    try {
+      const croppedFile = await getCroppedImg(
+        rawImageUrl,
+        croppedAreaPixels,
+        AVATAR_ASPECT_RATIO.outputWidth,
+        AVATAR_ASPECT_RATIO.outputHeight
+      );
+      onFileSelect(croppedFile);
+      setIsCropping(false);
+      URL.revokeObjectURL(rawImageUrl);
+      setRawImageUrl(null);
+    } catch (err) {
+      console.error("Crop error:", err);
+    }
+  };
+
+  const handleCropCancel = () => {
+    setIsCropping(false);
+    if (rawImageUrl) {
+      URL.revokeObjectURL(rawImageUrl);
+      setRawImageUrl(null);
+    }
   };
 
   const displayAvatar = previewUrl || currentAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
 
+  if (isCropping && rawImageUrl) {
+    return (
+      <div className="space-y-3" dir={isRTL ? "rtl" : "ltr"}>
+        <div className="relative w-full h-80 rounded-xl overflow-hidden border border-border">
+          <ImageCropper
+            imageSrc={rawImageUrl}
+            aspectRatio={1}
+            onCropComplete={handleCropComplete}
+            cropShape="round"
+            isRTL={isRTL}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={handleCropCancel}>
+            {txt.cancel}
+          </Button>
+          <Button className="flex-1" onClick={handleCropConfirm}>
+            {txt.crop}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
-      {/* Avatar Preview */}
       <div className={`flex items-center gap-6 ${isRTL ? "flex-row-reverse" : ""}`}>
         <div className="relative flex-shrink-0">
           <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
@@ -91,7 +161,6 @@ export function AvatarUploader({
         </div>
       </div>
 
-      {/* Drag & Drop Zone */}
       <Card
         className={cn(
           "relative border-2 border-dashed transition-all duration-200 cursor-pointer overflow-hidden",
@@ -124,7 +193,9 @@ export function AvatarUploader({
             {isUploading ? (
               <>
                 <p className="text-sm font-medium">{txt.uploading}</p>
-                <Progress value={uploadProgress} className="w-full" />
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
+                </div>
                 <p className="text-xs text-muted-foreground">{uploadProgress}%</p>
               </>
             ) : (
@@ -155,7 +226,6 @@ export function AvatarUploader({
         />
       </Card>
 
-      {/* Selected File Info */}
       {selectedFile && (
         <Card className="p-4 bg-muted/50 border border-border animate-in slide-in-from-top-2 duration-200">
           <div className={`flex items-start gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
