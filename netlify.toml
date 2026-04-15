@@ -1,48 +1,49 @@
 [build]
-  command = "pnpm install && cd novii && pnpm run build"
+  command = "pnpm install --filter novii... --filter novii-netlify-functions && cd novii && pnpm exec vite build"
   publish = "novii/dist/public"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION  = "20"
+  PNPM_VERSION  = "9"
 
 [functions]
-  directory = "netlify/functions"
+  directory    = "netlify/functions"
   node_bundler = "esbuild"
 
 # كل طلبات /api/* تروح للـ Serverless Function
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/api"
+  from   = "/api/*"
+  to     = "/.netlify/functions/api"
   status = 200
-  force = true
+  force  = true
 
 # ملفات ثابتة — تُخدَم مباشرة بدون redirect
 [[redirects]]
-  from = "/robots.txt"
-  to = "/robots.txt"
+  from   = "/robots.txt"
+  to     = "/robots.txt"
   status = 200
-  force = false
+  force  = false
 
 [[redirects]]
-  from = "/sitemap.xml"
-  to = "/sitemap.xml"
+  from   = "/sitemap.xml"
+  to     = "/sitemap.xml"
   status = 200
-  force = false
+  force  = false
 
 [[redirects]]
-  from = "/favicon.ico"
-  to = "/favicon.ico"
+  from   = "/favicon.ico"
+  to     = "/favicon.ico"
   status = 200
-  force = false
+  force  = false
 
 [[redirects]]
-  from = "/favicon.png"
-  to = "/favicon.png"
+  from   = "/favicon.png"
+  to     = "/favicon.png"
   status = 200
-  force = false
+  force  = false
 
 # SPA fallback — كل الروابط الأخرى → index.html
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from   = "/*"
+  to     = "/index.html"
   status = 200
