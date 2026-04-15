@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { ArrowRight, Hash, TrendingUp } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import PostCard from "@/components/post-card";
+import Layout from "@/components/layout";
 
 interface HashtagData {
   id: string;
@@ -65,7 +66,7 @@ export default function HashtagPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background" dir="rtl">
+    <Layout>
       <div className="max-w-2xl mx-auto">
         <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border">
           <div className="flex items-center gap-3 px-4 h-14">
@@ -126,6 +127,6 @@ export default function HashtagPage() {
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }
