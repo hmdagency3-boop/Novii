@@ -1194,11 +1194,13 @@ export const api = {
     const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const insertData: any = {
       user_id: user.id,
       media_url: mediaUrl,
       media_type: mediaType,
       filter_name: filterName || 'normal',
+      expires_at: expiresAt,
     };
 
     if (music) {

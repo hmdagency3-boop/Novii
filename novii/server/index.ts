@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { adminDb } from "./storage";
+import { extractPublicId, deleteFromCloudinary } from "./cloudinary";
 
 const app = express();
 
@@ -92,4 +94,37 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
   });
+
+  async function cleanupExpiredStories() {
+    try {
+      const { data: expired, error } = await adminDb
+        .from('stories')
+        .select('id, media_url, media_type')
+        .lt('expires_at', new Date().toISOString());
+
+      if (error || !expired || expired.length === 0) return;
+
+      log(`🧹 Cleaning up ${expired.length} expired stories...`);
+
+      for (const story of expired) {
+        const publicId = extractPublicId(story.media_url);
+        if (publicId) {
+          const resourceType = story.media_type === 'video' ? 'video' : 'image';
+          await deleteFromCloudinary(publicId, resourceType);
+        }
+      }
+
+      const ids = expired.map((s: any) => s.id);
+
+      await adminDb.from('story_views').delete().in('story_id', ids);
+      await adminDb.from('stories').delete().in('id', ids);
+
+      log(`✅ Deleted ${expired.length} expired stories and their media`);
+    } catch (err) {
+      console.error('Story cleanup error:', err);
+    }
+  }
+
+  cleanupExpiredStories();
+  setInterval(cleanupExpiredStories, 30 * 60 * 1000);
 })();

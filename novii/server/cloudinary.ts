@@ -41,6 +41,30 @@ export async function uploadToCloudinary(
   });
 }
 
+export function extractPublicId(url: string): string | null {
+  try {
+    const match = url.match(/\/upload\/(?:v\d+\/)?(novii\/.+?)(?:\.\w+)?$/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteFromCloudinary(
+  publicId: string,
+  resourceType: "image" | "video" | "raw" = "image"
+): Promise<boolean> {
+  try {
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType,
+    });
+    return result.result === "ok";
+  } catch (err) {
+    console.error(`Failed to delete ${publicId} from Cloudinary:`, err);
+    return false;
+  }
+}
+
 // Express handler: POST /api/upload
 export async function handleUpload(req: Request, res: Response) {
   try {
