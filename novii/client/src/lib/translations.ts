@@ -20,7 +20,7 @@ export const translations = {
       see_all: "See All",
       follow: "Follow",
       footer_links: "About • Help • Press • API • Jobs • Privacy • Terms",
-      copyright: "© 2025 NOVII FROM REPLIT"
+      copyright: "© 2025 NOVII"
     },
     settings: {
       title: "Settings",

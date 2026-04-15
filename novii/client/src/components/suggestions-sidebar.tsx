@@ -195,7 +195,7 @@ export default function SuggestionsSidebar() {
                 ? 'عن التطبيق • المساعدة • الصحافة • API • الوظائف • الخصوصية • الشروط'
                 : 'About • Help • Press • API • Jobs • Privacy • Terms'}
             </p>
-            <p>© 2025 {isRTL ? 'نوفي من ريبليت' : 'NOVII FROM REPLIT'}</p>
+            <p>© 2025 {isRTL ? 'نوفي' : 'NOVII'}</p>
           </div>
         </div>
       </aside>

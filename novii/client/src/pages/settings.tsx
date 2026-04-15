@@ -2053,7 +2053,7 @@ export default function SettingsPage() {
                     <span>{direction === 'rtl' ? 'الخصوصية' : 'Privacy'}</span>
                     <span>{direction === 'rtl' ? 'الشروط' : 'Terms'}</span>
                 </div>
-                <p>© 2025 NOVII FROM REPLIT</p>
+                <p>© 2025 NOVII</p>
             </footer>
         </div>
 
