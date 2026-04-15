@@ -314,8 +314,14 @@ export const api = {
     folder: string,
     onProgress?: (progress: number) => void
   ): Promise<string> {
+    let fileToUpload = file;
+    if (file.type.startsWith("image/") && !file.name.endsWith('.gif')) {
+      const { resizeImageBeforeUpload } = await import("@/lib/crop-utils");
+      fileToUpload = await resizeImageBeforeUpload(file, 1920);
+    }
+
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", fileToUpload);
     formData.append("folder", folder);
 
     if (onProgress) onProgress(10);

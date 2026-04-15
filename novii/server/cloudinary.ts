@@ -27,10 +27,7 @@ export async function uploadToCloudinary(
       {
         folder: `novii/${folder}`,
         resource_type: resourceType,
-        transformation:
-          resourceType === "image"
-            ? [{ quality: "auto", fetch_format: "auto" }]
-            : undefined,
+        transformation: undefined,
       },
       (error, result) => {
         if (error) return reject(error);
@@ -72,12 +69,15 @@ export async function handleUpload(req: Request, res: Response) {
       return res.status(400).json({ error: "No file provided" });
     }
 
-    const ALLOWED_FOLDERS = ['avatars', 'posts', 'stories', 'reels', 'messages', 'covers', 'audio', 'misc', 'communities', 'verification'];
+    if (!req.file.buffer || req.file.buffer.length === 0) {
+      return res.status(400).json({ error: "Empty file" });
+    }
+
+    const ALLOWED_FOLDERS = ['avatars', 'posts', 'stories', 'reels', 'messages', 'covers', 'audio', 'misc', 'communities', 'verification', 'community-avatars'];
     const rawFolder = (req.body.folder as string) || "misc";
     const folder = ALLOWED_FOLDERS.includes(rawFolder) ? rawFolder : "misc";
     const isVideo = req.file.mimetype.startsWith("video/");
     const isAudio = req.file.mimetype.startsWith("audio/") || folder === "audio";
-    // Use "raw" for audio (bypasses Cloudinary format validation); "video" for video; "image" otherwise
     const resourceType: "image" | "video" | "raw" | "auto" = isAudio ? "raw" : isVideo ? "video" : "image";
 
     const url = await uploadToCloudinary(req.file.buffer, folder, resourceType);

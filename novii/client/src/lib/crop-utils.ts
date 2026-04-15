@@ -81,6 +81,46 @@ function createImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
+export async function resizeImageBeforeUpload(
+  file: File,
+  maxDimension: number = 1080
+): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await createImage(url);
+    const { width, height } = img;
+
+    if (width <= maxDimension && height <= maxDimension) return file;
+
+    const scale = maxDimension / Math.max(width, height);
+    const newW = Math.round(width * scale);
+    const newH = Math.round(height * scale);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = newW;
+    canvas.height = newH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+
+    ctx.drawImage(img, 0, 0, newW, newH);
+
+    return new Promise((resolve) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; }
+          resolve(new File([blob], file.name, { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        0.92
+      );
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 function cssFilterToCanvasFilter(filterId: string): string {
   const map: Record<string, string> = {
     none: "none",
