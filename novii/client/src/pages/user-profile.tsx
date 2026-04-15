@@ -34,6 +34,7 @@ import { OnlineIndicator } from "@/components/online-indicator";
 import { supabase } from "@/lib/supabase";
 import { ProfileShareModal } from "@/components/profile-share-modal";
 import { useSettings } from "@/lib/settings-context";
+import { useSwipeTabs } from "@/hooks/use-swipe-tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +57,9 @@ export default function UserProfile() {
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("posts");
+  const userProfileTabs = useMemo(() => ["posts", "reels", "tagged"], []);
+  const swipeHandlers = useSwipeTabs({ tabs: userProfileTabs, currentTab: activeTab, onTabChange: setActiveTab, isRTL: direction === "rtl" });
   const [slideIn, setSlideIn] = useState(() => {
     const flag = sessionStorage.getItem("novii-qr-nav");
     if (flag) { sessionStorage.removeItem("novii-qr-nav"); return true; }
@@ -654,7 +658,7 @@ export default function UserProfile() {
 
         {/* Tabs & Grid */}
         <div className="flex-1 border-t border-border">
-            <Tabs defaultValue="posts" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="flex justify-center border-b border-border">
                     <TabsList className="h-12 bg-transparent gap-8">
                         <TabsTrigger value="posts" className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground text-muted-foreground px-4 gap-2 uppercase text-xs tracking-widest font-bold bg-transparent shadow-none">
@@ -669,6 +673,7 @@ export default function UserProfile() {
                     </TabsList>
                 </div>
 
+                <div {...swipeHandlers}>
                 <TabsContent value="posts" className="p-0 md:p-4 pb-20 md:pb-4 max-w-4xl mx-auto mt-0">
                     {postsLoading || reelsLoading ? (
                       <div className="flex items-center justify-center py-10">
@@ -760,6 +765,7 @@ export default function UserProfile() {
                       <p className="text-muted-foreground">{isRTL ? "المنشورات التي تم وسم هذا المستخدم فيها ستظهر هنا" : "Posts you're tagged in will appear here"}</p>
                     </div>
                 </TabsContent>
+                </div>
             </Tabs>
         </div>
       </div>

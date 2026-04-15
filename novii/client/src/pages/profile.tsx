@@ -26,10 +26,11 @@ import { ReelViewerModal } from "@/components/reel-viewer-modal";
 import { StoryViewerModal } from "@/components/story-viewer-modal";
 import { CreateStoryModal } from "@/components/create-story-modal";
 import { Link, useLocation } from "wouter";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLanguage } from "@/lib/language-context";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useUserStories } from "@/hooks/use-data";
+import { useSwipeTabs } from "@/hooks/use-swipe-tabs";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { REEL_COLUMNS, PROFILE_CARD } from "@/lib/query-columns";
@@ -52,7 +53,10 @@ export default function Profile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [isCreateStoryModalOpen, setIsCreateStoryModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("posts");
   const isRTL = direction === "rtl";
+  const profileTabs = useMemo(() => ["posts", "reels", "saved", "tagged"], []);
+  const swipeHandlers = useSwipeTabs({ tabs: profileTabs, currentTab: activeTab, onTabChange: setActiveTab, isRTL });
   const queryClient = useQueryClient();
   
   // Track online status
@@ -422,7 +426,7 @@ export default function Profile() {
 
         {/* Tabs & Grid */}
         <div className="flex-1 border-t border-border overflow-hidden">
-            <Tabs defaultValue="posts" className="w-full h-full flex flex-col">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
                 <div className="border-b border-border">
                     <TabsList className="h-12 bg-transparent gap-0.5 md:gap-8 w-full justify-center">
                         <TabsTrigger value="posts" className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground text-muted-foreground px-2.5 md:px-4 gap-2 uppercase text-xs tracking-widest font-bold bg-transparent shadow-none whitespace-nowrap flex-1 md:flex-none">
@@ -440,7 +444,8 @@ export default function Profile() {
                     </TabsList>
                 </div>
 
-                <TabsContent value="posts" className="p-0 md:p-4 max-w-4xl mx-auto mt-0 overflow-y-auto flex-1">
+                <div {...swipeHandlers} className="flex-1 overflow-hidden">
+                <TabsContent value="posts" className="p-0 md:p-4 max-w-4xl mx-auto mt-0 overflow-y-auto h-full">
                     {postsLoading || reelsLoading ? (
                       <div className="flex items-center justify-center py-10">
                         <Spinner className="w-6 h-6" />
@@ -472,7 +477,7 @@ export default function Profile() {
                     )}
                 </TabsContent>
 
-                <TabsContent value="reels" className="p-2 md:p-4 max-w-4xl mx-auto mt-0 overflow-y-auto flex-1">
+                <TabsContent value="reels" className="p-2 md:p-4 max-w-4xl mx-auto mt-0 overflow-y-auto h-full">
                     {reelsLoading ? (
                       <div className="flex items-center justify-center py-10">
                         <Spinner className="w-6 h-6" />
@@ -512,7 +517,7 @@ export default function Profile() {
                     )}
                 </TabsContent>
                 
-                <TabsContent value="saved" className="p-1 md:p-4 max-w-4xl mx-auto mt-0 overflow-y-auto flex-1">
+                <TabsContent value="saved" className="p-1 md:p-4 max-w-4xl mx-auto mt-0 overflow-y-auto h-full">
                     {savedLoading ? (
                       <div className="flex items-center justify-center py-10">
                         <Spinner className="w-6 h-6" />
@@ -536,13 +541,14 @@ export default function Profile() {
                     )}
                 </TabsContent>
                 
-                <TabsContent value="tagged" className="p-1 md:p-4 max-w-4xl mx-auto mt-0 overflow-y-auto flex-1">
+                <TabsContent value="tagged" className="p-1 md:p-4 max-w-4xl mx-auto mt-0 overflow-y-auto h-full">
                     <div className="flex flex-col items-center justify-center py-20 text-center">
                       <UserSquare2 className="w-16 h-16 text-muted-foreground mb-4" />
                       <h3 className="text-xl font-bold mb-2">No Tagged Posts</h3>
                       <p className="text-muted-foreground">Posts you're tagged in will appear here</p>
                     </div>
                 </TabsContent>
+                </div>
             </Tabs>
         </div>
 
