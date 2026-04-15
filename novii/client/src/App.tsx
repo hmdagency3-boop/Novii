@@ -25,7 +25,7 @@ import Reels from "@/pages/reels";
 import Settings from "@/pages/settings";
 import Messages from "@/pages/messages";
 import Notifications from "@/pages/notifications";
-import Mentions from "@/pages/mentions";
+
 import AuthPage from "@/pages/auth";
 import PostPage from "@/pages/post";
 import FollowersDetail from "@/pages/followers-detail";
@@ -186,11 +186,7 @@ function Router() {
           <Notifications />
         </ProtectedLayout>
       </Route>
-      <Route path="/mentions">
-        <ProtectedLayout>
-          <Mentions />
-        </ProtectedLayout>
-      </Route>
+
       <Route path="/create">
         <ProtectedLayout>
           <Create />

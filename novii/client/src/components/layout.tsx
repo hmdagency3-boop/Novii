@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Search, PlusSquare, Heart, User, LogOut, Menu, Sun, Moon, Clapperboard, MessageCircle, Compass, Settings, AtSign, FileText, Video, Image as ImageIcon } from "lucide-react";
+import { Home, Search, PlusSquare, Heart, User, LogOut, Menu, Sun, Moon, Clapperboard, MessageCircle, Compass, Settings, FileText, Video, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreatePostModal } from "@/components/create-post-modal";
 import { CreateStoryModal } from "@/components/create-story-modal";
@@ -187,7 +187,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // Determine if we should show the mobile header
   // We hide it on Reels, Messages, Settings for a more immersive/native feel if desired, or just keep it simple.
   // Let's keep it simple: Show mobile header on Home, Explore, Notifications. Hide on others if they have their own headers.
-  const hasOwnHeader = location === '/messages' || location === '/settings' || location === '/reels' || location === '/mentions';
+  const hasOwnHeader = location === '/messages' || location === '/settings' || location === '/reels';
   const isHome = location === '/';
 
   return (
@@ -230,7 +230,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <NavItem href="/reels" icon={Clapperboard} label={t.reels} isActive={location === "/reels"} onDoubleClick={() => handleNavDoubleClick('/reels')} />
           <NavItem href="/messages" icon={MessageCircle} label={t.messages} isActive={location === "/messages"} />
           <NavItem href="/notifications" icon={Heart} label={t.notifications} isActive={location === "/notifications"} badge={unreadCount > 0 ? unreadCount : undefined} onDoubleClick={() => handleNavDoubleClick('/notifications')} />
-          <NavItem href="/mentions" icon={AtSign} label={'Mentions'} isActive={location === "/mentions"} />
+
           <DropdownMenu open={createMenuOpen} onOpenChange={setCreateMenuOpen}>
             <DropdownMenuTrigger asChild>
               <button ref={createButtonRef} className={cn(
