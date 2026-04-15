@@ -41,7 +41,7 @@ export default function Reels() {
 
   const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set());
   const [savedReels, setSavedReels]       = useState<Set<string>>(new Set());
-  const [muted, setMuted]                 = useState(true);
+  const [muted, setMuted]                 = useState(false);
   const [commentReelId, setCommentReelId] = useState<string | null>(null);
   const guestViewCount   = useRef(0);
   const guestPromptShown = useRef(false);
@@ -337,9 +337,9 @@ function useVideoPlayback(reel: any, muted: boolean) {
         if (entry.isIntersecting) {
           userPaused.current = false;
           setPaused(false);
-          vid.muted = true;
+          vid.muted = muted;
           const p = vid.play();
-          if (p) p.catch(() => {});
+          if (p) p.catch(() => { vid.muted = true; vid.play().catch(() => {}); });
         } else {
           vid.pause();
           vid.currentTime = 0;
@@ -499,7 +499,7 @@ const MobileReelCard = React.memo(function MobileReelCard({
         ref={videoRef}
         src={reel.video_url}
         className="absolute inset-0 w-full h-full object-cover"
-        loop playsInline muted
+        loop playsInline
         preload="auto"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -663,7 +663,7 @@ const DesktopReelCard = React.memo(function DesktopReelCard({
             ref={videoRef}
             src={reel.video_url}
             className="w-full h-full object-cover"
-            loop playsInline muted
+            loop playsInline
             preload="auto"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/70 pointer-events-none" />

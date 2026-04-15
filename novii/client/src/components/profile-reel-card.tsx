@@ -31,7 +31,6 @@ export function ProfileReelCard({ reel, onClick }: ProfileReelCardProps) {
         src={reel.video_url}
         className="w-full h-full object-cover"
         preload="metadata"
-        muted
         playsInline
       />
 

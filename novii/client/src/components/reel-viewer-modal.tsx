@@ -555,7 +555,6 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
             ref={videoRef}
             src={localReel.video_url}
             autoPlay
-            muted
             onClick={handleVideoClick}
             onDoubleClick={handleDoubleTap}
             className="w-full h-full object-contain cursor-pointer"
