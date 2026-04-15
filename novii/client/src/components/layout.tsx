@@ -76,11 +76,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
     handleStorageChange(); // Check on mount
     window.addEventListener('storage', handleStorageChange);
-    // Also listen to messages from same tab
-    const interval = setInterval(handleStorageChange, 100);
+    window.addEventListener('chatActiveChange', handleStorageChange);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
+      window.removeEventListener('chatActiveChange', handleStorageChange);
     };
   }, []);
 

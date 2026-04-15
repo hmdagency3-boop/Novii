@@ -86,6 +86,7 @@ function ExploreContent() {
             {items.map((item, i) => {
               const isLarge = i % 7 === 0;
               const isTall = i % 5 === 0 && !isLarge;
+              const isAboveFold = i < 6;
 
               if (item.kind === 'reel') {
                 const reel = item.data;
@@ -104,13 +105,16 @@ function ExploreContent() {
                         src={reel.thumbnail_url}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         alt="Reel"
+                        loading={isAboveFold ? "eager" : "lazy"}
+                        decoding="async"
                       />
                     ) : reel.video_url ? (
                       <video
-                        src={reel.video_url}
+                        src={isAboveFold ? reel.video_url : undefined}
+                        data-src={!isAboveFold ? reel.video_url : undefined}
                         className="w-full h-full object-cover"
                         muted
-                        preload="metadata"
+                        preload="none"
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
@@ -144,11 +148,15 @@ function ExploreContent() {
                     ${isTall ? "row-span-2" : ""}
                   `}
                 >
-                  <img
-                    src={post.image_url || "https://via.placeholder.com/400"}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    alt="Explore"
-                  />
+                  {post.image_url && (
+                    <img
+                      src={post.image_url}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      alt="Explore"
+                      loading={isAboveFold ? "eager" : "lazy"}
+                      decoding="async"
+                    />
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
                     <p className="text-white font-bold text-sm truncate">{post.caption}</p>
                   </div>

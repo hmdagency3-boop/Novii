@@ -236,6 +236,7 @@ export default function Messages() {
   // Hide bottom nav in mobile when chat/community is selected
   useEffect(() => {
     localStorage.setItem('chatActive', selectedUserId || selectedCommunityId ? 'true' : 'false');
+    window.dispatchEvent(new Event('chatActiveChange'));
   }, [selectedUserId, selectedCommunityId]);
 
   // Fetch communities
