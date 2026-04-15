@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { ScanFace, RotateCcw, Check, X, Loader2, Zap } from "lucide-react";
+import { ScanFace, RotateCcw, Check, X, Loader2, Zap, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -82,31 +82,63 @@ function hasSkinTones(canvas: HTMLCanvasElement): boolean {
   return totalChecked > 0 && (skinPixels / totalChecked) > 0.15;
 }
 
+function analyzeImageFile(file: File): Promise<{ file: File; previewUrl: string; faceDetected: boolean; isSharp: boolean; brightnessOk: boolean }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const size = Math.min(img.width, img.height, 800);
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d")!;
+      const sx = (img.width - Math.min(img.width, img.height)) / 2;
+      const sy = (img.height - Math.min(img.width, img.height)) / 2;
+      const sSize = Math.min(img.width, img.height);
+      ctx.drawImage(img, sx, sy, sSize, sSize, 0, 0, size, size);
+
+      const sharpness = detectSharpness(canvas);
+      const brightness = detectBrightness(canvas);
+      const face = hasSkinTones(canvas);
+
+      canvas.toBlob((blob) => {
+        const outFile = blob ? new File([blob], "selfie.jpg", { type: "image/jpeg" }) : file;
+        resolve({
+          file: outFile,
+          previewUrl: url,
+          faceDetected: face,
+          isSharp: sharpness > 2.5,
+          brightnessOk: brightness > 50 && brightness < 220,
+        });
+      }, "image/jpeg", 0.92);
+    };
+    img.onerror = () => {
+      resolve({ file, previewUrl: url, faceDetected: true, isSharp: true, brightnessOk: true });
+    };
+    img.src = url;
+  });
+}
+
 export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const nativeCaptureRef = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<"loading" | "live" | "native">("loading");
   const [cameraReady, setCameraReady] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [faceDetected, setFaceDetected] = useState(true);
   const [brightnessOk, setBrightnessOk] = useState(true);
   const [isSharp, setIsSharp] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
 
   const startCamera = useCallback(async () => {
     try {
-      setError(null);
-
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setError(isRTL
-          ? "الكاميرا غير متاحة في هذا المتصفح. استخدم خيار رفع الصورة."
-          : "Camera not available in this browser. Use the upload option instead.");
+        setMode("native");
         return;
       }
-
-      let stream: MediaStream | null = null;
 
       const constraints = [
         { video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 1280 } } },
@@ -114,6 +146,7 @@ export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerP
         { video: true },
       ];
 
+      let stream: MediaStream | null = null;
       for (const constraint of constraints) {
         try {
           stream = await navigator.mediaDevices.getUserMedia(constraint);
@@ -124,9 +157,7 @@ export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerP
       }
 
       if (!stream) {
-        setError(isRTL
-          ? "لا يمكن الوصول للكاميرا. تحقق من الأذونات أو استخدم خيار رفع الصورة."
-          : "Cannot access camera. Check permissions or use the upload option.");
+        setMode("native");
         return;
       }
 
@@ -136,14 +167,13 @@ export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerP
         videoRef.current.onloadedmetadata = () => {
           videoRef.current?.play();
           setCameraReady(true);
+          setMode("live");
         };
       }
     } catch {
-      setError(isRTL
-        ? "لا يمكن الوصول للكاميرا. تحقق من الأذونات أو استخدم خيار رفع الصورة."
-        : "Cannot access camera. Check permissions or use the upload option.");
+      setMode("native");
     }
-  }, [isRTL]);
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -157,6 +187,20 @@ export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerP
     startCamera();
     return () => stopCamera();
   }, [startCamera, stopCamera]);
+
+  const handleNativeCapture = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setChecking(true);
+    const result = await analyzeImageFile(file);
+    setCapturedFile(result.file);
+    setCapturedImage(result.previewUrl);
+    setFaceDetected(result.faceDetected);
+    setIsSharp(result.isSharp);
+    setBrightnessOk(result.brightnessOk);
+    setChecking(false);
+  }, []);
 
   const capturePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -203,8 +247,10 @@ export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerP
     setFaceDetected(true);
     setIsSharp(true);
     setBrightnessOk(true);
-    startCamera();
-  }, [capturedImage, startCamera]);
+    if (mode === "live") {
+      startCamera();
+    }
+  }, [capturedImage, startCamera, mode]);
 
   const acceptPhoto = useCallback(() => {
     if (capturedFile) {
@@ -221,22 +267,22 @@ export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerP
         <ScanFace className="w-10 h-10 text-primary mx-auto mb-2" />
         <h3 className="font-bold text-lg">{isRTL ? "مسح الوجه" : "Face Scan"}</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          {isRTL ? "ضع وجهك داخل الإطار البيضاوي" : "Place your face inside the oval frame"}
+          {mode === "native"
+            ? (isRTL ? "التقط صورة سيلفي واضحة لوجهك" : "Take a clear selfie of your face")
+            : (isRTL ? "ضع وجهك داخل الإطار البيضاوي" : "Place your face inside the oval frame")}
         </p>
       </div>
 
-      {error ? (
-        <div className="text-center py-8 space-y-4">
-          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-2">
-            <X className="w-8 h-8 text-red-500" />
-          </div>
-          <p className="text-red-500 text-sm">{error}</p>
-          <div className="flex gap-3 justify-center">
-            <Button variant="outline" onClick={startCamera}>{isRTL ? "حاول مرة أخرى" : "Try Again"}</Button>
-            <Button variant="default" onClick={onCancel}>{isRTL ? "رفع صورة بدلاً من ذلك" : "Upload photo instead"}</Button>
-          </div>
-        </div>
-      ) : capturedImage ? (
+      <input
+        ref={nativeCaptureRef}
+        type="file"
+        accept="image/*"
+        capture="user"
+        className="hidden"
+        onChange={handleNativeCapture}
+      />
+
+      {capturedImage ? (
         <div className="space-y-3">
           <div className="relative rounded-xl overflow-hidden border-2 border-border bg-black mx-auto w-64 h-64">
             <img src={capturedImage} alt="Selfie" className="w-full h-full object-cover" />
@@ -296,7 +342,31 @@ export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerP
             </Button>
           </div>
         </div>
-      ) : (
+      ) : mode === "native" ? (
+        <div className="space-y-3">
+          <div className="relative rounded-xl overflow-hidden bg-gradient-to-b from-primary/5 to-primary/10 aspect-square mx-auto w-72 flex flex-col items-center justify-center border-2 border-dashed border-primary/30">
+            <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <Camera className="w-12 h-12 text-primary" />
+            </div>
+            <p className="text-sm font-medium text-center px-4">
+              {isRTL ? "اضغط الزر أدناه لفتح الكاميرا الأمامية" : "Press the button below to open the front camera"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1 text-center px-4">
+              {isRTL ? "سيتم فتح كاميرا جهازك مباشرة" : "Your device camera will open directly"}
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onCancel} className="flex-1">
+              {isRTL ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button onClick={() => nativeCaptureRef.current?.click()} className="flex-1">
+              <Camera className="w-4 h-4 mr-2" />
+              {isRTL ? "فتح الكاميرا" : "Open Camera"}
+            </Button>
+          </div>
+        </div>
+      ) : mode === "live" ? (
         <div className="space-y-3">
           <div className="relative rounded-xl overflow-hidden bg-black aspect-square mx-auto w-72">
             <video
@@ -341,6 +411,10 @@ export function FaceScanner({ onCapture, onCancel, isRTL = false }: FaceScannerP
               {isRTL ? "التقاط" : "Capture"}
             </Button>
           </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
         </div>
       )}
 

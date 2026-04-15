@@ -54,31 +54,63 @@ function detectBrightness(canvas: HTMLCanvasElement): number {
   return count > 0 ? sum / count : 128;
 }
 
+function analyzeIdCardFile(file: File): Promise<{ file: File; previewUrl: string; isSharp: boolean; brightnessOk: boolean; qualityScore: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const maxW = 1200;
+      const scale = img.width > maxW ? maxW / img.width : 1;
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      const sharpness = detectBlurriness(canvas);
+      const brightness = detectBrightness(canvas);
+      const sharp = sharpness > 3;
+      const brightOk = brightness > 40 && brightness < 230;
+      const score = Math.min(100, Math.round((sharpness / 15) * 100));
+
+      canvas.toBlob((blob) => {
+        const outFile = blob ? new File([blob], "id_card.jpg", { type: "image/jpeg" }) : file;
+        resolve({
+          file: outFile,
+          previewUrl: url,
+          isSharp: sharp,
+          brightnessOk: brightOk,
+          qualityScore: Math.min(score, 100),
+        });
+      }, "image/jpeg", 0.92);
+    };
+    img.onerror = () => {
+      resolve({ file, previewUrl: url, isSharp: true, brightnessOk: true, qualityScore: 70 });
+    };
+    img.src = url;
+  });
+}
+
 export function IdCardScanner({ onCapture, onCancel, isRTL = false }: IdCardScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const nativeCaptureRef = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<"loading" | "live" | "native">("loading");
   const [cameraReady, setCameraReady] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [brightnessOk, setBrightnessOk] = useState(true);
   const [isSharp, setIsSharp] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
 
   const startCamera = useCallback(async () => {
     try {
-      setError(null);
-
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setError(isRTL
-          ? "الكاميرا غير متاحة في هذا المتصفح. استخدم خيار رفع الصورة."
-          : "Camera not available in this browser. Use the upload option instead.");
+        setMode("native");
         return;
       }
-
-      let stream: MediaStream | null = null;
 
       const constraints = [
         { video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } },
@@ -86,6 +118,7 @@ export function IdCardScanner({ onCapture, onCancel, isRTL = false }: IdCardScan
         { video: true },
       ];
 
+      let stream: MediaStream | null = null;
       for (const constraint of constraints) {
         try {
           stream = await navigator.mediaDevices.getUserMedia(constraint);
@@ -96,9 +129,7 @@ export function IdCardScanner({ onCapture, onCancel, isRTL = false }: IdCardScan
       }
 
       if (!stream) {
-        setError(isRTL
-          ? "لا يمكن الوصول للكاميرا. تحقق من الأذونات أو استخدم خيار رفع الصورة."
-          : "Cannot access camera. Check permissions or use the upload option.");
+        setMode("native");
         return;
       }
 
@@ -108,14 +139,13 @@ export function IdCardScanner({ onCapture, onCancel, isRTL = false }: IdCardScan
         videoRef.current.onloadedmetadata = () => {
           videoRef.current?.play();
           setCameraReady(true);
+          setMode("live");
         };
       }
     } catch {
-      setError(isRTL
-        ? "لا يمكن الوصول للكاميرا. تحقق من الأذونات أو استخدم خيار رفع الصورة."
-        : "Cannot access camera. Check permissions or use the upload option.");
+      setMode("native");
     }
-  }, [isRTL]);
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -129,6 +159,20 @@ export function IdCardScanner({ onCapture, onCancel, isRTL = false }: IdCardScan
     startCamera();
     return () => stopCamera();
   }, [startCamera, stopCamera]);
+
+  const handleNativeCapture = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setChecking(true);
+    const result = await analyzeIdCardFile(file);
+    setCapturedFile(result.file);
+    setCapturedImage(result.previewUrl);
+    setIsSharp(result.isSharp);
+    setBrightnessOk(result.brightnessOk);
+    setQualityScore(result.qualityScore);
+    setChecking(false);
+  }, []);
 
   const capturePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -178,8 +222,10 @@ export function IdCardScanner({ onCapture, onCancel, isRTL = false }: IdCardScan
     setQualityScore(null);
     setIsSharp(true);
     setBrightnessOk(true);
-    startCamera();
-  }, [capturedImage, startCamera]);
+    if (mode === "live") {
+      startCamera();
+    }
+  }, [capturedImage, startCamera, mode]);
 
   const acceptPhoto = useCallback(() => {
     if (capturedFile) {
@@ -196,22 +242,22 @@ export function IdCardScanner({ onCapture, onCancel, isRTL = false }: IdCardScan
         <Camera className="w-10 h-10 text-primary mx-auto mb-2" />
         <h3 className="font-bold text-lg">{isRTL ? "مسح البطاقة الشخصية" : "Scan ID Card"}</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          {isRTL ? "وجّه الكاميرا نحو بطاقة الهوية داخل الإطار" : "Point your camera at your ID card within the frame"}
+          {mode === "native"
+            ? (isRTL ? "التقط صورة واضحة لبطاقة الهوية" : "Take a clear photo of your ID card")
+            : (isRTL ? "وجّه الكاميرا نحو بطاقة الهوية داخل الإطار" : "Point your camera at your ID card within the frame")}
         </p>
       </div>
 
-      {error ? (
-        <div className="text-center py-8 space-y-4">
-          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-2">
-            <X className="w-8 h-8 text-red-500" />
-          </div>
-          <p className="text-red-500 text-sm">{error}</p>
-          <div className="flex gap-3 justify-center">
-            <Button variant="outline" onClick={startCamera}>{isRTL ? "حاول مرة أخرى" : "Try Again"}</Button>
-            <Button variant="default" onClick={onCancel}>{isRTL ? "رفع صورة بدلاً من ذلك" : "Upload photo instead"}</Button>
-          </div>
-        </div>
-      ) : capturedImage ? (
+      <input
+        ref={nativeCaptureRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleNativeCapture}
+      />
+
+      {capturedImage ? (
         <div className="space-y-3">
           <div className="relative rounded-xl overflow-hidden border-2 border-border bg-black">
             <img src={capturedImage} alt="Captured ID" className="w-full h-auto" />
@@ -273,7 +319,37 @@ export function IdCardScanner({ onCapture, onCancel, isRTL = false }: IdCardScan
             </Button>
           </div>
         </div>
-      ) : (
+      ) : mode === "native" ? (
+        <div className="space-y-3">
+          <div className="relative rounded-xl overflow-hidden bg-gradient-to-b from-primary/5 to-primary/10 aspect-[16/10] flex flex-col items-center justify-center border-2 border-dashed border-primary/30">
+            <div className="w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+              <Camera className="w-12 h-12 text-primary" />
+            </div>
+            <p className="text-sm font-medium text-center px-4">
+              {isRTL ? "اضغط الزر أدناه لفتح الكاميرا" : "Press the button below to open the camera"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1 text-center px-4">
+              {isRTL ? "صوّر بطاقة الهوية بالكاميرا الخلفية" : "Capture your ID card with the rear camera"}
+            </p>
+          </div>
+
+          <div className="space-y-2 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
+            <p className="font-medium text-foreground text-sm mb-1">{isRTL ? "تعليمات:" : "Instructions:"}</p>
+            <p>• {isRTL ? "تأكد أن الصورة واضحة ومقروءة" : "Make sure the photo is clear and readable"}</p>
+            <p>• {isRTL ? "الاسم وتاريخ الميلاد والصورة يجب أن تكون ظاهرة" : "Name, date of birth, and photo must be visible"}</p>
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onCancel} className="flex-1">
+              {isRTL ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button onClick={() => nativeCaptureRef.current?.click()} className="flex-1">
+              <Camera className="w-4 h-4 mr-2" />
+              {isRTL ? "فتح الكاميرا" : "Open Camera"}
+            </Button>
+          </div>
+        </div>
+      ) : mode === "live" ? (
         <div className="space-y-3">
           <div className="relative rounded-xl overflow-hidden bg-black aspect-[16/10]">
             <video
@@ -321,6 +397,10 @@ export function IdCardScanner({ onCapture, onCancel, isRTL = false }: IdCardScan
               {isRTL ? "التقاط" : "Capture"}
             </Button>
           </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
         </div>
       )}
 
