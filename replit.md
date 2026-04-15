@@ -52,7 +52,7 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - **Separate frontend app** at `/novii-admin/` — completely independent from Novii platform codebase
 - **Tech**: React + Vite + Tailwind CSS + Supabase Auth, proxies API calls to Novii backend (port 5000)
 - **Design**: Ditto Pro-inspired dark sidebar, browser-style tab navigation, professional data tables with modals
-- **Pages**: Login (dark gradient), Dashboard (stats cards), Users (CRUD + ban/edit/delete with full badge management + user detail page), Content moderation, Admins management (add/edit/remove), Reports viewer, Verification Requests (review/approve/reject), Platform Settings (key-value editor), Activity Logs, Ban Appeals
+- **Pages (17 total)**: Login (dark gradient), Dashboard (stats cards), Users (CRUD + ban/edit/delete with full badge management + user detail page), Content/Posts moderation, Stories management, Reels management, Communities, Admins management (add/edit/remove), Reports viewer, Verification Requests (review/approve/reject), Ban Appeals, Analytics (growth/top-posts/devices), Announcements (broadcast notifications), Security (IP bans/suspicious accounts/login activity), Hashtags management (ban/unban/pin), Content Filter (banned words), Platform Settings (key-value editor), Activity Logs
 - **User Detail Page** (`artifacts/novii-admin/src/pages/user-detail.tsx`): Comprehensive user profile view with 7 tabs (Overview, Devices, Posts, Stories, Reports, Moderation, Connections). Shows all user data: profile header with badges/stats, usage statistics, device history with fingerprints/IPs/geo, posts/reels grid, stories grid, reports against/by, warnings/strikes/appeals/verification requests/admin logs, communities/followers/following/blocked. Accessed by clicking avatar or "View Details" in action menu. Endpoint: `GET /api/admin/users/:userId/details` fetches 16 data sources in parallel with graceful per-section error handling.
 - **All 10 badges**: verified, official, creator, premium, popular, active, gold early member, silver early member, bronze early member, beta tester — all viewable/editable from admin panel
 - **Auth flow**: Supabase email/password login → verifies admin status via `/api/admin/check` → shows panel if admin
@@ -75,6 +75,15 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 ### Error Handling
 - **ErrorBoundary**: `novii/client/src/components/error-boundary.tsx` wraps entire app in `App.tsx`
 - Prevents white screen on crashes, shows error UI with retry button
+
+### Hashtag System
+- **Database tables**: `hashtags` (name, posts_count, is_banned, is_pinned), `post_hashtags` (post_id, hashtag_id), `reel_hashtags` (reel_id, hashtag_id)
+- **Auto-extraction**: `saveHashtags()` in `api.ts` parses `#tags` from caption on post/reel creation, upserts hashtag rows, links via junction tables
+- **Public endpoints**: `/api/hashtags/trending`, `/api/hashtags/:name`, `/api/hashtags/:name/posts`, `/api/hashtags/search/:query`
+- **Admin endpoints**: `GET/PATCH /api/admin/hashtags/:id` (ban/unban/pin)
+- **Client page**: `novii/client/src/pages/hashtag.tsx` at route `/hashtag/:tag` — shows hashtag info + posts grid
+- **Clickable hashtags**: `post-card.tsx` renders `#tags` in captions as links to `/hashtag/:tag`
+- **Migration SQL**: `novii/supabase/add_hashtags_and_admin_features.sql`
 
 ### Follow System
 - Follow requests stored in `follow_requests` table (requester_id, recipient_id, status)

@@ -40,6 +40,7 @@ import TermsOfService from "@/pages/terms";
 import Help from "@/pages/help";
 import About from "@/pages/about";
 import ModerationNotice from "@/pages/moderation-notice";
+import HashtagPage from "@/pages/hashtag";
 
 function BanGuard() {
   const { isBanned } = useAuth();
@@ -212,6 +213,12 @@ function Router() {
         <ProtectedLayout>
           <ModerationNotice />
         </ProtectedLayout>
+      </Route>
+
+      <Route path="/hashtag/:tag">
+        <PublicRoute>
+          <HashtagPage />
+        </PublicRoute>
       </Route>
 
       <Route path="/features" component={Features} />

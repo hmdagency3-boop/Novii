@@ -122,15 +122,21 @@ export default function PostCard({ post }: PostCardProps) {
   const renderCaptionWithHashtags = (caption: string | null) => {
     if (!caption) return null;
     
-    const parts = caption.split(/(\#\w+)/g);
+    const parts = caption.split(/(#[\w\u0600-\u06FF]+)/g);
     return (
       <span className="text-foreground/90 leading-relaxed">
         {parts.map((part, i) => {
-          if (part?.startsWith('#')) {
+          if (part?.startsWith('#') && part.length > 1) {
+            const tagName = part.slice(1);
             return (
-              <span key={i} className="text-primary font-medium hover:text-primary/80 transition-colors cursor-pointer">
+              <a
+                key={i}
+                href={`/hashtag/${tagName}`}
+                onClick={(e) => { e.preventDefault(); window.location.href = `/hashtag/${tagName}`; }}
+                className="text-primary font-medium hover:text-primary/80 transition-colors cursor-pointer"
+              >
                 {part}
-              </span>
+              </a>
             );
           }
           return <span key={i}>{part}</span>;

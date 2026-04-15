@@ -13,10 +13,17 @@ import {
   ChevronRight,
   Menu,
   Scale,
+  Film,
+  Video,
+  BarChart3,
+  Megaphone,
+  ShieldAlert,
+  Hash,
+  Filter,
 } from "lucide-react";
 import { useState } from "react";
 
-export type TabId = "dashboard" | "users" | "content" | "communities" | "admins" | "reports" | "verification" | "appeals" | "settings" | "logs";
+export type TabId = "dashboard" | "users" | "content" | "stories" | "reels" | "communities" | "admins" | "reports" | "verification" | "appeals" | "analytics" | "announcements" | "security" | "hashtags" | "content-filter" | "settings" | "logs";
 
 interface SidebarProps {
   activeTab: TabId;
@@ -25,17 +32,24 @@ interface SidebarProps {
   onOpenTab: (tab: TabId) => void;
 }
 
-const menuItems: { id: TabId; label: string; labelAr: string; icon: React.ElementType; permission?: string }[] = [
-  { id: "dashboard", label: "Dashboard", labelAr: "لوحة التحكم", icon: LayoutDashboard },
-  { id: "users", label: "Users", labelAr: "المستخدمين", icon: Users, permission: "can_manage_users" },
-  { id: "content", label: "Content", labelAr: "المحتوى", icon: FileText, permission: "can_manage_content" },
-  { id: "communities", label: "Communities", labelAr: "المجتمعات", icon: UsersRound, permission: "can_manage_content" },
-  { id: "admins", label: "Admins", labelAr: "المشرفين", icon: Shield, permission: "can_manage_admins" },
-  { id: "reports", label: "Reports", labelAr: "البلاغات", icon: Flag, permission: "can_manage_reports" },
-  { id: "verification", label: "Verification", labelAr: "طلبات التوثيق", icon: BadgeCheck, permission: "can_manage_users" },
-  { id: "appeals", label: "Appeals", labelAr: "الاستئنافات", icon: Scale, permission: "can_manage_users" },
-  { id: "settings", label: "Settings", labelAr: "الإعدادات", icon: Settings, permission: "can_manage_settings" },
-  { id: "logs", label: "Logs", labelAr: "السجلات", icon: ScrollText, permission: "can_view_analytics" },
+const menuItems: { id: TabId; label: string; labelAr: string; icon: React.ElementType; permission?: string; section?: string }[] = [
+  { id: "dashboard", label: "Dashboard", labelAr: "لوحة التحكم", icon: LayoutDashboard, section: "رئيسي" },
+  { id: "analytics", label: "Analytics", labelAr: "التحليلات", icon: BarChart3, permission: "can_view_analytics", section: "رئيسي" },
+  { id: "users", label: "Users", labelAr: "المستخدمين", icon: Users, permission: "can_manage_users", section: "إدارة المحتوى" },
+  { id: "content", label: "Posts", labelAr: "المنشورات", icon: FileText, permission: "can_manage_content", section: "إدارة المحتوى" },
+  { id: "stories", label: "Stories", labelAr: "القصص", icon: Film, permission: "can_manage_content", section: "إدارة المحتوى" },
+  { id: "reels", label: "Reels", labelAr: "الريلز", icon: Video, permission: "can_manage_content", section: "إدارة المحتوى" },
+  { id: "communities", label: "Communities", labelAr: "المجتمعات", icon: UsersRound, permission: "can_manage_content", section: "إدارة المحتوى" },
+  { id: "hashtags", label: "Hashtags", labelAr: "الهاشتاقات", icon: Hash, permission: "can_manage_content", section: "إدارة المحتوى" },
+  { id: "content-filter", label: "Content Filter", labelAr: "فلتر المحتوى", icon: Filter, permission: "can_manage_content", section: "إدارة المحتوى" },
+  { id: "reports", label: "Reports", labelAr: "البلاغات", icon: Flag, permission: "can_manage_reports", section: "الطلبات" },
+  { id: "verification", label: "Verification", labelAr: "طلبات التوثيق", icon: BadgeCheck, permission: "can_manage_users", section: "الطلبات" },
+  { id: "appeals", label: "Appeals", labelAr: "الاستئنافات", icon: Scale, permission: "can_manage_users", section: "الطلبات" },
+  { id: "announcements", label: "Announcements", labelAr: "الإعلانات", icon: Megaphone, permission: "can_manage_settings", section: "أدوات" },
+  { id: "security", label: "Security", labelAr: "الأمان", icon: ShieldAlert, permission: "can_manage_users", section: "أدوات" },
+  { id: "admins", label: "Admins", labelAr: "المشرفين", icon: Shield, permission: "can_manage_admins", section: "النظام" },
+  { id: "settings", label: "Settings", labelAr: "الإعدادات", icon: Settings, permission: "can_manage_settings", section: "النظام" },
+  { id: "logs", label: "Logs", labelAr: "السجلات", icon: ScrollText, permission: "can_view_analytics", section: "النظام" },
 ];
 
 export default function Sidebar({ activeTab, onTabChange, onOpenTab }: SidebarProps) {
@@ -53,6 +67,9 @@ export default function Sidebar({ activeTab, onTabChange, onOpenTab }: SidebarPr
     onOpenTab(id);
     onTabChange(id);
   };
+
+  const visibleItems = menuItems.filter((item) => hasPermission(item.permission));
+  const sections = [...new Set(visibleItems.map((i) => i.section))];
 
   return (
     <div
@@ -94,41 +111,51 @@ export default function Sidebar({ activeTab, onTabChange, onOpenTab }: SidebarPr
       </div>
 
       <nav className="flex-1 py-2 px-3 space-y-0.5 overflow-y-auto scrollbar-thin">
-        {menuItems.map((item) => {
-          if (!hasPermission(item.permission)) return null;
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
+        {sections.map((section) => (
+          <div key={section}>
+            {!collapsed && (
+              <div className="px-3 pt-3 pb-1">
+                <span className="text-[10px] font-semibold text-[#8e8e8e] uppercase tracking-wider">{section}</span>
+              </div>
+            )}
+            {visibleItems
+              .filter((item) => item.section === section)
+              .map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
 
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleClick(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 group relative ${
-                isActive
-                  ? "bg-[#f5f5f5] text-[#262626] font-semibold"
-                  : "text-[#262626] hover:bg-[#fafafa]"
-              }`}
-              title={collapsed ? item.labelAr : undefined}
-            >
-              {isActive && (
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#262626] rounded-l-full" />
-              )}
-              <Icon
-                className={`w-[22px] h-[22px] shrink-0 transition-all ${
-                  isActive
-                    ? "text-[#262626]"
-                    : "text-[#262626] group-hover:scale-105"
-                }`}
-                strokeWidth={isActive ? 2.5 : 1.5}
-              />
-              {!collapsed && (
-                <span className={`text-[14px] truncate ${isActive ? "font-semibold" : "font-normal"}`}>
-                  {item.labelAr}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleClick(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 group relative ${
+                      isActive
+                        ? "bg-[#f5f5f5] text-[#262626] font-semibold"
+                        : "text-[#262626] hover:bg-[#fafafa]"
+                    }`}
+                    title={collapsed ? item.labelAr : undefined}
+                  >
+                    {isActive && (
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#262626] rounded-l-full" />
+                    )}
+                    <Icon
+                      className={`w-[20px] h-[20px] shrink-0 transition-all ${
+                        isActive
+                          ? "text-[#262626]"
+                          : "text-[#262626] group-hover:scale-105"
+                      }`}
+                      strokeWidth={isActive ? 2.5 : 1.5}
+                    />
+                    {!collapsed && (
+                      <span className={`text-[13px] truncate ${isActive ? "font-semibold" : "font-normal"}`}>
+                        {item.labelAr}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+          </div>
+        ))}
       </nav>
 
       <div className="border-t border-[#efefef] p-3">

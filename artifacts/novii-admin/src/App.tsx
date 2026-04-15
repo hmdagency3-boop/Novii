@@ -13,16 +13,30 @@ import VerificationPage from "@/pages/verification";
 import AppealsPage from "@/pages/appeals";
 import SettingsPage from "@/pages/settings";
 import LogsPage from "@/pages/logs";
+import StoriesPage from "@/pages/stories";
+import ReelsPage from "@/pages/reels";
+import AnalyticsPage from "@/pages/analytics";
+import AnnouncementsPage from "@/pages/announcements";
+import SecurityPage from "@/pages/security";
+import HashtagsPage from "@/pages/hashtags";
+import ContentFilterPage from "@/pages/content-filter";
 
 const pageComponents: Record<TabId, React.FC> = {
   dashboard: DashboardPage,
   users: UsersPage,
   content: ContentPage,
+  stories: StoriesPage,
+  reels: ReelsPage,
   communities: CommunitiesPage,
   admins: AdminsPage,
   reports: ReportsPage,
   verification: VerificationPage,
   appeals: AppealsPage,
+  analytics: AnalyticsPage,
+  announcements: AnnouncementsPage,
+  security: SecurityPage,
+  hashtags: HashtagsPage,
+  "content-filter": ContentFilterPage,
   settings: SettingsPage,
   logs: LogsPage,
 };

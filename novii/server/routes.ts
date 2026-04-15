@@ -3850,5 +3850,678 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // HASHTAG SYSTEM
+  // ========================================
+
+  app.get("/api/hashtags/trending", async (_req: Request, res: Response) => {
+    try {
+      const { data, error } = await db
+        .from('hashtags')
+        .select('*')
+        .eq('is_banned', false)
+        .order('posts_count', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Trending hashtags error:', error);
+      res.status(500).json({ error: 'Failed to fetch trending hashtags' });
+    }
+  });
+
+  app.get("/api/hashtags/:name", async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const tag = name.toLowerCase().replace(/^#/, '');
+      const { data: hashtag, error } = await db
+        .from('hashtags')
+        .select('*')
+        .eq('name', tag)
+        .eq('is_banned', false)
+        .single();
+      if (error || !hashtag) return res.status(404).json({ error: 'Hashtag not found' });
+      res.json(hashtag);
+    } catch (error) {
+      console.error('Get hashtag error:', error);
+      res.status(500).json({ error: 'Failed to fetch hashtag' });
+    }
+  });
+
+  app.get("/api/hashtags/:name/posts", async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const tag = name.toLowerCase().replace(/^#/, '');
+      const page = parseInt(req.query.page as string) || 0;
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      const { data: hashtag } = await db
+        .from('hashtags')
+        .select('id, is_banned')
+        .eq('name', tag)
+        .single();
+
+      if (!hashtag || hashtag.is_banned) return res.json([]);
+
+      const { data: postHashtags, error } = await db
+        .from('post_hashtags')
+        .select('post_id')
+        .eq('hashtag_id', hashtag.id)
+        .order('created_at', { ascending: false })
+        .range(page * limit, (page + 1) * limit - 1);
+
+      if (error) throw error;
+      if (!postHashtags?.length) return res.json([]);
+
+      const postIds = postHashtags.map((ph: any) => ph.post_id);
+      const { data: posts } = await db
+        .from('posts')
+        .select('*, profiles!posts_user_id_fkey(id, username, full_name, avatar_url, is_verified, is_official)')
+        .in('id', postIds)
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false });
+
+      res.json(posts || []);
+    } catch (error) {
+      console.error('Hashtag posts error:', error);
+      res.status(500).json({ error: 'Failed to fetch hashtag posts' });
+    }
+  });
+
+  app.get("/api/hashtags/search/:query", async (req: Request, res: Response) => {
+    try {
+      const q = req.params.query.toLowerCase().replace(/^#/, '');
+      const { data, error } = await db
+        .from('hashtags')
+        .select('*')
+        .eq('is_banned', false)
+        .ilike('name', `${q}%`)
+        .order('posts_count', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Search hashtags error:', error);
+      res.status(500).json({ error: 'Failed to search hashtags' });
+    }
+  });
+
+  // ========================================
+  // ADMIN: STORIES MANAGEMENT
+  // ========================================
+
+  app.get("/api/admin/stories", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const page = parseInt(req.query.page as string) || 0;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const showDeleted = req.query.deleted === 'true';
+
+      let query = adminDb!
+        .from('stories')
+        .select('*, profiles!stories_user_id_fkey(username, full_name, avatar_url, is_verified)')
+        .order('created_at', { ascending: false })
+        .range(page * limit, (page + 1) * limit - 1);
+
+      if (showDeleted) {
+        query = query.eq('is_deleted', true);
+      } else {
+        query = query.or('is_deleted.is.null,is_deleted.eq.false');
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Admin stories error:', error);
+      res.status(500).json({ error: 'Failed to fetch stories' });
+    }
+  });
+
+  app.delete("/api/admin/stories/:id", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { error } = await adminDb!
+        .from('stories')
+        .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      await logAdminAction(req, 'delete_story', 'story', id, `Deleted story ${id}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin delete story error:', error);
+      res.status(500).json({ error: 'Failed to delete story' });
+    }
+  });
+
+  app.post("/api/admin/stories/:id/restore", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { error } = await adminDb!
+        .from('stories')
+        .update({ is_deleted: false, deleted_at: null })
+        .eq('id', id);
+      if (error) throw error;
+      await logAdminAction(req, 'restore_story', 'story', id, `Restored story ${id}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin restore story error:', error);
+      res.status(500).json({ error: 'Failed to restore story' });
+    }
+  });
+
+  // ========================================
+  // ADMIN: REELS MANAGEMENT
+  // ========================================
+
+  app.get("/api/admin/reels", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const page = parseInt(req.query.page as string) || 0;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const showDeleted = req.query.deleted === 'true';
+
+      let query = adminDb!
+        .from('reels')
+        .select('*, profiles!reels_user_id_fkey(username, full_name, avatar_url, is_verified)')
+        .order('created_at', { ascending: false })
+        .range(page * limit, (page + 1) * limit - 1);
+
+      if (showDeleted) {
+        query = query.eq('is_deleted', true);
+      } else {
+        query = query.or('is_deleted.is.null,is_deleted.eq.false');
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Admin reels error:', error);
+      res.status(500).json({ error: 'Failed to fetch reels' });
+    }
+  });
+
+  app.delete("/api/admin/reels/:id", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { error } = await adminDb!
+        .from('reels')
+        .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      await logAdminAction(req, 'delete_reel', 'reel', id, `Deleted reel ${id}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin delete reel error:', error);
+      res.status(500).json({ error: 'Failed to delete reel' });
+    }
+  });
+
+  app.post("/api/admin/reels/:id/restore", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { error } = await adminDb!
+        .from('reels')
+        .update({ is_deleted: false, deleted_at: null })
+        .eq('id', id);
+      if (error) throw error;
+      await logAdminAction(req, 'restore_reel', 'reel', id, `Restored reel ${id}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin restore reel error:', error);
+      res.status(500).json({ error: 'Failed to restore reel' });
+    }
+  });
+
+  app.post("/api/admin/reels/:id/feature", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { featured } = req.body;
+      const { error } = await adminDb!
+        .from('reels')
+        .update({ is_featured: featured })
+        .eq('id', id);
+      if (error) throw error;
+      await logAdminAction(req, featured ? 'feature_reel' : 'unfeature_reel', 'reel', id, `${featured ? 'Featured' : 'Unfeatured'} reel ${id}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin feature reel error:', error);
+      res.status(500).json({ error: 'Failed to update reel' });
+    }
+  });
+
+  // ========================================
+  // ADMIN: ADVANCED ANALYTICS
+  // ========================================
+
+  app.get("/api/admin/analytics/growth", requireAuth, requireAdmin, checkPermission('can_view_analytics'), async (req: Request, res: Response) => {
+    try {
+      const days = parseInt(req.query.days as string) || 30;
+      const { data, error } = await adminDb!
+        .from('profiles')
+        .select('created_at')
+        .gte('created_at', new Date(Date.now() - days * 86400000).toISOString())
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+
+      const grouped: Record<string, number> = {};
+      (data || []).forEach((u: any) => {
+        const day = u.created_at?.split('T')[0];
+        if (day) grouped[day] = (grouped[day] || 0) + 1;
+      });
+
+      const result = Object.entries(grouped).map(([date, count]) => ({ date, count }));
+      res.json(result);
+    } catch (error) {
+      console.error('Admin growth analytics error:', error);
+      res.status(500).json({ error: 'Failed to fetch growth data' });
+    }
+  });
+
+  app.get("/api/admin/analytics/top-posts", requireAuth, requireAdmin, checkPermission('can_view_analytics'), async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const { data, error } = await adminDb!
+        .from('posts')
+        .select('*, profiles!posts_user_id_fkey(username, full_name, avatar_url)')
+        .eq('is_archived', false)
+        .order('likes_count', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Admin top posts error:', error);
+      res.status(500).json({ error: 'Failed to fetch top posts' });
+    }
+  });
+
+  app.get("/api/admin/analytics/devices", requireAuth, requireAdmin, checkPermission('can_view_analytics'), async (req: Request, res: Response) => {
+    try {
+      const { data, error } = await adminDb!
+        .from('user_devices')
+        .select('browser, os_name, device_type, country');
+      if (error) throw error;
+
+      const browsers: Record<string, number> = {};
+      const os: Record<string, number> = {};
+      const devices: Record<string, number> = {};
+      const countries: Record<string, number> = {};
+
+      (data || []).forEach((d: any) => {
+        if (d.browser) browsers[d.browser] = (browsers[d.browser] || 0) + 1;
+        if (d.os_name) os[d.os_name] = (os[d.os_name] || 0) + 1;
+        if (d.device_type) devices[d.device_type] = (devices[d.device_type] || 0) + 1;
+        if (d.country) countries[d.country] = (countries[d.country] || 0) + 1;
+      });
+
+      res.json({ browsers, os, devices, countries });
+    } catch (error) {
+      console.error('Admin devices analytics error:', error);
+      res.status(500).json({ error: 'Failed to fetch device analytics' });
+    }
+  });
+
+  // ========================================
+  // ADMIN: ANNOUNCEMENTS & NOTIFICATIONS
+  // ========================================
+
+  app.get("/api/admin/announcements", requireAuth, requireAdmin, checkPermission('can_manage_settings'), async (req: Request, res: Response) => {
+    try {
+      const { data, error } = await adminDb!
+        .from('announcements')
+        .select('*, profiles!announcements_created_by_fkey(username)')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Admin announcements error:', error);
+      res.status(500).json({ error: 'Failed to fetch announcements' });
+    }
+  });
+
+  app.post("/api/admin/announcements", requireAuth, requireAdmin, checkPermission('can_manage_settings'), async (req: Request, res: Response) => {
+    try {
+      const { title, content, type, target, is_banner, expires_at } = req.body;
+      if (!title || !content) return res.status(400).json({ error: 'Title and content required' });
+
+      const { data, error } = await adminDb!
+        .from('announcements')
+        .insert({
+          title, content,
+          type: type || 'info',
+          target: target || 'all',
+          is_banner: is_banner || false,
+          created_by: req.userId,
+          expires_at: expires_at || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      await logAdminAction(req, 'create_announcement', 'announcement', data.id, `Created announcement: ${title}`);
+      res.json(data);
+    } catch (error) {
+      console.error('Admin create announcement error:', error);
+      res.status(500).json({ error: 'Failed to create announcement' });
+    }
+  });
+
+  app.patch("/api/admin/announcements/:id", requireAuth, requireAdmin, checkPermission('can_manage_settings'), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { is_active } = req.body;
+      const { error } = await adminDb!
+        .from('announcements')
+        .update({ is_active })
+        .eq('id', id);
+      if (error) throw error;
+      await logAdminAction(req, is_active ? 'activate_announcement' : 'deactivate_announcement', 'announcement', id, `${is_active ? 'Activated' : 'Deactivated'} announcement`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin update announcement error:', error);
+      res.status(500).json({ error: 'Failed to update announcement' });
+    }
+  });
+
+  app.delete("/api/admin/announcements/:id", requireAuth, requireAdmin, checkPermission('can_manage_settings'), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { error } = await adminDb!
+        .from('announcements')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      await logAdminAction(req, 'delete_announcement', 'announcement', id, 'Deleted announcement');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin delete announcement error:', error);
+      res.status(500).json({ error: 'Failed to delete announcement' });
+    }
+  });
+
+  app.post("/api/admin/notifications/broadcast", requireAuth, requireAdmin, checkPermission('can_manage_settings'), async (req: Request, res: Response) => {
+    try {
+      const { content, type } = req.body;
+      if (!content) return res.status(400).json({ error: 'Content required' });
+
+      const { data: users, error: usersErr } = await adminDb!
+        .from('profiles')
+        .select('id')
+        .eq('is_banned', false);
+      if (usersErr) throw usersErr;
+
+      const notifications = (users || []).map((u: any) => ({
+        user_id: u.id,
+        actor_id: req.userId,
+        type: type || 'system',
+        content,
+        is_read: false,
+      }));
+
+      if (notifications.length > 0) {
+        const batchSize = 500;
+        for (let i = 0; i < notifications.length; i += batchSize) {
+          const batch = notifications.slice(i, i + batchSize);
+          await adminDb!.from('notifications').insert(batch);
+        }
+      }
+
+      await logAdminAction(req, 'broadcast_notification', 'system', null as any, `Broadcast to ${notifications.length} users: ${content.substring(0, 50)}`);
+      res.json({ success: true, sent: notifications.length });
+    } catch (error) {
+      console.error('Admin broadcast error:', error);
+      res.status(500).json({ error: 'Failed to broadcast notification' });
+    }
+  });
+
+  // ========================================
+  // ADMIN: SECURITY - IP BANS & SUSPICIOUS
+  // ========================================
+
+  app.get("/api/admin/security/ip-bans", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { data, error } = await adminDb!
+        .from('ip_bans')
+        .select('*, profiles!ip_bans_banned_by_fkey(username)')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Admin IP bans error:', error);
+      res.status(500).json({ error: 'Failed to fetch IP bans' });
+    }
+  });
+
+  app.post("/api/admin/security/ip-bans", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { ip_address, reason, expires_at } = req.body;
+      if (!ip_address) return res.status(400).json({ error: 'IP address required' });
+
+      const { data, error } = await adminDb!
+        .from('ip_bans')
+        .insert({
+          ip_address, reason,
+          banned_by: req.userId,
+          expires_at: expires_at || null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      await logAdminAction(req, 'ban_ip', 'ip', data.id, `Banned IP: ${ip_address}`);
+      res.json(data);
+    } catch (error) {
+      console.error('Admin ban IP error:', error);
+      res.status(500).json({ error: 'Failed to ban IP' });
+    }
+  });
+
+  app.delete("/api/admin/security/ip-bans/:id", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { error } = await adminDb!
+        .from('ip_bans')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      await logAdminAction(req, 'unban_ip', 'ip', id, 'Removed IP ban');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin unban IP error:', error);
+      res.status(500).json({ error: 'Failed to remove IP ban' });
+    }
+  });
+
+  app.get("/api/admin/security/suspicious", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { data: devices, error } = await adminDb!
+        .from('user_devices')
+        .select('user_id, ip_address, device_fingerprint, browser, os_name, country, login_count, last_active_at, profiles!user_devices_user_id_fkey(username, full_name, avatar_url, is_banned, created_at)')
+        .order('login_count', { ascending: false });
+      if (error) throw error;
+
+      const ipUsers: Record<string, Set<string>> = {};
+      const fpUsers: Record<string, Set<string>> = {};
+      (devices || []).forEach((d: any) => {
+        if (d.ip_address) {
+          if (!ipUsers[d.ip_address]) ipUsers[d.ip_address] = new Set();
+          ipUsers[d.ip_address].add(d.user_id);
+        }
+        if (d.device_fingerprint) {
+          if (!fpUsers[d.device_fingerprint]) fpUsers[d.device_fingerprint] = new Set();
+          fpUsers[d.device_fingerprint].add(d.user_id);
+        }
+      });
+
+      const suspiciousIPs = Object.entries(ipUsers)
+        .filter(([_, users]) => users.size > 2)
+        .map(([ip, users]) => ({ ip, user_count: users.size, user_ids: Array.from(users) }))
+        .sort((a, b) => b.user_count - a.user_count)
+        .slice(0, 20);
+
+      const suspiciousDevices = Object.entries(fpUsers)
+        .filter(([_, users]) => users.size > 2)
+        .map(([fp, users]) => ({ fingerprint: fp, user_count: users.size, user_ids: Array.from(users) }))
+        .sort((a, b) => b.user_count - a.user_count)
+        .slice(0, 20);
+
+      res.json({ suspiciousIPs, suspiciousDevices });
+    } catch (error) {
+      console.error('Admin suspicious error:', error);
+      res.status(500).json({ error: 'Failed to fetch suspicious data' });
+    }
+  });
+
+  app.get("/api/admin/security/login-activity", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const { data, error } = await adminDb!
+        .from('user_devices')
+        .select('*, profiles!user_devices_user_id_fkey(username, full_name, avatar_url)')
+        .order('last_active_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Admin login activity error:', error);
+      res.status(500).json({ error: 'Failed to fetch login activity' });
+    }
+  });
+
+  // ========================================
+  // ADMIN: BANNED WORDS (CONTENT FILTER)
+  // ========================================
+
+  app.get("/api/admin/banned-words", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { data, error } = await adminDb!
+        .from('banned_words')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Admin banned words error:', error);
+      res.status(500).json({ error: 'Failed to fetch banned words' });
+    }
+  });
+
+  app.post("/api/admin/banned-words", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { word, severity } = req.body;
+      if (!word) return res.status(400).json({ error: 'Word required' });
+
+      const { data, error } = await adminDb!
+        .from('banned_words')
+        .insert({ word: word.trim().toLowerCase(), severity: severity || 'warning', created_by: req.userId })
+        .select()
+        .single();
+      if (error) throw error;
+      await logAdminAction(req, 'add_banned_word', 'content_filter', data.id, `Added banned word: ${word}`);
+      res.json(data);
+    } catch (error) {
+      console.error('Admin add banned word error:', error);
+      res.status(500).json({ error: 'Failed to add banned word' });
+    }
+  });
+
+  app.delete("/api/admin/banned-words/:id", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { error } = await adminDb!
+        .from('banned_words')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      await logAdminAction(req, 'remove_banned_word', 'content_filter', id, 'Removed banned word');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin remove banned word error:', error);
+      res.status(500).json({ error: 'Failed to remove banned word' });
+    }
+  });
+
+  // ========================================
+  // ADMIN: HASHTAG MANAGEMENT
+  // ========================================
+
+  app.get("/api/admin/hashtags", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { data, error } = await adminDb!
+        .from('hashtags')
+        .select('*')
+        .order('posts_count', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Admin hashtags error:', error);
+      res.status(500).json({ error: 'Failed to fetch hashtags' });
+    }
+  });
+
+  app.patch("/api/admin/hashtags/:id", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { is_banned, is_pinned } = req.body;
+      const updates: any = {};
+      if (is_banned !== undefined) updates.is_banned = is_banned;
+      if (is_pinned !== undefined) updates.is_pinned = is_pinned;
+      updates.updated_at = new Date().toISOString();
+
+      const { error } = await adminDb!
+        .from('hashtags')
+        .update(updates)
+        .eq('id', id);
+      if (error) throw error;
+      await logAdminAction(req, 'update_hashtag', 'hashtag', id, JSON.stringify(updates));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin update hashtag error:', error);
+      res.status(500).json({ error: 'Failed to update hashtag' });
+    }
+  });
+
+  // ========================================
+  // ADMIN: FEATURED CONTENT
+  // ========================================
+
+  app.post("/api/admin/content/:id/feature", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { featured } = req.body;
+      const { error } = await adminDb!
+        .from('posts')
+        .update({ is_featured: featured, featured_at: featured ? new Date().toISOString() : null })
+        .eq('id', id);
+      if (error) throw error;
+      await logAdminAction(req, featured ? 'feature_post' : 'unfeature_post', 'post', id, `${featured ? 'Featured' : 'Unfeatured'} post`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin feature post error:', error);
+      res.status(500).json({ error: 'Failed to update post' });
+    }
+  });
+
+  // ========================================
+  // PUBLIC: ACTIVE ANNOUNCEMENTS
+  // ========================================
+
+  app.get("/api/announcements/active", async (_req: Request, res: Response) => {
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await db
+        .from('announcements')
+        .select('id, title, content, type, is_banner')
+        .eq('is_active', true)
+        .or(`expires_at.is.null,expires_at.gt.${now}`)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      res.json(data || []);
+    } catch (error) {
+      console.error('Active announcements error:', error);
+      res.status(500).json({ error: 'Failed to fetch announcements' });
+    }
+  });
+
   return httpServer;
 }
