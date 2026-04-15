@@ -8,6 +8,7 @@ interface BanInfo {
   ban_until?: string;
   is_permanent: boolean;
   strikes_count?: number;
+  show_duration?: boolean;
 }
 
 interface AuthContextType {

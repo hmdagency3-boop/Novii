@@ -166,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { data: profile } = await adminDb
         .from('profiles')
-        .select('is_banned, banned_reason, ban_until, strikes_count')
+        .select('is_banned, banned_reason, ban_until, strikes_count, show_ban_duration')
         .eq('id', user.id)
         .single();
 
@@ -181,9 +181,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({
         is_banned: true,
         reason: profile.banned_reason,
-        ban_until: profile.ban_until,
+        ban_until: profile.show_ban_duration ? profile.ban_until : undefined,
         is_permanent: !profile.ban_until,
         strikes_count: profile.strikes_count || 0,
+        show_duration: !!profile.show_ban_duration,
       });
     } catch {
       return res.json({ is_banned: false });
@@ -2280,12 +2281,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         banUntil = now.toISOString();
       }
 
+      const showDuration = req.body.showDuration ?? false;
+
       const { error } = await adminDb
         .from('profiles')
         .update({
           is_banned: ban,
           banned_reason: ban ? (reason || null) : null,
           ban_until: ban ? banUntil : null,
+          show_ban_duration: ban ? showDuration : false,
         })
         .eq('id', userId);
 

@@ -430,6 +430,7 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
   const [customReason, setCustomReason] = useState("");
   const [selectedDuration, setSelectedDuration] = useState("7d");
   const [terminateSessions, setTerminateSessions] = useState(true);
+  const [showDuration, setShowDuration] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [step, setStep] = useState<"reason" | "duration" | "confirm">(user.is_banned ? "confirm" : "reason");
@@ -447,6 +448,7 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
         reason: user.is_banned ? undefined : finalReason,
         duration: user.is_banned ? undefined : selectedDuration,
         terminateSessions: user.is_banned ? undefined : terminateSessions,
+        showDuration: user.is_banned ? undefined : showDuration,
       });
       onDone();
       onClose();
@@ -587,6 +589,21 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
               </div>
             </label>
 
+            {selectedDuration !== "permanent" && (
+              <label className="flex items-center gap-3 p-3 rounded-lg bg-[#fafafa] cursor-pointer transition-colors hover:bg-[#efefef]">
+                <input
+                  type="checkbox"
+                  checked={showDuration}
+                  onChange={(e) => setShowDuration(e.target.checked)}
+                  className="w-4 h-4 rounded border-[#dbdbdb] text-[#0095f6] focus:ring-[#0095f6]/20 accent-[#0095f6]"
+                />
+                <div>
+                  <span className="text-[14px] text-[#262626] font-medium">إظهار مدة الحظر للمستخدم</span>
+                  <p className="text-[12px] text-[#8e8e8e]">السماح للمستخدم بمعرفة متى ينتهي الحظر</p>
+                </div>
+              </label>
+            )}
+
             <div className="flex gap-2 justify-end pt-1">
               <button onClick={() => setStep("reason")} className="px-4 py-2 rounded-lg text-[14px] font-medium text-[#262626] hover:bg-[#fafafa] transition-colors">رجوع</button>
               <button onClick={() => setStep("confirm")} className="px-5 py-2 rounded-lg text-[14px] font-semibold text-white bg-[#ed4956] hover:bg-[#dc3545] transition-colors">
@@ -605,6 +622,9 @@ function BanModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =>
                 <ConfirmRow label="السبب" value={finalReason} />
                 <ConfirmRow label="المدة" value={durationLabel} highlight={selectedDuration === "permanent"} />
                 <ConfirmRow label="إنهاء الجلسات" value={terminateSessions ? "نعم" : "لا"} />
+                {selectedDuration !== "permanent" && (
+                  <ConfirmRow label="إظهار المدة للمستخدم" value={showDuration ? "نعم" : "لا"} />
+                )}
               </div>
             </div>
 

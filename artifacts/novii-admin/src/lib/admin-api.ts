@@ -55,7 +55,7 @@ export async function fetchUsers(): Promise<UserProfile[]> {
 
 export async function banUser(
   userId: string,
-  data: { ban: boolean; reason?: string; duration?: string }
+  data: { ban: boolean; reason?: string; duration?: string; terminateSessions?: boolean; showDuration?: boolean }
 ): Promise<unknown> {
   return adminFetch(`/users/${userId}/ban`, {
     method: "POST",
