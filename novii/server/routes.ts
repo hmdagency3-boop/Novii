@@ -3353,7 +3353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { data: appeals, error } = await adminDb!
         .from('ban_appeals')
-        .select('*, profiles!ban_appeals_user_id_fkey(username, full_name, avatar_url, email)')
+        .select('*, profiles!ban_appeals_user_id_fkey(username, full_name, avatar_url)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

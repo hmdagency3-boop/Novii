@@ -410,7 +410,7 @@ export interface BanAppeal {
   reviewed_by?: string;
   created_at: string;
   reviewed_at?: string;
-  profiles?: { username: string; full_name?: string; avatar_url?: string; email?: string };
+  profiles?: { username: string; full_name?: string; avatar_url?: string };
 }
 
 export async function fetchBanAppeals(): Promise<BanAppeal[]> {

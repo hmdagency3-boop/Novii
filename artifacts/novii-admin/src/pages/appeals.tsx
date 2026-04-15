@@ -180,7 +180,7 @@ function AppealModal({ appeal, onClose, onDone }: { appeal: BanAppeal; onClose: 
               />
               <div>
                 <p className="text-[15px] font-bold text-[#262626]">{profile?.full_name || profile?.username}</p>
-                <p className="text-[13px] text-[#8e8e8e]">@{profile?.username} · {profile?.email}</p>
+                <p className="text-[13px] text-[#8e8e8e]">@{profile?.username}</p>
               </div>
             </div>
             <span
