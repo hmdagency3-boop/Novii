@@ -287,13 +287,35 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <NavItem 
-            href="/profile"
-            icon={User} 
-            label={t.profile} 
-            isActive={location === "/profile"} 
-            onDoubleClick={() => handleNavDoubleClick('/profile')}
-          />
+          <div className="w-full">
+            <Link href="/profile">
+              <div 
+                onDoubleClick={() => handleNavDoubleClick('/profile')}
+                className={cn(
+                  "flex items-center gap-4 p-3 rounded-xl transition-all duration-200 group hover:bg-accent/50 relative cursor-pointer justify-center md:justify-start w-full",
+                  isSidebarExpanded && "md:justify-start",
+                  !isSidebarExpanded && "md:justify-center",
+                  location === "/profile" ? "font-bold text-foreground" : "text-muted-foreground hover:text-foreground"
+                )}>
+                <div className={cn(
+                  "w-7 h-7 rounded-full overflow-hidden flex-shrink-0 transition-transform duration-200 group-hover:scale-110 border-2",
+                  location === "/profile" ? "border-primary" : "border-transparent"
+                )}>
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <span className={cn(
+                  "text-md transition-opacity duration-300 whitespace-nowrap",
+                  isSidebarExpanded ? "opacity-100" : "opacity-0 hidden"
+                )}>{t.profile}</span>
+              </div>
+            </Link>
+          </div>
           <NavItem href="/settings" icon={Settings} label={t.settings} isActive={location === "/settings"} />
         </nav>
 
@@ -461,7 +483,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </Link>
         <Link href="/profile">
           <button type="button" onDoubleClick={() => handleNavDoubleClick('/profile')} className="p-3 rounded-full active:scale-95 transition-transform cursor-pointer">
-            <User className={cn("w-6 h-6", location === "/profile" ? "text-primary stroke-[3px]" : "text-muted-foreground")} />
+            <div className={cn(
+              "w-7 h-7 rounded-full overflow-hidden border-2",
+              location === "/profile" ? "border-primary" : "border-transparent"
+            )}>
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-muted flex items-center justify-center rounded-full">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                </div>
+              )}
+            </div>
           </button>
         </Link>
       </nav>
