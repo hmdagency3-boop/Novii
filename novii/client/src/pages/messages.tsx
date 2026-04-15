@@ -1873,9 +1873,28 @@ export default function Messages() {
                           <div className="flex flex-col gap-2 sm:gap-3 w-full sm:max-w-2xl sm:mx-auto px-2 sm:px-5 pt-2 sm:pt-5 pb-0 flex-1">
                                 {communityMessages.map((msg: any) => {
                               const isMe = msg.sender_id === currentUser?.id;
+                              const isSystem = msg.is_system_message === true;
                               const currentUserMember = communityMembers.find((m: any) => m.user_id === currentUser?.id);
                               const isAdmin = currentUserMember?.role === 'admin';
                               const isDeleted = msg.is_deleted;
+
+                              // System messages render as a centered notice banner
+                              if (isSystem && !isDeleted) {
+                                return (
+                                  <div key={msg.id} className="flex justify-center my-2">
+                                    <div className="flex items-start gap-2 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-2xl px-4 py-2.5 max-w-[85%] shadow-sm">
+                                      <span className="text-purple-600 dark:text-purple-400 text-base leading-none mt-0.5">⚙️</span>
+                                      <div>
+                                        <p className="text-[10px] font-bold text-purple-600 dark:text-purple-400 mb-0.5">
+                                          {isRTL ? "النظام" : "System"}
+                                        </p>
+                                        <p className="text-xs text-purple-800 dark:text-purple-200 leading-relaxed">{msg.content}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <div key={msg.id} className={cn("flex gap-2 group", isMe && "flex-row-reverse")}>
                                   <Avatar className="w-8 h-8 flex-shrink-0">

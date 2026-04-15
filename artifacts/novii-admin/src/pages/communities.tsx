@@ -10,6 +10,7 @@ import {
   unmuteCommunityMember,
   setCommunityMemberRole,
   deleteCommunityMessage,
+  sendSystemMessage,
   type CommunityRecord,
   type CommunityMemberRecord,
   type CommunityMessageRecord,
@@ -34,6 +35,9 @@ import {
   Image as ImageIcon,
   Copy,
   Check,
+  Send,
+  AlertTriangle,
+  Settings,
 } from "lucide-react";
 
 export default function CommunitiesPage() {
@@ -554,10 +558,16 @@ function MembersTab({ community, onRefresh }: { community: CommunityRecord; onRe
   );
 }
 
+const MIGRATION_SQL = "ALTER TABLE community_messages ADD COLUMN IF NOT EXISTS is_system_message BOOLEAN NOT NULL DEFAULT FALSE;";
+
 function ChatTab({ community }: { community: CommunityRecord }) {
   const [messages, setMessages] = useState<CommunityMessageRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [msgInput, setMsgInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<{ text: string; sql?: string } | null>(null);
+  const [sqlCopied, setSqlCopied] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -583,6 +593,32 @@ function ChatTab({ community }: { community: CommunityRecord }) {
     }
   };
 
+  const handleSend = async () => {
+    if (!msgInput.trim() || sending) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      const result = await sendSystemMessage(community.id, msgInput.trim());
+      if (result.error === "MIGRATION_NEEDED") {
+        setSendError({ text: "يجب تشغيل الـ SQL التالي في Supabase Dashboard أولاً:", sql: result.sql });
+      } else {
+        setMsgInput("");
+        load();
+      }
+    } catch (e: any) {
+      setSendError({ text: e?.message || "فشل في إرسال الرسالة" });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const copySql = () => {
+    navigator.clipboard.writeText(MIGRATION_SQL).then(() => {
+      setSqlCopied(true);
+      setTimeout(() => setSqlCopied(false), 2000);
+    });
+  };
+
   if (loading) {
     return (
       <div className="p-6 space-y-4">
@@ -599,65 +635,134 @@ function ChatTab({ community }: { community: CommunityRecord }) {
     );
   }
 
-  if (messages.length === 0) {
-    return <p className="text-center text-gray-400 py-16">لا توجد رسائل</p>;
-  }
-
   return (
-    <div className="p-5 space-y-3" dir="rtl">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-xs text-gray-400">{messages.length} رسالة (آخر 100)</p>
-        <button onClick={load} className="p-1 rounded hover:bg-gray-100 transition-colors">
-          <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
-        </button>
+    <div dir="rtl">
+      {/* Send system message form */}
+      <div className="px-5 pt-4 pb-3 border-b border-gray-100 sticky top-0 bg-white z-10">
+        <p className="text-[11px] font-semibold text-purple-700 mb-2 flex items-center gap-1.5">
+          <Settings className="w-3.5 h-3.5" />
+          إرسال رسالة باسم النظام
+        </p>
+        {sendError && (
+          <div className="mb-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 space-y-1.5">
+            <div className="flex items-start gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
+              <span>{sendError.text}</span>
+            </div>
+            {sendError.sql && (
+              <div className="flex items-center gap-2 bg-white border border-amber-200 rounded-lg px-3 py-1.5 mt-1">
+                <code className="text-[10px] font-mono text-amber-900 flex-1 break-all">{sendError.sql}</code>
+                <button
+                  onClick={copySql}
+                  className={`shrink-0 p-1 rounded transition-colors ${sqlCopied ? "text-green-600" : "text-amber-600 hover:text-amber-800"}`}
+                >
+                  {sqlCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={msgInput}
+            onChange={(e) => setMsgInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+            placeholder="اكتب رسالة النظام هنا..."
+            className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-300 placeholder:text-gray-400"
+            dir="rtl"
+          />
+          <button
+            onClick={handleSend}
+            disabled={sending || !msgInput.trim()}
+            className="px-3 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center gap-1.5 text-sm font-medium"
+          >
+            {sending ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+            إرسال
+          </button>
+        </div>
       </div>
 
-      {messages.map((msg) => (
-        <div
-          key={msg.id}
-          className={`flex items-start gap-3 group p-2 rounded-xl transition-colors ${
-            msg.is_deleted ? "opacity-50 bg-red-50/40" : "hover:bg-gray-50"
-          }`}
-        >
-          <Avatar url={msg.sender_avatar} name={msg.sender_username || "?"} size="sm" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-2 mb-0.5">
-              <span className="text-xs font-semibold text-gray-700">
-                {msg.sender_display_name || msg.sender_username || "مجهول"}
-              </span>
-              <span className="text-[10px] text-gray-400" dir="ltr">
-                {new Date(msg.created_at).toLocaleString("ar-EG")}
-              </span>
-              {msg.is_deleted && (
-                <span className="text-[10px] font-medium text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">محذوف</span>
+      {/* Messages list */}
+      <div className="p-5 space-y-3">
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-xs text-gray-400">{messages.length} رسالة (آخر 100)</p>
+          <button onClick={load} className="p-1 rounded hover:bg-gray-100 transition-colors">
+            <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
+          </button>
+        </div>
+
+        {messages.length === 0 && (
+          <p className="text-center text-gray-400 py-12">لا توجد رسائل</p>
+        )}
+
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`flex items-start gap-3 group p-2 rounded-xl transition-colors ${
+              msg.is_deleted
+                ? "opacity-50 bg-red-50/40"
+                : msg.is_system_message
+                ? "bg-purple-50/60 border border-purple-100"
+                : "hover:bg-gray-50"
+            }`}
+          >
+            {msg.is_system_message ? (
+              <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center shrink-0">
+                <Settings className="w-4 h-4 text-white" />
+              </div>
+            ) : (
+              <Avatar url={msg.sender_avatar} name={msg.sender_username || "?"} size="sm" />
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
+                {msg.is_system_message ? (
+                  <span className="text-xs font-bold text-purple-700">⚙️ النظام</span>
+                ) : (
+                  <span className="text-xs font-semibold text-gray-700">
+                    {msg.sender_display_name || msg.sender_username || "مجهول"}
+                  </span>
+                )}
+                <span className="text-[10px] text-gray-400" dir="ltr">
+                  {new Date(msg.created_at).toLocaleString("ar-EG")}
+                </span>
+                {msg.is_deleted && (
+                  <span className="text-[10px] font-medium text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">محذوف</span>
+                )}
+              </div>
+
+              {msg.content && !msg.is_deleted && (
+                <p className={`text-sm break-words leading-relaxed ${msg.is_system_message ? "text-purple-800 font-medium" : "text-gray-700"}`}>
+                  {msg.content}
+                </p>
+              )}
+              {msg.content && msg.is_deleted && (
+                <p className="text-sm text-gray-400 italic line-through">{msg.content}</p>
+              )}
+              {msg.image_url && !msg.is_deleted && !msg.is_system_message && (
+                <a href={msg.image_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1.5 text-xs text-purple-600 hover:underline">
+                  <ImageIcon className="w-3.5 h-3.5" /> عرض الصورة
+                </a>
               )}
             </div>
 
-            {msg.content && !msg.is_deleted && (
-              <p className="text-sm text-gray-700 break-words leading-relaxed">{msg.content}</p>
-            )}
-            {msg.content && msg.is_deleted && (
-              <p className="text-sm text-gray-400 italic line-through">{msg.content}</p>
-            )}
-            {msg.image_url && !msg.is_deleted && (
-              <a href={msg.image_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1.5 text-xs text-purple-600 hover:underline">
-                <ImageIcon className="w-3.5 h-3.5" /> عرض الصورة
-              </a>
+            {!msg.is_deleted && (
+              <button
+                onClick={() => handleDelete(msg)}
+                disabled={deletingId === msg.id}
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all disabled:opacity-50 shrink-0"
+                title="حذف الرسالة"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
-
-          {!msg.is_deleted && (
-            <button
-              onClick={() => handleDelete(msg)}
-              disabled={deletingId === msg.id}
-              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all disabled:opacity-50 shrink-0"
-              title="حذف الرسالة"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

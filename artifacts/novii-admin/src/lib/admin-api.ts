@@ -385,8 +385,19 @@ export interface CommunityMessageRecord {
   content: string;
   image_url: string | null;
   is_deleted: boolean;
+  is_system_message: boolean;
   created_at: string;
   sender_username: string | null;
   sender_display_name: string | null;
   sender_avatar: string | null;
+}
+
+export async function sendSystemMessage(
+  communityId: string,
+  content: string
+): Promise<{ success?: boolean; messageId?: string; error?: string; sql?: string }> {
+  return adminFetch(`/communities/${communityId}/system-message`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  });
 }

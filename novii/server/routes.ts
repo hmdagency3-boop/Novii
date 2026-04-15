@@ -1072,9 +1072,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id: communityId } = req.params;
       const { limit = 50 } = req.query;
 
-      const { data: messages, error } = await getDb(req)
+      if (!adminDb) return res.json({ data: [] });
+
+      const { data: messages, error } = await adminDb
         .from('community_messages')
-        .select('*, profiles!sender_id(username, avatar_url, is_verified, is_official)')
+        .select('*, profiles!sender_id(username, full_name, avatar_url, is_verified, is_official)')
         .eq('community_id', communityId)
         .order('created_at', { ascending: true })
         .limit(parseInt(limit as string) || 50);
@@ -1084,9 +1086,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const formatted = (messages || []).map((m: any) => ({
         ...m,
         username: m.profiles?.username,
+        full_name: m.profiles?.full_name,
         avatar_url: m.profiles?.avatar_url,
         is_verified: m.profiles?.is_verified,
-        is_official: m.profiles?.is_official
+        is_official: m.profiles?.is_official,
+        is_system_message: m.is_system_message ?? false,
       }));
 
       res.json({ data: formatted });
@@ -3393,6 +3397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: m.content,
         image_url: m.image_url,
         is_deleted: m.is_deleted,
+        is_system_message: m.is_system_message ?? false,
         created_at: m.created_at,
         sender_username: m.profiles?.username || null,
         sender_display_name: m.profiles?.full_name || null,
@@ -3403,6 +3408,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Admin community messages error:', error);
       res.status(500).json({ error: 'Failed to fetch messages' });
+    }
+  });
+
+  // Send a system message to a community (as "النظام") 📢
+  app.post("/api/admin/communities/:communityId/system-message", requireAuth, requireAdmin, checkPermission('can_manage_content'), async (req: Request, res: Response) => {
+    try {
+      const { communityId } = req.params;
+      const { content } = req.body;
+      const adminUserId = req.userId;
+
+      if (!content?.trim()) {
+        return res.status(400).json({ error: 'Message content is required' });
+      }
+      if (!adminUserId) {
+        return res.status(401).json({ error: 'Admin user ID required' });
+      }
+
+      const messageId = crypto.randomUUID();
+      const { error: insertErr } = await adminDb!
+        .from('community_messages')
+        .insert({
+          id: messageId,
+          community_id: communityId,
+          sender_id: adminUserId,
+          content: content.trim(),
+          is_system_message: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (insertErr) {
+        // Column doesn't exist yet — prompt user to run migration
+        if (insertErr.message?.includes('is_system_message') || (insertErr as any).code === '42703') {
+          return res.status(400).json({
+            error: 'MIGRATION_NEEDED',
+            sql: 'ALTER TABLE community_messages ADD COLUMN IF NOT EXISTS is_system_message BOOLEAN NOT NULL DEFAULT FALSE;',
+          });
+        }
+        throw insertErr;
+      }
+
+      await logAdminAction(req, 'send_system_message', 'community', communityId, `System message sent to community ${communityId}`);
+      console.log(`📢 System message sent to community ${communityId} by admin ${adminUserId}`);
+      res.json({ success: true, messageId });
+    } catch (error) {
+      console.error('Send system message error:', error);
+      res.status(500).json({ error: 'Failed to send system message' });
     }
   });
 
