@@ -914,11 +914,46 @@ export default function Messages() {
           table: 'community_messages',
           filter: `community_id=eq.${selectedCommunityId}`,
         },
-        (payload) => {
-          // Refetch community messages to get the new message
-          queryClient.invalidateQueries({
-            queryKey: ['communityMessages', selectedCommunityId, currentUser?.id]
+        (payload: any) => {
+          const newMessage = payload.new;
+          const queryKey = ['communityMessages', selectedCommunityId, currentUser?.id];
+
+          // Optimistically append the new message to the cache so it appears instantly
+          queryClient.setQueryData(queryKey, (oldData: any) => {
+            const existing = Array.isArray(oldData) ? oldData : [];
+
+            // Skip if already present (e.g. from optimistic send)
+            if (existing.some((m: any) => m.id === newMessage.id)) {
+              return existing;
+            }
+
+            // Try to enrich with sender profile from cached community members
+            const members: any[] = queryClient.getQueryData(['communityMembers', selectedCommunityId]) || [];
+            const member = members.find((m: any) => m.user_id === newMessage.sender_id);
+            const enriched = {
+              ...newMessage,
+              sender: member ? {
+                id: member.user_id,
+                username: member.username,
+                full_name: member.full_name,
+                avatar_url: member.avatar_url,
+                is_verified: member.is_verified,
+                is_official: member.is_official,
+              } : newMessage.sender,
+            };
+
+            // Replace any pending optimistic message from same sender with same content
+            const filtered = existing.filter((m: any) => !(
+              typeof m.id === 'string' && m.id.startsWith('temp-') &&
+              m.sender_id === newMessage.sender_id &&
+              m.content === newMessage.content
+            ));
+
+            return [...filtered, enriched];
           });
+
+          // Background refetch to ensure consistency (joins, server-side data)
+          queryClient.invalidateQueries({ queryKey });
         }
       )
       .subscribe();
@@ -1108,7 +1143,18 @@ export default function Messages() {
             (newMessage.sender_id === selectedUserId && newMessage.receiver_id === currentUser.id);
           
           if (isRelevant) {
-            // Update messages query only, keep unread count at 0 for active chat
+            // Optimistically append the new message into the cache for instant display
+            queryClient.setQueryData(['messages', selectedUserId], (oldData: any) => {
+              const existing = Array.isArray(oldData) ? oldData : [];
+              if (existing.some((m: any) => m.id === newMessage.id)) return existing;
+              const filtered = existing.filter((m: any) => !(
+                typeof m.id === 'string' && m.id.startsWith('temp-') &&
+                m.sender_id === newMessage.sender_id &&
+                m.content === newMessage.content
+              ));
+              return [...filtered, newMessage];
+            });
+            // Background refetch to ensure consistency
             queryClient.invalidateQueries({ queryKey: ['messages', selectedUserId] });
             queryClient.setQueryData(['conversations', currentUser?.id], (oldData: any) => {
               if (!oldData) return oldData;
