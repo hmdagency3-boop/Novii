@@ -183,8 +183,6 @@ export default function SuggestionsSidebar() {
   return (
     <>
       <aside className={`hidden xl:flex flex-col w-80 h-screen sticky top-0 p-6 pt-10 z-40 overflow-y-auto ${isRTL ? 'border-l' : 'border-r'} border-border/40`}>
-        <ContactsSyncBanner variant="sidebar" />
-
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
