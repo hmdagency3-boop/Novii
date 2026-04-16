@@ -2871,9 +2871,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      let authEmail: string | null = null;
+      let authPhone: string | null = null;
+      let authEmailConfirmed: string | null = null;
+      let authPhoneConfirmed: string | null = null;
+      try {
+        const { data: authData } = await adminDb!.auth.admin.getUserById(userId);
+        if (authData?.user) {
+          authEmail = authData.user.email || null;
+          authPhone = authData.user.phone || null;
+          authEmailConfirmed = (authData.user as any).email_confirmed_at || null;
+          authPhoneConfirmed = (authData.user as any).phone_confirmed_at || null;
+        }
+      } catch (e) {
+        console.warn('Failed to fetch auth user:', e);
+      }
+
       const profile = {
         ...profileRes.data,
         display_name: profileRes.data.full_name || profileRes.data.display_name || profileRes.data.username,
+        email: authEmail || profileRes.data.email || null,
+        phone: authPhone || profileRes.data.phone || null,
+        email_confirmed_at: authEmailConfirmed,
+        phone_confirmed_at: authPhoneConfirmed,
       };
 
       const sectionErrors: string[] = [];

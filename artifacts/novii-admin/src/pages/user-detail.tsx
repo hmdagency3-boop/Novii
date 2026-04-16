@@ -4,7 +4,7 @@ import {
   ArrowRight, Smartphone, Globe, MapPin, Clock, Shield, AlertTriangle,
   FileText, Image, Film, MessageCircle, Users, Ban, Eye, CheckCircle2,
   XCircle, Loader2, Copy, ExternalLink, Wifi, MonitorSmartphone, Calendar,
-  Heart, BarChart3, UserCheck, UserX, Scale, BadgeCheck, Flag,
+  Heart, BarChart3, UserCheck, UserX, Scale, BadgeCheck, Flag, Mail, Phone,
 } from "lucide-react";
 
 const fmt = (d: string) => d ? new Date(d).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" }) : "—";
@@ -128,6 +128,20 @@ export default function UserDetailPage({ userId, onBack }: { userId: string; onB
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-[13px]">
+          <InfoItem
+            icon={Mail}
+            label="البريد الإلكتروني"
+            value={p.email || "—"}
+            verified={!!p.email_confirmed_at}
+            copyable={!!p.email}
+          />
+          <InfoItem
+            icon={Phone}
+            label="رقم الهاتف"
+            value={p.phone ? (p.phone.startsWith('+') ? p.phone : `+${p.phone}`) : "—"}
+            verified={!!p.phone_confirmed_at}
+            copyable={!!p.phone}
+          />
           <InfoItem icon={Calendar} label="تاريخ التسجيل" value={fmtDate(p.created_at)} />
           <InfoItem icon={Clock} label="آخر ظهور" value={p.last_seen ? fmt(p.last_seen) : "غير معروف"} />
           <InfoItem icon={MapPin} label="الموقع" value={p.location || "—"} />
@@ -185,14 +199,33 @@ function Badge({ label, color }: { label: string; color: string }) {
   );
 }
 
-function InfoItem({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function InfoItem({ icon: Icon, label, value, verified, copyable }: { icon: any; label: string; value: string; verified?: boolean; copyable?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    if (!copyable || value === "—") return;
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#fafafa]">
+    <div
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-[#fafafa] ${copyable && value !== "—" ? "cursor-pointer hover:bg-[#f0f0f0] transition-colors" : ""}`}
+      onClick={handleCopy}
+      title={copyable && value !== "—" ? "نسخ" : undefined}
+    >
       <Icon className="w-4 h-4 text-[#8e8e8e] shrink-0" />
-      <div className="min-w-0">
-        <p className="text-[11px] text-[#8e8e8e]">{label}</p>
-        <p className="text-[13px] text-[#262626] font-medium truncate">{value}</p>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1">
+          <p className="text-[11px] text-[#8e8e8e]">{label}</p>
+          {verified && <CheckCircle2 className="w-3 h-3 text-[#16a34a]" />}
+        </div>
+        <p className="text-[13px] text-[#262626] font-medium truncate" dir="ltr" style={{ textAlign: 'right' }}>{value}</p>
       </div>
+      {copyable && value !== "—" && (
+        <span className="shrink-0">
+          {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-[#16a34a]" /> : <Copy className="w-3.5 h-3.5 text-[#8e8e8e]" />}
+        </span>
+      )}
     </div>
   );
 }
