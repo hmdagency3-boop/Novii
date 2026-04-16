@@ -12,6 +12,7 @@ import { useLanguage } from "@/lib/language-context";
 import { getTranslation } from "@/lib/translations";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import InstallAppBanner from "@/components/install-app-banner";
 
 const logo = "/assets/novii_logo_new.png";
 
@@ -496,6 +497,7 @@ export default function AuthPage() {
         </div>
 
         <div className="flex-1 max-w-md w-full flex flex-col max-h-[100dvh] py-4 animate-in fade-in slide-in-from-right-8 duration-700 delay-100">
+          <InstallAppBanner />
           <div className="relative group flex-1 min-h-0 flex flex-col">
             <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-purple-500 to-pink-500 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
             
