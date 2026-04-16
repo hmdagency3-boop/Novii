@@ -1,91 +1,93 @@
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 
-interface ZoomState {
+export interface PinchOverlay {
+  active: boolean;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
   scale: number;
   originX: number;
   originY: number;
+  releasing: boolean;
 }
 
-function getTouchDistance(t0: Touch, t1: Touch) {
-  const dx = t0.clientX - t1.clientX;
-  const dy = t0.clientY - t1.clientY;
-  return Math.sqrt(dx * dx + dy * dy);
+const HIDDEN: PinchOverlay = {
+  active: false, x: 0, y: 0, width: 0, height: 0,
+  scale: 1, originX: 50, originY: 50, releasing: false,
+};
+
+function touchDist(a: Touch, b: Touch) {
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
 }
 
 export function usePinchZoom() {
-  const [zoom, setZoom] = useState<ZoomState>({ scale: 1, originX: 50, originY: 50 });
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [overlay, setOverlay] = useState<PinchOverlay>(HIDDEN);
   const lastDistRef = useRef<number | null>(null);
-  const isPinchingRef = useRef(false);
-
-  const resetZoom = useCallback(() => {
-    setZoom({ scale: 1, originX: 50, originY: 50 });
-  }, []);
+  const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        isPinchingRef.current = true;
-        lastDistRef.current = getTouchDistance(e.touches[0], e.touches[1]);
-        const rect = el.getBoundingClientRect();
-        const midX = ((e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left) / rect.width * 100;
-        const midY = ((e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top) / rect.height * 100;
-        setZoom(prev => ({ ...prev, originX: midX, originY: midY }));
-      }
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      if (releaseTimer.current) clearTimeout(releaseTimer.current);
+
+      const rect = el.getBoundingClientRect();
+      lastDistRef.current = touchDist(e.touches[0], e.touches[1]);
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+      setOverlay({
+        active: true,
+        releasing: false,
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height,
+        scale: 1,
+        originX: ((midX - rect.left) / rect.width) * 100,
+        originY: ((midY - rect.top) / rect.height) * 100,
+      });
     };
 
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2 && lastDistRef.current !== null) {
-        e.preventDefault();
-        const newDist = getTouchDistance(e.touches[0], e.touches[1]);
-        const delta = newDist / lastDistRef.current;
-        lastDistRef.current = newDist;
-        setZoom(prev => ({
-          ...prev,
-          scale: Math.min(Math.max(prev.scale * delta, 1), 4),
-        }));
-      }
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || lastDistRef.current === null) return;
+      e.preventDefault();
+      const newDist = touchDist(e.touches[0], e.touches[1]);
+      const delta = newDist / lastDistRef.current;
+      lastDistRef.current = newDist;
+      setOverlay(prev =>
+        prev.active
+          ? { ...prev, scale: Math.min(Math.max(prev.scale * delta, 1), 4) }
+          : prev
+      );
     };
 
-    const handleTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) {
-        isPinchingRef.current = false;
-        lastDistRef.current = null;
-        setZoom(prev =>
-          prev.scale < 1.1
-            ? { scale: 1, originX: 50, originY: 50 }
-            : prev
-        );
-      }
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length >= 2) return;
+      lastDistRef.current = null;
+      setOverlay(prev => prev.active ? { ...prev, releasing: true, scale: 1 } : prev);
+      releaseTimer.current = setTimeout(() => {
+        setOverlay(HIDDEN);
+      }, 300);
     };
 
-    el.addEventListener("touchstart", handleTouchStart, { passive: true });
-    el.addEventListener("touchmove", handleTouchMove, { passive: false });
-    el.addEventListener("touchend", handleTouchEnd, { passive: true });
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    el.addEventListener("touchcancel", onTouchEnd, { passive: true });
 
     return () => {
-      el.removeEventListener("touchstart", handleTouchStart);
-      el.removeEventListener("touchmove", handleTouchMove);
-      el.removeEventListener("touchend", handleTouchEnd);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+      if (releaseTimer.current) clearTimeout(releaseTimer.current);
     };
   }, []);
 
-  const isZoomed = zoom.scale > 1.05;
-
-  const imageStyle: React.CSSProperties = {
-    transform: `scale(${zoom.scale})`,
-    transformOrigin: `${zoom.originX}% ${zoom.originY}%`,
-    transition: isPinchingRef.current ? "none" : "transform 0.25s ease",
-    willChange: "transform",
-  };
-
-  return {
-    containerRef,
-    isZoomed,
-    imageStyle,
-    resetZoom,
-  };
+  return { containerRef, overlay };
 }

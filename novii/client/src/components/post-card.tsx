@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Trash2, MapPin, Check, BarChart3, Pin, Eye, MessageSquare, Link as LinkIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface FloatingHeart {
   id: string;
@@ -75,7 +76,7 @@ export default function PostCard({ post }: PostCardProps) {
   const { data: currentUser } = useCurrentUser();
   const { direction } = useLanguage();
   const isMobile = useIsMobile();
-  const { containerRef, isZoomed, imageStyle, resetZoom } = usePinchZoom();
+  const { containerRef, overlay } = usePinchZoom();
   const { settings } = useSettings();
   const t = direction === "rtl";
   const shouldHideLikes = hideLikes || (currentUser?.id === post.user_id ? settings.likes.hide_like_counts_own : settings.likes.hide_like_counts_others);
@@ -320,18 +321,43 @@ export default function PostCard({ post }: PostCardProps) {
       <div 
         ref={containerRef}
         className="relative w-full aspect-square lg:aspect-[4/5] bg-muted overflow-hidden cursor-pointer group"
-        onDoubleClick={isZoomed ? resetZoom : handleDoubleTap}
-        onClick={isZoomed ? resetZoom : undefined}
+        onDoubleClick={handleDoubleTap}
         style={{ touchAction: "pan-y" }}
       >
         <img 
             src={post.image_url || "https://via.placeholder.com/600x600?text=No+Image"} 
             alt="Post content" 
             loading="lazy"
-            className="w-full h-full object-cover"
-            style={imageStyle}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
             draggable={false}
         />
+
+        {/* Pinch-zoom overlay — renders outside overflow-hidden via portal */}
+        {overlay.active && createPortal(
+          <div
+            style={{
+              position: "fixed",
+              left: overlay.x,
+              top: overlay.y,
+              width: overlay.width,
+              height: overlay.height,
+              transform: `scale(${overlay.scale})`,
+              transformOrigin: `${overlay.originX}% ${overlay.originY}%`,
+              transition: overlay.releasing ? "transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94)" : "none",
+              zIndex: 9999,
+              pointerEvents: "none",
+              overflow: "hidden",
+              borderRadius: "inherit",
+            }}
+          >
+            <img
+              src={post.image_url || "https://via.placeholder.com/600x600?text=No+Image"}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              draggable={false}
+            />
+          </div>,
+          document.body
+        )}
         
         {/* Gradient Overlay on Hover */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/0 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
