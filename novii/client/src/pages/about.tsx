@@ -91,7 +91,7 @@ export default function About() {
           <div className="space-y-3">
             {[
               { label: "اسم التطبيق", value: "Novii · نوفيي" },
-              { label: "الإصدار", value: "1.0.0" },
+              { label: "الإصدار", value: "Beta" },
               { label: "الفئة", value: "تواصل اجتماعي" },
               { label: "اللغات المدعومة", value: "العربية · الإنجليزية" },
               { label: "سنة الإطلاق", value: "2026" },
