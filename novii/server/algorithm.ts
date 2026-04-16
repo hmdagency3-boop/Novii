@@ -326,11 +326,11 @@ export async function getPersonalizedFeed(
       reasons.push("pinned");
     }
     if (post.is_featured) {
-      boostScore += 0.8;
+      boostScore += 0.25;
       reasons.push("featured_post");
     }
     if (p?.is_featured) {
-      boostScore += 0.6;
+      boostScore += 0.2;
       reasons.push("featured_account");
     }
     boostScore = Math.min(boostScore, 1);
@@ -444,11 +444,11 @@ export async function getPersonalizedExplore(
     if (p?.is_creator) qualityScore += config.creator_boost + 0.05;
     if ((p?.followers_count || 0) > 10) qualityScore += 0.1;
     if (post.is_featured) {
-      qualityScore += 0.8;
+      qualityScore += 0.25;
       reasons.push("featured_post");
     }
     if (p?.is_featured) {
-      qualityScore += 0.6;
+      qualityScore += 0.2;
       reasons.push("featured_account");
     }
     qualityScore = Math.min(qualityScore, 1);
@@ -546,8 +546,8 @@ export async function getPersonalizedExploreReels(
 
     let boostScore = 0;
     if (reel.profile?.is_verified) boostScore += config.verified_boost * 0.33;
-    if (reel.is_featured) boostScore += 0.8;
-    if (reel.profile?.is_featured) boostScore += 0.6;
+    if (reel.is_featured) boostScore += 0.25;
+    if (reel.profile?.is_featured) boostScore += 0.2;
     boostScore = Math.min(boostScore, 1);
 
     const finalScore =
