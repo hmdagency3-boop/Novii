@@ -2583,6 +2583,9 @@ export default function Messages() {
                               }
                             }}
                             placeholder={isRTL ? "اكتب رسالة..." : "Type a message..."}
+                            type="search"
+                            inputMode="text"
+                            enterKeyHint="send"
                             autoComplete="off"
                             autoCorrect="off"
                             autoCapitalize="off"
@@ -2591,7 +2594,7 @@ export default function Messages() {
                             data-form-type="other"
                             data-1p-ignore
                             data-lpignore="true"
-                            className="flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-9 text-sm px-3 py-0 m-0"
+                            className="flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-9 text-sm px-3 py-0 m-0 [&::-webkit-search-cancel-button]:hidden"
                           />
                           <Button 
                             onClick={() => {
@@ -2665,6 +2668,9 @@ export default function Messages() {
                                 onChange={handleInputChange}
                                 onKeyDown={handleKeyPress}
                                 placeholder={isRTL ? "اكتب رسالة..." : "Type a message..."}
+                                type="search"
+                                inputMode="text"
+                                enterKeyHint="send"
                                 autoComplete="off"
                                 autoCorrect="off"
                                 autoCapitalize="off"
@@ -2673,7 +2679,7 @@ export default function Messages() {
                                 data-form-type="other"
                                 data-1p-ignore
                                 data-lpignore="true"
-                                className="flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 h-9 text-sm px-3 py-0 m-0"
+                                className="flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 h-9 text-sm px-3 py-0 m-0 [&::-webkit-search-cancel-button]:hidden"
                               />
                             )}
 
@@ -2766,6 +2772,9 @@ export default function Messages() {
                   }
                 }}
                 placeholder={userKickedStatus?.isKicked ? (isRTL ? "مطرود..." : "You are kicked...") : userMuteStatus?.isMuted ? (isRTL ? "معموله كتم..." : "You are muted...") : (isRTL ? "اكتب رسالة..." : "Type a message...")}
+                type="search"
+                inputMode="text"
+                enterKeyHint="send"
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -2775,7 +2784,7 @@ export default function Messages() {
                 data-1p-ignore
                 data-lpignore="true"
                 className={cn(
-                  "flex-1 rounded-lg sm:rounded-2xl bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-8 sm:h-9 text-xs sm:text-sm px-3 py-0 m-0",
+                  "flex-1 rounded-lg sm:rounded-2xl bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-8 sm:h-9 text-xs sm:text-sm px-3 py-0 m-0 [&::-webkit-search-cancel-button]:hidden",
                   isRTL && "text-right",
                   (userMuteStatus?.isMuted || userKickedStatus?.isKicked) && "opacity-50 cursor-not-allowed bg-destructive/5"
                 )}
@@ -2848,6 +2857,9 @@ export default function Messages() {
                     onChange={handleInputChange}
                     onKeyDown={handleKeyPress}
                     placeholder={isRTL ? "اكتب رسالة..." : "Type a message..."}
+                    type="search"
+                    inputMode="text"
+                    enterKeyHint="send"
                     autoComplete="off"
                     autoCorrect="off"
                     autoCapitalize="off"
@@ -2856,7 +2868,7 @@ export default function Messages() {
                     data-form-type="other"
                     data-1p-ignore
                     data-lpignore="true"
-                    className={cn("flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 h-8 text-xs px-3 py-0 m-0", isRTL && "text-right")}
+                    className={cn("flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 h-8 text-xs px-3 py-0 m-0 [&::-webkit-search-cancel-button]:hidden", isRTL && "text-right")}
                   />
                 )}
 
