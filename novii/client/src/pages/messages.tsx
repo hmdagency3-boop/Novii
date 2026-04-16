@@ -3600,9 +3600,9 @@ export default function Messages() {
       {chatMenu && (() => {
         const isPinned = pinnedConvIds.has(chatMenu.userId);
         const isMuted = mutedConvIds.has(chatMenu.userId);
-        const menuWidth = 300;
-        const menuHeight = 132;
-        const padding = 16;
+        const menuWidth = 220;
+        const menuHeight = 108;
+        const padding = 12;
         const vw = typeof window !== 'undefined' ? window.innerWidth : 360;
         const vh = typeof window !== 'undefined' ? window.innerHeight : 640;
         let left = chatMenu.x - menuWidth / 2;
