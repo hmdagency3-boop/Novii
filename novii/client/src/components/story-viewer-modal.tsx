@@ -9,6 +9,7 @@ import { api, type Story, type Profile } from "@/lib/api";
 import { getFilterById } from "@/lib/story-filters";
 import { useLanguage } from "@/lib/language-context";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@supabase/supabase-js";
 
 interface StoryViewerModalProps {
@@ -45,6 +46,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
 
   const { language } = useLanguage();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const musicRef = useRef<HTMLAudioElement | null>(null);
   const startFromZeroRef = useRef(true);
@@ -216,13 +218,29 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
 
   const handleDeleteStory = async () => {
     if (!currentStory) return;
+    const deletedId = currentStory.id;
     setShowMenu(false);
     setIsDeleting(true);
+
+    // Optimistically remove the story from every cached stories list so it disappears immediately
+    const previousStoriesQueries = queryClient.getQueriesData({ queryKey: ['stories'] });
+    for (const [key, data] of previousStoriesQueries) {
+      if (Array.isArray(data)) {
+        queryClient.setQueryData(key, (data as any[]).filter((s: any) => s?.id !== deletedId));
+      }
+    }
+    // Close the viewer right away so the UI feels instant
+    onOpenChange(false);
+
     try {
-      await api.deleteStory(currentStory.id);
+      await api.deleteStory(deletedId);
       toast({ title: language.code === 'ar' ? '✅ تم الحذف' : '✅ Deleted' });
-      onOpenChange(false);
+      queryClient.invalidateQueries({ queryKey: ['stories'] });
     } catch (error: any) {
+      // Revert on failure
+      for (const [key, data] of previousStoriesQueries) {
+        queryClient.setQueryData(key, data);
+      }
       toast({ title: '❌', description: error.message, variant: 'destructive' });
     } finally { setIsDeleting(false); }
   };

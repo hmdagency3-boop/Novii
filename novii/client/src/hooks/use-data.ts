@@ -153,8 +153,50 @@ export function useDeletePost() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const removePostFromCaches = (postId: string) => {
+    const prefixes = [['feed'], ['posts'], ['profile'], ['explore'], ['reels'], ['user-posts'], ['saved-posts']];
+    for (const prefix of prefixes) {
+      const queries = queryClient.getQueriesData({ queryKey: prefix });
+      for (const [key, data] of queries) {
+        if (!data) continue;
+        // Infinite query shape: { pages: [...] }
+        if ((data as any).pages && Array.isArray((data as any).pages)) {
+          const next = {
+            ...(data as any),
+            pages: (data as any).pages.map((page: any) => {
+              if (Array.isArray(page)) return page.filter((p: any) => p?.id !== postId);
+              if (Array.isArray(page?.posts)) return { ...page, posts: page.posts.filter((p: any) => p?.id !== postId) };
+              if (Array.isArray(page?.items)) return { ...page, items: page.items.filter((p: any) => p?.id !== postId) };
+              return page;
+            }),
+          };
+          queryClient.setQueryData(key, next);
+          continue;
+        }
+        // Plain array
+        if (Array.isArray(data)) {
+          queryClient.setQueryData(key, (data as any[]).filter((p: any) => p?.id !== postId));
+          continue;
+        }
+        // Object with posts/items
+        if (Array.isArray((data as any).posts)) {
+          queryClient.setQueryData(key, { ...(data as any), posts: (data as any).posts.filter((p: any) => p?.id !== postId) });
+        } else if (Array.isArray((data as any).items)) {
+          queryClient.setQueryData(key, { ...(data as any), items: (data as any).items.filter((p: any) => p?.id !== postId) });
+        }
+      }
+    }
+  };
+
   return useMutation({
     mutationFn: (postId: string) => api.deletePost(postId),
+    onMutate: async (postId: string) => {
+      // Optimistically remove the post from every cached list right away
+      await queryClient.cancelQueries({ queryKey: ['feed'] });
+      await queryClient.cancelQueries({ queryKey: ['posts'] });
+      await queryClient.cancelQueries({ queryKey: ['profile'] });
+      removePostFromCaches(postId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['posts'] });
@@ -165,6 +207,10 @@ export function useDeletePost() {
       });
     },
     onError: () => {
+      // Revert by refetching so the removed post reappears if delete actually failed
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
       toast({
         variant: 'destructive',
         title: 'خطأ',
