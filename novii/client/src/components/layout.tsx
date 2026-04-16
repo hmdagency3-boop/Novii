@@ -78,8 +78,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const atBoundary = (goingRight && !isRTL && atStart) || (goingLeft && !isRTL && atEnd) ||
                        (goingLeft && isRTL && atStart) || (goingRight && isRTL && atEnd);
     if (atBoundary) {
-      // Rubber-band resistance: allow a tiny dampened offset so it doesn't feel stuck
-      setSwipeOffset(dx * 0.08);
       return;
     }
     setSwipeOffset(dx * 0.4);
@@ -98,7 +96,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       setTimeout(() => setIsSwipeTransitioning(false), 250);
     };
 
-    if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 40) { snapBack(); return; }
+    if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 40) { setSwipeOffset(0); return; }
 
     const velocity = Math.abs(dx) / dt;
     const shouldSwipe = Math.abs(dx) > 80 || velocity > 0.4;
