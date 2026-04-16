@@ -1660,7 +1660,10 @@ export default function Messages() {
                   return (
                     <button
                       key={conv.user?.id}
-                      onClick={() => setSelectedUserId(conv.user?.id)}
+                      onClick={() => {
+                        setSelectedCommunityId(null);
+                        setSelectedUserId(conv.user?.id);
+                      }}
                       className={cn(
                         "flex items-center gap-3 px-4 py-3.5 cursor-pointer relative w-full",
                         "transition-colors duration-150",
@@ -1782,7 +1785,10 @@ export default function Messages() {
                 {communities.map((community: any) => (
                   <button
                     key={community.id}
-                    onClick={() => setSelectedCommunityId(community.id)}
+                    onClick={() => {
+                      setSelectedUserId(null);
+                      setSelectedCommunityId(community.id);
+                    }}
                     className={cn(
                       "flex items-center gap-3 px-4 py-3 transition-all duration-300 border-b border-border/20 last:border-0 text-left",
                       community.creator_is_official
