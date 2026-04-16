@@ -1017,7 +1017,8 @@ export default function Messages() {
         _optimistic: true,
       };
       queryClient.setQueryData(queryKey, [...previous, optimistic]);
-      setMessageInput("");
+      messageComposerRef.current?.clear();
+      setHasMessageText(false);
       setSelectedImage(null);
       setPreviewUrl(null);
       setReplyingTo(null);
@@ -1494,8 +1495,9 @@ export default function Messages() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleSendMessage = async () => {
-    if ((messageInput.trim() || selectedImage) && selectedUserId) {
+  const handleSendMessage = async (overrideText?: string) => {
+    const text = (overrideText ?? messageComposerRef.current?.getValue() ?? "").trim();
+    if ((text || selectedImage) && selectedUserId) {
       sendTypingEvent(false);
       
       let imageUrl: string | undefined;
@@ -1505,7 +1507,7 @@ export default function Messages() {
       
       sendMessageMutation.mutate({
         receiverId: selectedUserId,
-        content: messageInput.trim(),
+        content: text,
         imageUrl,
         replyToId: replyingTo?.id,
       });
@@ -2705,7 +2707,7 @@ export default function Messages() {
                           {showEmojiPicker && (
                             <div className="flex flex-wrap gap-1 p-2 bg-muted rounded-lg border border-border max-h-32 overflow-y-auto mx-1">
                               {EMOJI_LIST.map(emoji => (
-                                <button key={emoji} onClick={() => setMessageInput(prev => prev + emoji)} className="text-lg hover:scale-125 transition-transform leading-none">
+                                <button key={emoji} onClick={() => messageComposerRef.current?.insert(emoji)} className="text-lg hover:scale-125 transition-transform leading-none">
                                   {emoji}
                                 </button>
                               ))}
@@ -2731,29 +2733,24 @@ export default function Messages() {
                                 </Button>
                               </div>
                             ) : (
-                              <Input
-                                value={messageInput}
-                                onChange={handleInputChange}
-                                onKeyDown={handleKeyPress}
+                              <IsolatedChatInput
+                                ref={messageComposerRef}
+                                rtl={isRTL}
+                                onHasTextChange={setHasMessageText}
+                                onTyping={() => {
+                                  sendTypingEvent(true);
+                                  if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                                  typingTimeoutRef.current = setTimeout(() => sendTypingEvent(false), 2000);
+                                }}
+                                onSubmit={(text) => handleSendMessage(text)}
                                 placeholder={isRTL ? "اكتب رسالة..." : "Type a message..."}
-                                type="search"
-                                inputMode="text"
-                                enterKeyHint="send"
-                                autoComplete="off"
-                                autoCorrect="off"
-                                autoCapitalize="off"
-                                spellCheck={false}
-                                name="novii-message"
-                                data-form-type="other"
-                                data-1p-ignore
-                                data-lpignore="true"
-                                className="flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 h-9 text-sm px-3 py-0 m-0 [&::-webkit-search-cancel-button]:hidden"
+                                className="flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 h-9 text-sm px-3 py-0 m-0"
                               />
                             )}
 
                             {/* Mic or Send */}
-                            {(messageInput.trim() || selectedImage) ? (
-                              <Button onClick={handleSendMessage} disabled={sendMessageMutation.isPending} className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg h-9 w-9 p-0 m-0" size="icon">
+                            {(hasMessageText || selectedImage) ? (
+                              <Button onClick={() => handleSendMessage()} disabled={sendMessageMutation.isPending} className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg h-9 w-9 p-0 m-0" size="icon">
                                 {sendMessageMutation.isPending ? <Spinner className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                               </Button>
                             ) : isRecording ? (
@@ -2878,7 +2875,7 @@ export default function Messages() {
               {showEmojiPicker && (
                 <div className="flex flex-wrap gap-1 p-2 bg-muted rounded-lg border border-border max-h-28 overflow-y-auto mx-1">
                   {EMOJI_LIST.map(emoji => (
-                    <button key={emoji} onClick={() => setMessageInput(prev => prev + emoji)} className="text-lg hover:scale-125 transition-transform leading-none">
+                    <button key={emoji} onClick={() => messageComposerRef.current?.insert(emoji)} className="text-lg hover:scale-125 transition-transform leading-none">
                       {emoji}
                     </button>
                   ))}
@@ -2901,28 +2898,23 @@ export default function Messages() {
                     <button onClick={cancelRecording} className="text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
                   </div>
                 ) : (
-                  <Input
-                    value={messageInput}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyPress}
+                  <IsolatedChatInput
+                    ref={messageComposerRef}
+                    rtl={isRTL}
+                    onHasTextChange={setHasMessageText}
+                    onTyping={() => {
+                      sendTypingEvent(true);
+                      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                      typingTimeoutRef.current = setTimeout(() => sendTypingEvent(false), 2000);
+                    }}
+                    onSubmit={(text) => handleSendMessage(text)}
                     placeholder={isRTL ? "اكتب رسالة..." : "Type a message..."}
-                    type="search"
-                    inputMode="text"
-                    enterKeyHint="send"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    name="novii-message"
-                    data-form-type="other"
-                    data-1p-ignore
-                    data-lpignore="true"
-                    className={cn("flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 h-8 text-xs px-3 py-0 m-0 [&::-webkit-search-cancel-button]:hidden", isRTL && "text-right")}
+                    className="flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 h-8 text-xs px-3 py-0 m-0"
                   />
                 )}
 
-                {(messageInput.trim() || selectedImage) ? (
-                  <Button onClick={handleSendMessage} disabled={sendMessageMutation.isPending} className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 shadow-lg h-8 w-8 p-0 m-0 ml-1" size="icon">
+                {(hasMessageText || selectedImage) ? (
+                  <Button onClick={() => handleSendMessage()} disabled={sendMessageMutation.isPending} className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 shadow-lg h-8 w-8 p-0 m-0 ml-1" size="icon">
                     {sendMessageMutation.isPending ? <Spinner className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
                   </Button>
                 ) : isRecording ? (
