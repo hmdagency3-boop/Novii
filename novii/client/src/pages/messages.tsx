@@ -543,6 +543,9 @@ export default function Messages() {
       const queryKey = ['communityMessages', selectedCommunityId, currentUser?.id];
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<any[]>(queryKey) || [];
+      // Pull live profile data from current member list (has username + avatar)
+      const me = communityMembers.find((m: any) => m.user_id === currentUser?.id);
+      const meta: any = (currentUser as any)?.user_metadata || {};
       const optimistic = {
         id: `temp-${Date.now()}`,
         community_id: communityId,
@@ -552,8 +555,11 @@ export default function Messages() {
         created_at: new Date().toISOString(),
         is_deleted: false,
         is_system_message: false,
-        username: currentUser?.user_metadata?.username || (currentUser as any)?.username,
-        avatar_url: (currentUser as any)?.avatar_url,
+        username: me?.profiles?.username || meta.username || meta.user_name || 'You',
+        full_name: me?.profiles?.full_name || meta.full_name || null,
+        avatar_url: me?.profiles?.avatar_url || meta.avatar_url || null,
+        is_verified: !!me?.profiles?.is_verified,
+        is_official: !!me?.profiles?.is_official,
         _optimistic: true,
       };
       queryClient.setQueryData(queryKey, [...previous, optimistic]);
