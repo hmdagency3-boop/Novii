@@ -422,24 +422,11 @@ export async function getPersonalizedExplore(
   }
   if (!posts) return [];
 
-  console.log(`🔍 Explore: fetched ${posts.length} posts, user follows ${followingIds.size - 1} accounts`);
+  const ownPosts = posts.filter((p: any) => p.user_id !== userId);
 
-  const nonFollowedPosts = posts.filter(
-    (p: any) => !followingIds.has(p.user_id)
-  );
+  console.log(`🔍 Explore: fetched ${posts.length} posts, showing ${ownPosts.length} (excluded own)`);
 
-  const featuredPosts = posts.filter(
-    (p: any) => p.is_featured || p.profile?.is_featured
-  );
-  const featuredFromFollowed = featuredPosts.filter(
-    (p: any) => followingIds.has(p.user_id) && !nonFollowedPosts.some((nf: any) => nf.id === p.id)
-  );
-
-  const combinedPosts = [...nonFollowedPosts, ...featuredFromFollowed];
-
-  console.log(`🔍 Explore: ${nonFollowedPosts.length} from non-followed, ${featuredFromFollowed.length} featured from followed, ${combinedPosts.length} total`);
-
-  const scored: ScoredPost[] = combinedPosts.map((post: any) => {
+  const scored: ScoredPost[] = ownPosts.map((post: any) => {
     const reasons: string[] = [];
 
     const interestScore = calculateInterestScore(profile, post.caption);
@@ -549,11 +536,9 @@ export async function getPersonalizedExploreReels(
 
   if (error || !reels) return [];
 
-  const nonFollowed = reels.filter(
-    (r: any) => !followingIds.has(r.user_id)
-  );
+  const allReels = reels.filter((r: any) => r.user_id !== userId);
 
-  const scored = nonFollowed.map((reel: any) => {
+  const scored = allReels.map((reel: any) => {
     const interestScore = calculateInterestScore(profile, reel.caption);
     const engagementScore = calculateEngagementScore(reel);
     const recencyScore = calculateRecencyScore(reel.created_at);
