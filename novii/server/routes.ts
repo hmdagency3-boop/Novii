@@ -3980,6 +3980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let query = queryDb
         .from('hashtags')
         .select('*')
+        .order('is_pinned', { ascending: false })
         .order('posts_count', { ascending: false })
         .limit(20);
       const { data, error } = await query;
