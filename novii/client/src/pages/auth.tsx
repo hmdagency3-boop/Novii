@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -424,7 +424,7 @@ export default function AuthPage() {
     setOtpCountdown(0);
   };
 
-  const PhoneInput = () => (
+  const phoneInputJSX = (
     <div className="space-y-2">
       <div className="flex gap-2">
         <div className="relative">
@@ -472,7 +472,7 @@ export default function AuthPage() {
     </div>
   );
 
-  const OtpVerification = () => (
+  const otpVerificationJSX = (
     <div className="space-y-4">
       <div className="text-center space-y-2">
         <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-3">
@@ -543,7 +543,7 @@ export default function AuthPage() {
     </div>
   );
 
-  const AuthMethodToggle = () => (
+  const authMethodToggleJSX = (
     <div className="flex rounded-xl bg-background/50 border border-border/60 p-1 gap-1">
       <button
         type="button"
@@ -744,7 +744,7 @@ export default function AuthPage() {
                 </p>
               </div>
 
-              <AuthMethodToggle />
+              {authMethodToggleJSX}
 
               {!isLogin ? (
                 <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-3.5 overflow-visible">
@@ -759,9 +759,9 @@ export default function AuthPage() {
                       dir="ltr"
                     />
                   ) : otpStep ? (
-                    <OtpVerification />
+                    otpVerificationJSX
                   ) : (
-                    <PhoneInput />
+                    phoneInputJSX
                   )}
 
                   {!(authMethod === "phone" && otpStep) && (
@@ -898,12 +898,12 @@ export default function AuthPage() {
                 <form onSubmit={handleSubmit} className="space-y-5">
                   {authMethod === "phone" ? (
                     otpStep ? (
-                      <OtpVerification />
+                      otpVerificationJSX
                     ) : (
                       <>
                         <div className="space-y-2.5">
                           <label className="text-sm font-medium text-foreground">{t.auth.phone_number}</label>
-                          <PhoneInput />
+                          {phoneInputJSX}
                         </div>
                         <Button
                           type="submit"
