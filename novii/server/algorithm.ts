@@ -110,12 +110,12 @@ export function clearConfigCache() {
 const POST_SELECT = `
   id, user_id, caption, image_url, location,
   likes_count, comments_count, views_count,
-  hide_likes, replies_disabled, is_archived, is_pinned,
+  hide_likes, replies_disabled, is_archived, is_pinned, is_featured,
   created_at, updated_at,
   profile:profiles!posts_user_id_fkey(
     id, username, full_name, avatar_url, bio,
     is_verified, is_official, is_creator, is_premium,
-    is_popular, is_active, is_private,
+    is_popular, is_active, is_private, is_featured,
     is_gold_early_member, is_silver_early_member, is_bronze_early_member,
     is_beta_tester, is_bug_hunter,
     followers_count, following_count
@@ -325,6 +325,14 @@ export async function getPersonalizedFeed(
       boostScore += 0.5;
       reasons.push("pinned");
     }
+    if (post.is_featured) {
+      boostScore += 0.8;
+      reasons.push("featured_post");
+    }
+    if (p?.is_featured) {
+      boostScore += 0.6;
+      reasons.push("featured_account");
+    }
     boostScore = Math.min(boostScore, 1);
 
     const idSum = post.id
@@ -431,6 +439,14 @@ export async function getPersonalizedExplore(
     if (p?.is_official) qualityScore += config.official_boost + 0.1;
     if (p?.is_creator) qualityScore += config.creator_boost + 0.05;
     if ((p?.followers_count || 0) > 10) qualityScore += 0.1;
+    if (post.is_featured) {
+      qualityScore += 0.8;
+      reasons.push("featured_post");
+    }
+    if (p?.is_featured) {
+      qualityScore += 0.6;
+      reasons.push("featured_account");
+    }
     qualityScore = Math.min(qualityScore, 1);
 
     const idSum = post.id
@@ -479,9 +495,9 @@ export async function getPersonalizedExploreReels(
 
   const REEL_SELECT = `
     id, user_id, video_url, thumbnail_url, caption,
-    likes_count, comments_count, views_count, created_at,
+    likes_count, comments_count, views_count, is_featured, created_at,
     profile:profiles!reels_user_id_fkey(
-      id, username, avatar_url, is_verified, is_official, followers_count
+      id, username, avatar_url, is_verified, is_official, is_featured, followers_count
     )
   `;
 
@@ -525,11 +541,17 @@ export async function getPersonalizedExploreReels(
     const engagementScore = calculateEngagementScore(reel);
     const recencyScore = calculateRecencyScore(reel.created_at);
 
+    let boostScore = 0;
+    if (reel.profile?.is_verified) boostScore += config.verified_boost * 0.33;
+    if (reel.is_featured) boostScore += 0.8;
+    if (reel.profile?.is_featured) boostScore += 0.6;
+    boostScore = Math.min(boostScore, 1);
+
     const finalScore =
       interestScore * config.reels_weight_interest +
       engagementScore * config.reels_weight_engagement +
       recencyScore * config.reels_weight_recency +
-      (reel.profile?.is_verified ? config.verified_boost * 0.33 : 0);
+      boostScore * 0.15;
 
     return { ...reel, _score: finalScore };
   });

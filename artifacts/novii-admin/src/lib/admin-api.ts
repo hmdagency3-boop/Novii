@@ -135,6 +135,20 @@ export async function restoreContent(postId: string): Promise<unknown> {
   return adminFetch(`/content/${postId}/restore`, { method: "POST" });
 }
 
+export async function featureContent(postId: string, featured: boolean): Promise<unknown> {
+  return adminFetch(`/content/${postId}/feature`, {
+    method: "POST",
+    body: JSON.stringify({ featured }),
+  });
+}
+
+export async function featureUser(userId: string, featured: boolean): Promise<unknown> {
+  return adminFetch(`/users/${userId}/feature`, {
+    method: "POST",
+    body: JSON.stringify({ featured }),
+  });
+}
+
 export async function warnUser(
   userId: string,
   data: { reason?: string }
@@ -263,6 +277,7 @@ export interface UserProfile {
   is_bronze_early_member: boolean;
   is_beta_tester: boolean;
   is_bug_hunter: boolean;
+  is_featured: boolean;
   is_banned: boolean;
   ban_reason: string;
   banned_reason?: string;
@@ -301,6 +316,7 @@ export interface PostRecord {
   shares_count: number;
   views_count: number;
   is_deleted: boolean;
+  is_featured: boolean;
   created_at: string;
   username: string | null;
   display_name: string | null;

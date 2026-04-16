@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
-import { fetchContent, deleteContent, fetchDeletedContent, restoreContent, type PostRecord } from "@/lib/admin-api";
-import { Search, Trash2, Eye, Image, Heart, MessageCircle, RefreshCw, X, AlertTriangle, BarChart3, Archive, RotateCcw, CheckCircle2 } from "lucide-react";
+import { fetchContent, deleteContent, fetchDeletedContent, restoreContent, featureContent, type PostRecord } from "@/lib/admin-api";
+import { Search, Trash2, Eye, Image, Heart, MessageCircle, RefreshCw, X, AlertTriangle, BarChart3, Archive, RotateCcw, CheckCircle2, Star, StarOff } from "lucide-react";
 
 type Tab = "active" | "deleted";
 
@@ -161,7 +161,10 @@ export default function ContentPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-[14px] text-[#262626] truncate max-w-[250px]">{post.content || "—"}</p>
+                      <div className="flex items-center gap-1.5">
+                        {post.is_featured && <Star className="w-3.5 h-3.5 text-[#ff9500] shrink-0" fill="#ff9500" />}
+                        <p className="text-[14px] text-[#262626] truncate max-w-[250px]">{post.content || "—"}</p>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {post.media_urls && post.media_urls.length > 0 ? (
@@ -190,6 +193,20 @@ export default function ContentPage() {
                         <button onClick={() => setViewPost(post)} className="p-1.5 rounded-full hover:bg-[#efefef] text-[#262626] transition-colors" title="عرض">
                           <Eye className="w-4 h-4" />
                         </button>
+                        {tab === "active" && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await featureContent(post.id, !post.is_featured);
+                                reload();
+                              } catch { alert("فشل في تحديث التعزيز"); }
+                            }}
+                            className={`p-1.5 rounded-full transition-colors ${post.is_featured ? "bg-[#ff9500]/10 text-[#ff9500] hover:bg-[#ff9500]/20" : "hover:bg-[#ff9500]/10 text-[#8e8e8e] hover:text-[#ff9500]"}`}
+                            title={post.is_featured ? "إلغاء التعزيز" : "تعزيز في الترند"}
+                          >
+                            {post.is_featured ? <Star className="w-4 h-4" fill="currentColor" /> : <StarOff className="w-4 h-4" />}
+                          </button>
+                        )}
                         {tab === "active" ? (
                           <button onClick={() => setDeletePost(post)} className="p-1.5 rounded-full hover:bg-[#ed4956]/10 text-[#8e8e8e] hover:text-[#ed4956] transition-colors" title="حذف">
                             <Trash2 className="w-4 h-4" />

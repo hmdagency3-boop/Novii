@@ -5,6 +5,7 @@ import {
   deleteUser,
   updateUser,
   forceLogoutUser,
+  featureUser,
   type UserProfile,
 } from "@/lib/admin-api";
 import {
@@ -31,6 +32,8 @@ import {
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
+  Star,
+  TrendingUp,
 } from "lucide-react";
 
 import UserDetailPage from "./user-detail";
@@ -39,7 +42,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "verified" | "banned" | "creators">("all");
+  const [filter, setFilter] = useState<"all" | "verified" | "featured" | "banned" | "creators">("all");
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [showBanModal, setShowBanModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -78,6 +81,7 @@ export default function UsersPage() {
       );
     }
     if (filter === "verified") result = result.filter((u) => u.is_verified);
+    if (filter === "featured") result = result.filter((u) => u.is_featured);
     if (filter === "banned") result = result.filter((u) => u.is_banned);
     if (filter === "creators") result = result.filter((u) => u.is_creator);
     return result;
@@ -86,6 +90,7 @@ export default function UsersPage() {
   const filters = [
     { key: "all" as const, label: "الكل", count: users.length },
     { key: "verified" as const, label: "موثقين", count: users.filter(u => u.is_verified).length },
+    { key: "featured" as const, label: "معزّزين", count: users.filter(u => u.is_featured).length },
     { key: "banned" as const, label: "محظورين", count: users.filter(u => u.is_banned).length },
     { key: "creators" as const, label: "صناع محتوى", count: users.filter(u => u.is_creator).length },
   ];
@@ -206,6 +211,7 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1 flex-wrap">
+                        {user.is_featured && <BadgeTag icon={<Star className="w-3 h-3" />} color="#ff9500" title="معزّز" />}
                         {user.is_official && <BadgeTag icon={<Shield className="w-3 h-3" />} color="#833AB4" title="رسمي" />}
                         {user.is_creator && <BadgeTag icon={<Sparkles className="w-3 h-3" />} color="#ff9500" title="صانع محتوى" />}
                         {user.is_premium && <BadgeTag icon={<Crown className="w-3 h-3" />} color="#ffc107" title="مميز" />}
@@ -244,6 +250,18 @@ export default function UsersPage() {
                           <div className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.15)] border border-[#dbdbdb] py-1.5 z-50 min-w-[180px]" dir="rtl">
                             <ActionMenuItem icon={<Eye className="w-4 h-4" />} label="عرض التفاصيل" onClick={() => { setDetailUserId(user.id); setActionMenu(null); }} />
                             <ActionMenuItem icon={<UserCog className="w-4 h-4" />} label="تعديل" onClick={() => { setActionUser(user); setShowEditModal(true); setActionMenu(null); }} />
+                            <ActionMenuItem
+                              icon={user.is_featured ? <Star className="w-4 h-4" fill="currentColor" /> : <TrendingUp className="w-4 h-4" />}
+                              label={user.is_featured ? "إلغاء التعزيز" : "تعزيز في الترند"}
+                              onClick={async () => {
+                                setActionMenu(null);
+                                try {
+                                  await featureUser(user.id, !user.is_featured);
+                                  loadUsers();
+                                } catch { alert("فشل في تحديث التعزيز"); }
+                              }}
+                              variant={user.is_featured ? "warning" : undefined}
+                            />
                             <ActionMenuItem
                               icon={<Ban className="w-4 h-4" />}
                               label={user.is_banned ? "إلغاء الحظر" : "حظر"}

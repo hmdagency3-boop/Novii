@@ -2925,6 +2925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       shares_count: p.shares_count || 0,
       views_count: p.views_count || 0,
       is_deleted: p.is_deleted || false,
+      is_featured: p.is_featured || false,
       created_at: p.created_at,
       username: prof?.username || p.profiles?.username || null,
       display_name: prof?.full_name || p.profiles?.full_name || null,
@@ -4330,7 +4331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { featured } = req.body;
       const { error } = await adminDb!
         .from('reels')
-        .update({ is_featured: featured })
+        .update({ is_featured: featured, featured_at: featured ? new Date().toISOString() : null })
         .eq('id', id);
       if (error) throw error;
       await logAdminAction(req, featured ? 'feature_reel' : 'unfeature_reel', 'reel', id, `${featured ? 'Featured' : 'Unfeatured'} reel ${id}`);
@@ -4749,6 +4750,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Admin feature post error:', error);
       res.status(500).json({ error: 'Failed to update post' });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/feature", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { featured } = req.body;
+      const { error } = await adminDb!
+        .from('profiles')
+        .update({ is_featured: featured, featured_at: featured ? new Date().toISOString() : null })
+        .eq('id', userId);
+      if (error) throw error;
+      await logAdminAction(req, featured ? 'feature_account' : 'unfeature_account', 'user', userId, `${featured ? 'Featured' : 'Unfeatured'} account ${userId}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Admin feature account error:', error);
+      res.status(500).json({ error: 'Failed to update account' });
     }
   });
 
