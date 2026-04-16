@@ -107,15 +107,20 @@ export function clearConfigCache() {
   cacheTime = 0;
 }
 
-function createRequestJitter(magnitude: number = 0.06): (postId: string) => number {
-  const requestSeed = Date.now() ^ (Math.random() * 0xFFFFFFFF >>> 0);
-  return (postId: string) => {
-    const idSum = postId.split("").reduce((a: number, c: string) => a + c.charCodeAt(0), 0);
-    const hash = (requestSeed * 31 + idSum * 2654435761) >>> 0;
-    const x = Math.sin(hash) * 10000;
-    const norm = x - Math.floor(x);
-    return (norm * 2 - 1) * magnitude;
-  };
+function shuffleWithinBands(items: ScoredPost[], bandSize: number = 3): ScoredPost[] {
+  if (items.length <= 1) return items;
+  const result = [...items];
+  const seed = Date.now() + Math.random() * 1000000;
+  for (let i = 0; i < result.length; i += bandSize) {
+    const end = Math.min(i + bandSize, result.length);
+    for (let j = end - 1; j > i; j--) {
+      const x = Math.sin(seed * (j + 1) * 9301 + 49297) * 10000;
+      const r = Math.abs(x - Math.floor(x));
+      const k = i + Math.floor(r * (j - i + 1));
+      [result[j], result[k]] = [result[k], result[j]];
+    }
+  }
+  return result;
 }
 
 const POST_SELECT = `
@@ -312,8 +317,6 @@ export async function getPersonalizedFeed(
 
   if (error || !posts) return [];
 
-  const getJitter = createRequestJitter(0.04);
-
   const scored: ScoredPost[] = posts.map((post: any) => {
     const reasons: string[] = [];
 
@@ -348,21 +351,18 @@ export async function getPersonalizedFeed(
     }
     boostScore = Math.min(boostScore, 1);
 
-    const jitter = getJitter(post.id);
-
     const finalScore =
       authorScore * config.feed_weight_author +
       interestScore * config.feed_weight_interest +
       engagementScore * config.feed_weight_engagement +
       recencyScore * config.feed_weight_recency +
-      boostScore * config.feed_weight_boost +
-      jitter;
+      boostScore * config.feed_weight_boost;
 
     return { ...post, _score: finalScore, _reasons: reasons };
   });
 
   scored.sort((a, b) => b._score - a._score);
-  const diversified = applyDiversityPenalty(scored, config.feed_max_per_author);
+  const diversified = shuffleWithinBands(applyDiversityPenalty(scored, config.feed_max_per_author), 4);
 
   const start = page * limit;
   const paged = diversified.slice(start, start + limit);
@@ -434,8 +434,6 @@ export async function getPersonalizedExplore(
 
   console.log(`🔍 Explore: fetched ${posts.length} posts, showing ${ownPosts.length} (excluded own)`);
 
-  const getExploreJitter = createRequestJitter(0.06);
-
   const scored: ScoredPost[] = ownPosts.map((post: any) => {
     const reasons: string[] = [];
 
@@ -463,20 +461,17 @@ export async function getPersonalizedExplore(
     }
     qualityScore = Math.min(qualityScore, 1);
 
-    const jitter = getExploreJitter(post.id);
-
     const finalScore =
       interestScore * config.explore_weight_interest +
       engagementScore * config.explore_weight_engagement +
       recencyScore * config.explore_weight_recency +
-      qualityScore * config.explore_weight_quality +
-      jitter;
+      qualityScore * config.explore_weight_quality;
 
     return { ...post, _score: finalScore, _reasons: reasons };
   });
 
   scored.sort((a, b) => b._score - a._score);
-  const diversified = applyDiversityPenalty(scored, config.explore_max_per_author);
+  const diversified = shuffleWithinBands(applyDiversityPenalty(scored, config.explore_max_per_author), 5);
   const result = diversified.slice(0, limit);
 
   const postIds = result.map((p) => p.id);
@@ -546,9 +541,7 @@ export async function getPersonalizedExploreReels(
 
   const allReels = reels.filter((r: any) => r.user_id !== userId);
 
-  const getReelsJitter = createRequestJitter(0.06);
-
-  const scored = allReels.map((reel: any) => {
+  const scored: ScoredPost[] = allReels.map((reel: any) => {
     const interestScore = calculateInterestScore(profile, reel.caption);
     const engagementScore = calculateEngagementScore(reel);
     const recencyScore = calculateRecencyScore(reel.created_at);
@@ -559,18 +552,16 @@ export async function getPersonalizedExploreReels(
     if (reel.profile?.is_featured) boostScore += 0.2;
     boostScore = Math.min(boostScore, 1);
 
-    const jitter = getReelsJitter(reel.id);
-
     const finalScore =
       interestScore * config.reels_weight_interest +
       engagementScore * config.reels_weight_engagement +
       recencyScore * config.reels_weight_recency +
-      boostScore * 0.15 +
-      jitter;
+      boostScore * 0.15;
 
-    return { ...reel, _score: finalScore };
+    return { ...reel, _score: finalScore, _reasons: [] };
   });
 
   scored.sort((a: any, b: any) => b._score - a._score);
-  return scored.slice(offset, offset + limit).map(({ _score, ...reel }) => reel);
+  const shuffled = shuffleWithinBands(scored, 4);
+  return shuffled.slice(offset, offset + limit).map(({ _score, _reasons, ...reel }) => reel);
 }
