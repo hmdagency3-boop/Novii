@@ -3855,48 +3855,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========================================
 
   (async () => {
-    try {
-      await adminDb!.rpc('exec_sql', { query: `
-        CREATE TABLE IF NOT EXISTS hashtags (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          name TEXT UNIQUE NOT NULL,
-          posts_count INTEGER DEFAULT 0,
-          is_banned BOOLEAN DEFAULT FALSE,
-          is_pinned BOOLEAN DEFAULT FALSE,
-          created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-        ALTER TABLE hashtags ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
-        ALTER TABLE hashtags ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE;
-        CREATE TABLE IF NOT EXISTS post_hashtags (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-          hashtag_id UUID NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
-          UNIQUE(post_id, hashtag_id)
-        );
-        CREATE TABLE IF NOT EXISTS reel_hashtags (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          reel_id UUID NOT NULL REFERENCES reels(id) ON DELETE CASCADE,
-          hashtag_id UUID NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
-          UNIQUE(reel_id, hashtag_id)
-        );
-        CREATE INDEX IF NOT EXISTS idx_hashtags_posts_count ON hashtags(posts_count DESC);
-        NOTIFY pgrst, 'reload schema';
-      `});
+    const { error: sqlErr } = await adminDb!.rpc('exec_sql', { query: `
+      CREATE TABLE IF NOT EXISTS hashtags (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT UNIQUE NOT NULL,
+        posts_count INTEGER DEFAULT 0,
+        is_banned BOOLEAN DEFAULT FALSE,
+        is_pinned BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      ALTER TABLE hashtags ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
+      ALTER TABLE hashtags ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE;
+      CREATE TABLE IF NOT EXISTS post_hashtags (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        hashtag_id UUID NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
+        UNIQUE(post_id, hashtag_id)
+      );
+      CREATE TABLE IF NOT EXISTS reel_hashtags (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        reel_id UUID NOT NULL REFERENCES reels(id) ON DELETE CASCADE,
+        hashtag_id UUID NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
+        UNIQUE(reel_id, hashtag_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_hashtags_posts_count ON hashtags(posts_count DESC);
+      NOTIFY pgrst, 'reload schema';
+    `});
+    if (sqlErr) {
+      console.warn('⚠️ hashtags exec_sql failed:', sqlErr.message, '— columns may be missing, but update endpoint will use exec_sql directly');
+    } else {
       console.log('✅ hashtags system ready');
-    } catch {
-      const { error } = await adminDb!.from('hashtags').select('id').limit(1);
-      if (!error) {
-        const { error: colErr } = await adminDb!.from('hashtags').select('is_banned').limit(1);
-        if (colErr) {
-          console.log('⚠️ hashtags table exists but missing columns — run this SQL in Supabase Dashboard:');
-          console.log('ALTER TABLE hashtags ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;');
-          console.log('ALTER TABLE hashtags ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE;');
-        } else {
-          console.log('✅ hashtags table ready');
-        }
-      } else {
-        console.log('⚠️ hashtags table missing — run add_hashtags_and_admin_features.sql in Supabase Dashboard');
-      }
     }
   })();
 
