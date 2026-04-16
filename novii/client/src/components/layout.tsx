@@ -75,8 +75,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const atEnd = isRTL ? idx <= 0 : idx >= mainPages.length - 1;
     const goingRight = dx > 0;
     const goingLeft = dx < 0;
-    if ((goingRight && !isRTL && atStart) || (goingLeft && !isRTL && atEnd) ||
-        (goingLeft && isRTL && atStart) || (goingRight && isRTL && atEnd)) {
+    const atBoundary = (goingRight && !isRTL && atStart) || (goingLeft && !isRTL && atEnd) ||
+                       (goingLeft && isRTL && atStart) || (goingRight && isRTL && atEnd);
+    if (atBoundary) {
+      // Rubber-band resistance: allow a tiny dampened offset so it doesn't feel stuck
+      setSwipeOffset(dx * 0.08);
       return;
     }
     setSwipeOffset(dx * 0.4);
@@ -89,26 +92,36 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const dt = Date.now() - swipeTouchStart.current.time;
     swipeTouchStart.current = null;
 
-    if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 40) { setSwipeOffset(0); return; }
+    const snapBack = () => {
+      setIsSwipeTransitioning(true);
+      setSwipeOffset(0);
+      setTimeout(() => setIsSwipeTransitioning(false), 250);
+    };
+
+    if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 40) { snapBack(); return; }
 
     const velocity = Math.abs(dx) / dt;
     const shouldSwipe = Math.abs(dx) > 80 || velocity > 0.4;
-    if (!shouldSwipe) { setIsSwipeTransitioning(true); setSwipeOffset(0); setTimeout(() => setIsSwipeTransitioning(false), 250); return; }
+    if (!shouldSwipe) { snapBack(); return; }
 
     const idx = mainPages.indexOf(location);
     const swipedLeft = isRTL ? dx > 0 : dx < 0;
     const swipedRight = isRTL ? dx < 0 : dx > 0;
 
     if (swipedRight && idx > 0) {
+      // Navigate immediately — no slide-off animation to avoid black flash
       setIsSwipeTransitioning(true);
-      setSwipeOffset(window.innerWidth * (isRTL ? -1 : 1));
-      setTimeout(() => { navigate(mainPages[idx - 1]); setSwipeOffset(0); setIsSwipeTransitioning(false); }, 200);
+      setSwipeOffset(0);
+      navigate(mainPages[idx - 1]);
+      setTimeout(() => setIsSwipeTransitioning(false), 200);
     } else if (swipedLeft && idx < mainPages.length - 1) {
       setIsSwipeTransitioning(true);
-      setSwipeOffset(-window.innerWidth * (isRTL ? -1 : 1));
-      setTimeout(() => { navigate(mainPages[idx + 1]); setSwipeOffset(0); setIsSwipeTransitioning(false); }, 200);
+      setSwipeOffset(0);
+      navigate(mainPages[idx + 1]);
+      setTimeout(() => setIsSwipeTransitioning(false), 200);
     } else {
-      setIsSwipeTransitioning(true); setSwipeOffset(0); setTimeout(() => setIsSwipeTransitioning(false), 250);
+      // At boundary — snap back smoothly
+      snapBack();
     }
   }, [isMainPage, location, mainPages, navigate, isRTL]);
   
