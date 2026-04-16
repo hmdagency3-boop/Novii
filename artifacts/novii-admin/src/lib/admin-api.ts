@@ -449,6 +449,17 @@ export async function fetchUserDetails(userId: string): Promise<any> {
   return adminFetch(`/users/${userId}/details`);
 }
 
+export interface UserActivityResponse {
+  liked_posts: any[];
+  commented_posts: any[];
+  liked_total: number;
+  commented_total: number;
+}
+
+export async function fetchUserActivity(userId: string): Promise<UserActivityResponse> {
+  return adminFetch(`/users/${userId}/activity`);
+}
+
 export interface BanAppeal {
   id: string;
   user_id: string;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchUserDetails } from "@/lib/admin-api";
+import { fetchUserDetails, fetchUserActivity, type UserActivityResponse } from "@/lib/admin-api";
 import {
   ArrowRight, Smartphone, Globe, MapPin, Clock, Shield, AlertTriangle,
   FileText, Image, Film, MessageCircle, Users, Ban, Eye, CheckCircle2,
@@ -64,6 +64,7 @@ export default function UserDetailPage({ userId, onBack }: { userId: string; onB
     { id: "posts", label: "المنشورات", count: (data.posts?.length || 0) + (data.reels?.length || 0), icon: Image },
     { id: "stories", label: "القصص", count: data.stories?.length, icon: Film },
     { id: "reports", label: "البلاغات", count: (data.reports_against?.length || 0) + (data.reports_by?.length || 0), icon: Flag },
+    { id: "activity", label: "النشاط", icon: Heart },
     { id: "moderation", label: "الإشراف", icon: Shield },
     { id: "connections", label: "الاتصالات", icon: Users },
   ];
@@ -175,6 +176,7 @@ export default function UserDetailPage({ userId, onBack }: { userId: string; onB
         {activeTab === "posts" && <PostsTab posts={data.posts} reels={data.reels} />}
         {activeTab === "stories" && <StoriesTab stories={data.stories} />}
         {activeTab === "reports" && <ReportsTab against={data.reports_against} by={data.reports_by} />}
+        {activeTab === "activity" && <ActivityTab userId={userId} />}
         {activeTab === "moderation" && <ModerationTab data={data} />}
         {activeTab === "connections" && <ConnectionsTab data={data} />}
       </div>
@@ -669,6 +671,114 @@ function ConnectionsTab({ data }: { data: any }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ActivityTab({ userId }: { userId: string }) {
+  const [data, setData] = useState<UserActivityResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [tab, setTab] = useState<'likes' | 'comments'>('likes');
+
+  useEffect(() => {
+    setLoading(true);
+    setErr(null);
+    fetchUserActivity(userId)
+      .then(setData)
+      .catch((e: any) => setErr(e?.message || 'فشل تحميل النشاط'))
+      .finally(() => setLoading(false));
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-6 h-6 animate-spin text-[#8e8e8e]" />
+      </div>
+    );
+  }
+
+  if (err) {
+    return (
+      <div className="p-6 text-center">
+        <AlertTriangle className="w-7 h-7 text-[#d97706] mx-auto mb-3" />
+        <p className="text-[13px] text-[#8e8e8e]">{err}</p>
+      </div>
+    );
+  }
+
+  const items = tab === 'likes' ? (data?.liked_posts || []) : (data?.commented_posts || []);
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setTab('likes')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium ${tab === 'likes' ? 'bg-[#262626] text-white' : 'text-[#8e8e8e] bg-[#fafafa]'}`}
+        >
+          <Heart className="w-3.5 h-3.5" />
+          الإعجابات ({data?.liked_total || 0})
+        </button>
+        <button
+          onClick={() => setTab('comments')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium ${tab === 'comments' ? 'bg-[#262626] text-white' : 'text-[#8e8e8e] bg-[#fafafa]'}`}
+        >
+          <MessageCircle className="w-3.5 h-3.5" />
+          التعليقات ({data?.commented_total || 0})
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <EmptyState text={tab === 'likes' ? 'لم يعجب بأي منشور بعد' : 'لم يعلق على أي منشور بعد'} />
+      ) : (
+        <div className="space-y-2">
+          {items.map((post: any) => {
+            const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
+            const username = profile?.username || 'مستخدم';
+            const ts = tab === 'likes' ? post.liked_at : post.last_comment_at;
+            return (
+              <div
+                key={post.id}
+                className="flex items-start gap-3 p-3 rounded-xl bg-[#fafafa] border border-[#efefef] hover:border-[#dbdbdb] transition-colors"
+              >
+                <div className="w-14 h-14 rounded-lg bg-white border border-[#efefef] overflow-hidden shrink-0 flex items-center justify-center">
+                  {post.image_url ? (
+                    <img src={post.image_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <FileText className="w-5 h-5 text-[#dbdbdb]" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-[13px] font-semibold text-[#262626] truncate">@{username}</span>
+                    {profile?.is_verified && <BadgeCheck className="w-3.5 h-3.5 text-[#0095f6] shrink-0" />}
+                    <span className="text-[11px] text-[#8e8e8e]">·</span>
+                    <span className="text-[11px] text-[#8e8e8e] shrink-0">{ts ? fmt(ts) : ''}</span>
+                  </div>
+
+                  {tab === 'comments' && post.last_comment && (
+                    <p dir="auto" className="text-[12px] text-[#262626] bg-white rounded-md px-2 py-1 mb-1 border border-[#efefef] line-clamp-2">
+                      {post.last_comment}
+                    </p>
+                  )}
+
+                  <p dir="auto" className="text-[12px] text-[#8e8e8e] line-clamp-2">
+                    {post.caption?.trim() || 'بدون وصف'}
+                  </p>
+
+                  <div className="flex items-center gap-3 mt-1.5 text-[11px] text-[#8e8e8e]">
+                    <span className="flex items-center gap-1"><Heart className="w-3 h-3" />{post.likes_count || 0}</span>
+                    <span className="flex items-center gap-1"><MessageCircle className="w-3 h-3" />{post.comments_count || 0}</span>
+                    {post.is_deleted && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#ed4956] text-white">محذوف</span>}
+                    {post.is_archived && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#8e8e8e] text-white">مؤرشف</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

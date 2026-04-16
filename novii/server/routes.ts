@@ -2933,6 +2933,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/admin/users/:userId/activity — fetch posts the user liked or commented on
+  app.get("/api/admin/users/:userId/activity", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const limit = Math.min(parseInt((req.query.limit as string) || '100', 10) || 100, 200);
+
+      const [likesRes, commentsRes] = await Promise.all([
+        adminDb!
+          .from('likes')
+          .select('post_id, created_at')
+          .eq('user_id', userId)
+          .not('post_id', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+        adminDb!
+          .from('comments')
+          .select('id, post_id, content, created_at, is_deleted')
+          .eq('user_id', userId)
+          .eq('is_deleted', false)
+          .order('created_at', { ascending: false })
+          .limit(limit * 2),
+      ]);
+
+      if (likesRes.error) console.error('user activity likes error:', likesRes.error);
+      if (commentsRes.error) console.error('user activity comments error:', commentsRes.error);
+
+      const likedPostIds: string[] = (likesRes.data || []).map((l: any) => l.post_id).filter(Boolean);
+      const likedAt = new Map<string, string>();
+      (likesRes.data || []).forEach((l: any) => { if (l.post_id) likedAt.set(l.post_id, l.created_at); });
+
+      const commentedSeen = new Set<string>();
+      const commentedPostIds: string[] = [];
+      const lastCommentByPost = new Map<string, { content: string; created_at: string; id: string }>();
+      for (const c of (commentsRes.data || []) as any[]) {
+        if (!c.post_id) continue;
+        if (!lastCommentByPost.has(c.post_id)) {
+          lastCommentByPost.set(c.post_id, { content: c.content, created_at: c.created_at, id: c.id });
+        }
+        if (!commentedSeen.has(c.post_id)) {
+          commentedSeen.add(c.post_id);
+          commentedPostIds.push(c.post_id);
+          if (commentedPostIds.length >= limit) break;
+        }
+      }
+
+      const allIds = Array.from(new Set([...likedPostIds, ...commentedPostIds]));
+      let postsById = new Map<string, any>();
+      if (allIds.length > 0) {
+        const { data: posts } = await adminDb!
+          .from('posts')
+          .select('id, user_id, caption, image_url, likes_count, comments_count, created_at, is_archived, is_deleted, profiles!posts_user_id_fkey(username, avatar_url, is_verified)')
+          .in('id', allIds);
+        (posts || []).forEach((p: any) => postsById.set(p.id, p));
+      }
+
+      const likedPosts = likedPostIds
+        .map((id) => {
+          const post = postsById.get(id);
+          if (!post) return null;
+          return { ...post, liked_at: likedAt.get(id) };
+        })
+        .filter(Boolean);
+
+      const commentedPosts = commentedPostIds
+        .map((id) => {
+          const post = postsById.get(id);
+          if (!post) return null;
+          const last = lastCommentByPost.get(id);
+          return {
+            ...post,
+            last_comment: last?.content || null,
+            last_comment_at: last?.created_at || null,
+            last_comment_id: last?.id || null,
+          };
+        })
+        .filter(Boolean);
+
+      res.json({
+        liked_posts: likedPosts,
+        commented_posts: commentedPosts,
+        liked_total: likedPosts.length,
+        commented_total: commentedPosts.length,
+      });
+    } catch (error) {
+      console.error('Admin user activity error:', error);
+      res.status(500).json({ error: 'Failed to fetch user activity' });
+    }
+  });
+
   // POST /api/admin/users/:userId/ban — ban/unban user
   app.post("/api/admin/users/:userId/ban", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
     try {
