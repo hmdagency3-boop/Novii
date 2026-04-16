@@ -242,6 +242,19 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
   }
+  /* Hide Radix ScrollArea scrollbars on mobile only (used in chat panes) */
+  @media (max-width: 767px) {
+    .chat-scroll [data-radix-scroll-area-scrollbar] {
+      display: none !important;
+    }
+    .chat-scroll::-webkit-scrollbar {
+      display: none;
+    }
+    .chat-scroll {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  }
   
   .live-ring {
     @apply relative;

@@ -2218,7 +2218,7 @@ export default function Messages() {
                         <BugSwarmAnimation />
                       )}
                       <ScrollArea className={cn(
-                          "flex-1 w-full overflow-y-auto transition-all duration-300 m-0 p-0",
+                          "chat-scroll flex-1 w-full overflow-y-auto transition-all duration-300 m-0 p-0",
                           currentCommunity?.creator_is_official && currentCommunity?.name !== "Bug Hunter"
                             ? "bg-gradient-to-b from-purple-950/40 via-black to-purple-950/20"
                             : currentCommunity?.name === "Bug Hunter"
@@ -2519,7 +2519,7 @@ export default function Messages() {
                     </div>
 
                     {/* Messages Area */}
-                    <ScrollArea className="flex-1 p-2 sm:p-5 bg-background overflow-y-auto w-full">
+                    <ScrollArea className="chat-scroll flex-1 p-2 sm:p-5 bg-background overflow-y-auto w-full">
                         {messagesLoading ? (
                           <div className="flex items-center justify-center py-10">
                             <Spinner className="w-6 h-6" />
