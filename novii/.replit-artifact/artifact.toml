@@ -1,0 +1,35 @@
+kind = "web"
+previewPath = "/"
+title = "Novii Platform"
+version = "1.0.0"
+id = "novii"
+router = "path"
+
+[[services]]
+name = "web"
+paths = ["/"]
+localPort = 5000
+
+[services.development]
+run = "cd novii && pnpm run dev"
+
+[services.production]
+
+[services.production.build]
+args = ["pnpm", "--filter", "rest-express", "run", "build"]
+
+[services.production.build.env]
+NODE_ENV = "production"
+
+[services.production.run]
+args = ["node", "novii/dist/index.js"]
+
+[services.production.run.env]
+PORT = "5000"
+NODE_ENV = "production"
+
+[services.production.health.startup]
+path = "/"
+
+[services.env]
+PORT = "5000"

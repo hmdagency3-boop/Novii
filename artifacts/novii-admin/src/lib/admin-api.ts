@@ -1,6 +1,9 @@
 import { supabase } from "./supabase";
 
-const NOVII_API_BASE = `${import.meta.env.BASE_URL}api`;
+const NOVII_API_URL_OVERRIDE = (import.meta.env.VITE_NOVII_API_URL as string | undefined)?.replace(/\/$/, "");
+const NOVII_API_BASE = NOVII_API_URL_OVERRIDE
+  ? `${NOVII_API_URL_OVERRIDE}/api`
+  : `${import.meta.env.BASE_URL}api`;
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();

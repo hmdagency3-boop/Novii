@@ -35,6 +35,9 @@ export default defineConfig({
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(
       process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
     ),
+    'import.meta.env.VITE_NOVII_API_URL': JSON.stringify(
+      process.env.VITE_NOVII_API_URL || ''
+    ),
   },
   plugins: [
     react(),
