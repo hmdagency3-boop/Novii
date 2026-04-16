@@ -234,6 +234,29 @@ export default function Messages() {
     selectedUserIdRef.current = selectedUserId;
   }, [selectedUserId]);
 
+  // Lock the document so iOS Safari can't auto-scroll the page when the
+  // on-screen keyboard opens (which would push the chat header off-screen).
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPosition = body.style.position;
+    const prevBodyWidth = body.style.width;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.width = '100%';
+    window.scrollTo(0, 0);
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.position = prevBodyPosition;
+      body.style.width = prevBodyWidth;
+    };
+  }, []);
+
   // Keep selectedCommunityIdRef in sync (for community notification closures)
   useEffect(() => {
     selectedCommunityIdRef.current = selectedCommunityId;
