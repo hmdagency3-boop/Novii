@@ -20,9 +20,6 @@ export const PROFILE_COLUMNS = `
   is_premium,
   is_private,
   is_active,
-  is_deactivated,
-  deactivated_at,
-  scheduled_deletion_at,
   is_popular,
   is_online,
   last_seen,
@@ -49,7 +46,6 @@ export const PROFILE_MINIMAL = `
   avatar_url,
   is_verified,
   is_official,
-  is_deactivated,
   followers_count
 `;
 
@@ -68,7 +64,6 @@ export const PROFILE_CARD = `
   is_premium,
   is_popular,
   is_active,
-  is_deactivated,
   is_gold_early_member,
   is_silver_early_member,
   is_bronze_early_member,

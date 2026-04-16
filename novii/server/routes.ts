@@ -1353,120 +1353,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ---------- Helpers: DB-level redaction (radical approach) ----------
-  async function redactProfileInDb(adminDb: any, userId: string, extraFields: Record<string, any> = {}) {
-    // 1) Read the current profile row so we can back it up
-    const { data: original, error: readErr } = await adminDb
-      .from('profiles').select('*').eq('id', userId).single();
-    if (readErr || !original) throw new Error(readErr?.message || 'Profile not found');
-
-    // Skip backup if already redacted (idempotent)
-    const backup = original.deletion_backup ? original.deletion_backup : {
-      full_name: original.full_name,
-      username: original.username,
-      avatar_url: original.avatar_url,
-      cover_url: original.cover_url,
-      bio: original.bio,
-      website: original.website,
-      location: original.location,
-      phone_number: original.phone_number,
-      is_verified: original.is_verified,
-      is_official: original.is_official,
-      is_creator: original.is_creator,
-      is_premium: original.is_premium,
-      is_popular: original.is_popular,
-      is_active: original.is_active,
-      is_private: original.is_private,
-      is_online: original.is_online,
-      last_seen: original.last_seen,
-      followers_count: original.followers_count,
-      following_count: original.following_count,
-      posts_count: original.posts_count,
-    };
-
-    // 2) Overwrite the row with redacted values + the lifecycle flags
-    const redactedUsername = `deleted_user_${String(userId).replace(/-/g, '').slice(0, 8)}`;
-    const basePayload: Record<string, any> = {
-      full_name: 'User Deleted',
-      username: redactedUsername,
-      avatar_url: null,
-      cover_url: null,
-      bio: '',
-      website: '',
-      location: '',
-      phone_number: null,
-      is_verified: false,
-      is_official: false,
-      is_creator: false,
-      is_premium: false,
-      is_popular: false,
-      is_active: false,
-      is_private: true,
-      is_online: false,
-      last_seen: null,
-      followers_count: 0,
-      following_count: 0,
-      posts_count: 0,
-      ...extraFields,
-    };
-    // Try with backup, fall back without if the column doesn't exist
-    let upErr: any = null;
-    {
-      const r = await adminDb
-        .from('profiles')
-        .update({ ...basePayload, deletion_backup: backup })
-        .eq('id', userId);
-      upErr = r.error;
-    }
-    if (upErr && /deletion_backup/i.test(upErr.message || '')) {
-      const r = await adminDb.from('profiles').update(basePayload).eq('id', userId);
-      upErr = r.error;
-    }
-    if (upErr) throw new Error(upErr.message);
-
-    // 3) Stories are real-time so we delete them; posts/reels/comments are NOT
-    //    soft-deleted at the row level — instead, every feed/comment query
-    //    filters them out via the joined profile.is_deactivated flag.
-    //    This avoids permanently mutating content rows and keeps reactivation
-    //    instant for both the owner and everyone who follows them.
-    try { await adminDb.from('stories').delete().eq('user_id', userId); } catch {}
-  }
-
-  async function restoreProfileInDb(adminDb: any, userId: string, extraFields: Record<string, any> = {}) {
-    const { data: row } = await adminDb
-      .from('profiles').select('deletion_backup').eq('id', userId).single();
-    const backup = row?.deletion_backup || {};
-    await adminDb
-      .from('profiles')
-      .update({
-        ...backup,
-        deletion_backup: null,
-        is_deactivated: false,
-        deactivated_at: null,
-        deletion_requested_at: null,
-        scheduled_deletion_at: null,
-        ...extraFields,
-      })
-      .eq('id', userId);
-
-    // Restore the user's content
-    await Promise.all([
-      adminDb.from('posts').update({ is_deleted: false }).eq('user_id', userId),
-      adminDb.from('reels').update({ is_deleted: false }).eq('user_id', userId),
-      adminDb.from('comments').update({ is_deleted: false }).eq('user_id', userId),
-    ].map(p => p.then(() => null).catch(() => null)));
-  }
-
-  // Deactivate account (temporary - reversible). Same redaction as soft-delete but no scheduled date.
+  // Deactivate account (temporary - reversible)
   app.post("/api/account/deactivate", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId!;
       if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
 
-      await redactProfileInDb(adminDb, userId, {
-        is_deactivated: true,
-        deactivated_at: new Date().toISOString(),
-      });
+      const { error } = await adminDb
+        .from('profiles')
+        .update({
+          is_deactivated: true,
+          deactivated_at: new Date().toISOString(),
+          is_online: false,
+        })
+        .eq('id', userId);
+
+      if (error) return res.status(500).json({ error: error.message });
 
       // Sign out all devices
       try { await adminDb.from('user_devices').delete().eq('user_id', userId); } catch {}
@@ -1477,7 +1379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Soft-delete account: mark for deletion in 30 days, can be cancelled
+  // Permanently delete account
   app.delete("/api/account/delete", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId!;
@@ -1505,99 +1407,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Password is incorrect' });
       }
 
-      // SOFT DELETE: schedule deletion in 30 days, redact + hide content immediately
-      const now = new Date();
-      const scheduled = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      // Delete auth user — cascade should remove profile via FK
+      const { error: delErr } = await adminDb.auth.admin.deleteUser(userId);
+      if (delErr) return res.status(500).json({ error: delErr.message });
 
-      await redactProfileInDb(adminDb, userId, {
-        is_deactivated: true,
-        deactivated_at: now.toISOString(),
-        deletion_requested_at: now.toISOString(),
-        scheduled_deletion_at: scheduled.toISOString(),
-      });
-
-      // Sign out all other devices
+      // Best-effort cleanup
+      try { await adminDb.from('profiles').delete().eq('id', userId); } catch {}
       try { await adminDb.from('user_devices').delete().eq('user_id', userId); } catch {}
 
-      return res.json({
-        success: true,
-        scheduled_deletion_at: scheduled.toISOString(),
-        days_remaining: 30,
-      });
+      return res.json({ success: true });
     } catch (e: any) {
       return res.status(500).json({ error: e?.message || 'Failed to delete account' });
-    }
-  });
-
-  // Cancel a pending account deletion (within 30-day grace period)
-  app.post("/api/account/cancel-deletion", requireAuth as any, async (req: Request, res: Response) => {
-    try {
-      const userId = req.userId!;
-      if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
-
-      const { data: profile } = await adminDb
-        .from('profiles')
-        .select('scheduled_deletion_at, deletion_requested_at, is_deactivated')
-        .eq('id', userId)
-        .single();
-
-      if (!profile?.scheduled_deletion_at) {
-        return res.status(400).json({ error: 'No pending deletion to cancel' });
-      }
-
-      // Grace period guard: cannot cancel after the scheduled time
-      if (new Date(profile.scheduled_deletion_at).getTime() <= Date.now()) {
-        return res.status(410).json({ error: 'Grace period has expired' });
-      }
-
-      await restoreProfileInDb(adminDb, userId);
-
-      return res.json({ success: true });
-    } catch (e: any) {
-      return res.status(500).json({ error: e?.message || 'Failed to cancel deletion' });
-    }
-  });
-
-  // Account lifecycle status
-  app.get("/api/account/status", requireAuth as any, async (req: Request, res: Response) => {
-    try {
-      const userId = req.userId!;
-      if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
-
-      const { data: profile, error } = await adminDb
-        .from('profiles')
-        .select('is_deactivated, deactivated_at, deletion_requested_at, scheduled_deletion_at')
-        .eq('id', userId)
-        .single();
-
-      if (error) return res.status(500).json({ error: error.message });
-
-      const scheduled = profile?.scheduled_deletion_at ? new Date(profile.scheduled_deletion_at) : null;
-      const daysRemaining = scheduled ? Math.max(0, Math.ceil((scheduled.getTime() - Date.now()) / (24 * 60 * 60 * 1000))) : 0;
-
-      return res.json({
-        is_deactivated: !!profile?.is_deactivated,
-        deactivated_at: profile?.deactivated_at || null,
-        deletion_requested_at: profile?.deletion_requested_at || null,
-        scheduled_deletion_at: profile?.scheduled_deletion_at || null,
-        days_remaining: daysRemaining,
-        pending_deletion: !!scheduled && scheduled.getTime() > Date.now(),
-      });
-    } catch (e: any) {
-      return res.status(500).json({ error: e?.message || 'Failed to get status' });
-    }
-  });
-
-  // Reactivate (clears is_deactivated even when no pending deletion)
-  app.post("/api/account/reactivate", requireAuth as any, async (req: Request, res: Response) => {
-    try {
-      const userId = req.userId!;
-      if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
-
-      await restoreProfileInDb(adminDb, userId);
-      return res.json({ success: true });
-    } catch (e: any) {
-      return res.status(500).json({ error: e?.message || 'Failed to reactivate' });
     }
   });
 
@@ -3197,9 +3017,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Explore communities (public, non-private) ──────────────────────
   app.get("/api/communities/explore", requireAuth as any, async (req: Request, res: Response) => {
     try {
-      if (!rateLimit(req, 'community:explore', 60, 60 * 1000)) {
-        return res.status(429).json({ error: 'Too many requests', data: [] });
-      }
       if (!adminDb) return res.json({ data: [] });
       const limit = Math.min(parseInt((req.query.limit as string) || '30') || 30, 100);
       const category = req.query.category as string | undefined;
@@ -3229,9 +3046,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Search communities by name (non-private) ───────────────────────
   app.get("/api/communities/search", requireAuth as any, async (req: Request, res: Response) => {
     try {
-      if (!rateLimit(req, 'community:search', 60, 60 * 1000)) {
-        return res.status(429).json({ error: 'Too many requests', data: [] });
-      }
       if (!adminDb) return res.json({ data: [] });
       const query = (req.query.q as string)?.trim();
       if (!query || query.length < 2) return res.json({ data: [] });
@@ -4741,86 +4555,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
     } catch {}
-  })();
-
-  // ---------- Startup: ensure deletion_backup column + backfill existing deactivated profiles ----------
-  (async () => {
-    console.log('🔍 [redaction startup] adminDb available:', !!adminDb);
-    if (!adminDb) { console.warn('⚠️ adminDb missing — skipping redaction backfill'); return; }
-    try {
-      // 1) Try adding the column via exec_sql RPC (no-op if it already exists or RPC missing)
-      try {
-        await adminDb.rpc('exec_sql', {
-          query: `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS deletion_backup JSONB;`,
-        });
-      } catch {}
-
-      // 2) Detect whether deletion_backup exists by attempting a tiny select
-      let hasBackupColumn = true;
-      try {
-        const probe = await adminDb.from('profiles').select('deletion_backup').limit(1);
-        if (probe.error) hasBackupColumn = false;
-      } catch { hasBackupColumn = false; }
-
-      // 3) Find all currently deactivated profiles that haven't been redacted yet
-      const fields = hasBackupColumn ? 'id, full_name, deletion_backup' : 'id, full_name';
-      const { data: pending, error: pendErr } = await adminDb
-        .from('profiles')
-        .select(fields)
-        .eq('is_deactivated', true);
-
-      console.log(`🔍 [redaction startup] hasBackupColumn=${hasBackupColumn} pending=${pending?.length || 0} err=${pendErr?.message || 'none'}`);
-
-      // Always re-apply redaction for ALL deactivated profiles to make sure
-      // their posts/reels/comments/stories are also hidden — even if the
-      // profile row itself was already redacted in a previous run.
-      const toRedact = pending || [];
-
-      if (toRedact.length > 0) {
-        console.log(`🧹 Backfilling redaction for ${toRedact.length} deactivated profile(s)... (backup column: ${hasBackupColumn})`);
-        for (const p of toRedact) {
-          try {
-            await redactProfileInDb(adminDb, p.id);
-          } catch (e: any) {
-            console.warn(`  ⚠️ Failed to redact ${p.id}:`, e?.message);
-          }
-        }
-        console.log('✅ Redaction backfill complete');
-
-        // ONE-TIME RECOVERY: previous versions of redactProfileInDb
-        // bulk-marked posts/reels/comments of deactivated users as
-        // is_deleted=true. We now rely solely on the joined
-        // profile.is_deactivated filter. Un-mark those rows once per
-        // affected profile, then set a marker inside deletion_backup so
-        // we never run it again (which would otherwise revive
-        // legitimately deleted/moderated rows).
-        if (hasBackupColumn) {
-          const needsRecovery = toRedact.filter((p: any) => !p?.deletion_backup?.recovery_v1_done);
-          if (needsRecovery.length > 0) {
-            const ids = needsRecovery.map((p: any) => p.id).filter(Boolean);
-            try {
-              const [pr, rr, cr] = await Promise.all([
-                adminDb.from('posts').update({ is_deleted: false }).in('user_id', ids).eq('is_deleted', true).select('id'),
-                adminDb.from('reels').update({ is_deleted: false }).in('user_id', ids).eq('is_deleted', true).select('id'),
-                adminDb.from('comments').update({ is_deleted: false }).in('user_id', ids).eq('is_deleted', true).select('id'),
-              ]);
-              console.log(`🔄 One-time recovery for ${ids.length} profile(s): posts=${pr.data?.length || 0} reels=${rr.data?.length || 0} comments=${cr.data?.length || 0}`);
-              for (const p of needsRecovery) {
-                const merged = { ...(p.deletion_backup || {}), recovery_v1_done: true };
-                await adminDb.from('profiles').update({ deletion_backup: merged }).eq('id', p.id);
-              }
-            } catch (e: any) {
-              console.warn('⚠️ Content visibility recovery skipped:', e?.message);
-            }
-          }
-        }
-      }
-      if (!hasBackupColumn) {
-        console.log('ℹ️  Run this SQL in Supabase to enable restore-on-cancel: ALTER TABLE profiles ADD COLUMN IF NOT EXISTS deletion_backup JSONB;');
-      }
-    } catch (e: any) {
-      console.warn('⚠️ Account redaction startup task skipped:', e?.message);
-    }
   })();
 
   app.post("/api/verification/request", requireAuth as any, async (req: Request, res: Response) => {
