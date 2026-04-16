@@ -2750,29 +2750,40 @@ export const api = {
     const user = await getCurrentUser();
     if (!user) return null;
 
+    // Throttle typing pings so we never block the keyboard with one DB call per keystroke.
+    // Cache the user's profile and only re-emit "isTyping=true" once every 2s per community.
+    const g = globalThis as any;
+    g.__noviiTypingCache = g.__noviiTypingCache || { profile: null, lastSent: new Map<string, number>() };
+    const cache = g.__noviiTypingCache as { profile: { username: string; avatar_url: string | null } | null; lastSent: Map<string, number> };
+
     if (isTyping) {
-      // Insert or update typing indicator
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('username, avatar_url')
-        .eq('id', user.id)
-        .single();
+      const now = Date.now();
+      const last = cache.lastSent.get(communityId) || 0;
+      if (now - last < 2000) return; // throttle
+      cache.lastSent.set(communityId, now);
 
-      const typingUser = {
-        community_id: communityId,
-        user_id: user.id,
-        username: profile?.username || 'Anonymous',
-        avatar_url: profile?.avatar_url || null,
-        updated_at: new Date().toISOString()
-      };
+      if (!cache.profile) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', user.id)
+          .single();
+        cache.profile = { username: profile?.username || 'Anonymous', avatar_url: profile?.avatar_url || null };
+      }
 
-      await supabase
+      // Fire-and-forget so the keystroke doesn't await network IO.
+      void supabase
         .from('typing_indicators')
-        .upsert(typingUser, { onConflict: 'community_id,user_id' })
-        .select();
+        .upsert({
+          community_id: communityId,
+          user_id: user.id,
+          username: cache.profile.username,
+          avatar_url: cache.profile.avatar_url,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'community_id,user_id' });
     } else {
-      // Delete typing indicator
-      await supabase
+      cache.lastSent.delete(communityId);
+      void supabase
         .from('typing_indicators')
         .delete()
         .eq('community_id', communityId)
