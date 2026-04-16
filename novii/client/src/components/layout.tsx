@@ -266,7 +266,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // Determine if we should show the mobile header
   // We hide it on Reels, Messages, Settings for a more immersive/native feel if desired, or just keep it simple.
   // Let's keep it simple: Show mobile header on Home, Explore, Notifications. Hide on others if they have their own headers.
-  const hasOwnHeader = location === '/messages' || location === '/settings' || location === '/reels';
+  const hasOwnHeader = location === '/messages' || location === '/settings' || location === '/reels' || location.startsWith('/accounts-center');
   const isHome = location === '/';
 
   return (
