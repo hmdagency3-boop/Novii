@@ -2333,11 +2333,12 @@ export default function Messages() {
                 </>
             ) : selectedUserId && selectedConversation ? (
                 <>
-                    {/* Chat Header */}
+                    {/* Chat Header — sticky so it stays visible above the messages
+                         even when the mobile keyboard pushes the layout up. */}
                     <div className={cn(
                         "h-16 border-b border-border/30 flex items-center justify-between px-4 bg-gradient-to-r from-background via-background to-primary/5 shadow-sm",
-                        "fixed top-0 left-0 right-0 w-full z-50",
-                        "md:relative md:shrink-0 md:static md:top-auto md:left-auto md:right-auto md:w-auto md:z-20"
+                        "sticky top-0 left-0 right-0 w-full z-50 shrink-0",
+                        "md:relative md:static md:z-20"
                     )}>
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                             <Button 
@@ -2405,7 +2406,7 @@ export default function Messages() {
                     </div>
 
                     {/* Messages Area */}
-                    <ScrollArea className="flex-1 p-2 sm:p-5 bg-background overflow-y-auto w-full pt-16 md:pt-0">
+                    <ScrollArea className="flex-1 p-2 sm:p-5 bg-background overflow-y-auto w-full">
                         {messagesLoading ? (
                           <div className="flex items-center justify-center py-10">
                             <Spinner className="w-6 h-6" />
