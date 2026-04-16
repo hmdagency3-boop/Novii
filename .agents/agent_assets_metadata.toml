@@ -65,3 +65,9 @@ id = "uSvaJtjL68eccNBvqDTdO"
 uri = "file://attached_assets/generated_images/novii_beta_invite_16x9.png"
 type = "image"
 title = "Banner (16:9)"
+
+[[outputs]]
+id = "RQyGdosYQKw1FUFz86y29"
+uri = "file://novii/docs/algorithm-report.md"
+type = "text"
+title = "تقرير خوارزمية Novii الكامل"
