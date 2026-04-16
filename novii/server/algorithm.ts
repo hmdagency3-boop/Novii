@@ -131,7 +131,7 @@ const POST_SELECT = `
   profile:profiles!posts_user_id_fkey(
     id, username, full_name, avatar_url, bio,
     is_verified, is_official, is_creator, is_premium,
-    is_popular, is_active, is_private, is_featured,
+    is_popular, is_active, is_private, is_featured, is_deactivated,
     is_gold_early_member, is_silver_early_member, is_bronze_early_member,
     is_beta_tester, is_bug_hunter,
     followers_count, following_count
@@ -501,7 +501,7 @@ export async function getPersonalizedExplore(
       .eq("is_deleted", false)
       .order("created_at", { ascending: false })
       .range(0, limit - 1);
-    return chronoPosts || [];
+    return (chronoPosts || []).filter((p: any) => !p.profile?.is_deactivated);
   }
 
   const [profile, followingRes, negProfile] = await Promise.all([
@@ -532,7 +532,7 @@ export async function getPersonalizedExplore(
   }
   if (!posts) return [];
 
-  const ownPosts = posts.filter((p: any) => p.user_id !== userId);
+  const ownPosts = posts.filter((p: any) => p.user_id !== userId && !p.profile?.is_deactivated);
 
   const scored: ScoredPost[] = ownPosts.map((post: any) => {
     const reasons: string[] = [];
@@ -613,7 +613,7 @@ export async function getPersonalizedExploreReels(
     id, user_id, video_url, thumbnail_url, caption,
     likes_count, comments_count, views_count, is_featured, created_at,
     profile:profiles!reels_user_id_fkey(
-      id, username, avatar_url, is_verified, is_official, is_featured, followers_count
+      id, username, avatar_url, is_verified, is_official, is_featured, is_deactivated, followers_count
     )
   `;
 
@@ -624,7 +624,7 @@ export async function getPersonalizedExploreReels(
       .eq("is_deleted", false)
       .order("created_at", { ascending: false })
       .range(0, limit - 1);
-    return chronoReels || [];
+    return (chronoReels || []).filter((r: any) => !r.profile?.is_deactivated);
   }
 
   const [profile, followingRes, negProfile] = await Promise.all([
@@ -649,7 +649,7 @@ export async function getPersonalizedExploreReels(
 
   if (error || !reels) return [];
 
-  const allReels = reels.filter((r: any) => r.user_id !== userId);
+  const allReels = reels.filter((r: any) => r.user_id !== userId && !r.profile?.is_deactivated);
 
   const scored: ScoredPost[] = allReels.map((reel: any) => {
     const reasons: string[] = [];

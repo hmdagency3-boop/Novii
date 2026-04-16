@@ -270,6 +270,35 @@ async function saveHashtags(
   } catch {}
 }
 
+// Redact a deactivated user's profile to a generic "User Deleted" placeholder.
+// Used in chat lists, messages, and anywhere else a profile row is embedded.
+function redactIfDeactivated(p: any): any {
+  if (!p || !p.is_deactivated) return p;
+  return {
+    ...p,
+    full_name: 'User Deleted',
+    username: 'deleted_user',
+    avatar_url: null,
+    cover_url: null,
+    bio: '',
+    website: '',
+    location: '',
+    phone_number: null,
+    is_verified: false,
+    is_official: false,
+    is_private: true,
+    is_online: false,
+    last_seen: null,
+    is_active: false,
+    is_creator: false,
+    is_premium: false,
+    is_popular: false,
+    followers_count: 0,
+    following_count: 0,
+    posts_count: 0,
+  };
+}
+
 export const api = {
   // Profile APIs
   async getCurrentProfile(): Promise<Profile | null> {
@@ -1765,6 +1794,12 @@ export const api = {
 
     if (error) throw error;
 
+    // Redact deactivated user profiles in chat list
+    (data || []).forEach((m: any) => {
+      m.sender = redactIfDeactivated(m.sender);
+      m.receiver = redactIfDeactivated(m.receiver);
+    });
+
     // Group messages by conversation (unique pair of users)
     const conversations = new Map();
     (data || []).forEach(message => {
@@ -1826,7 +1861,12 @@ export const api = {
       console.error('❌ Error fetching messages:', error);
       throw error;
     }
-    
+
+    (data || []).forEach((m: any) => {
+      m.sender = redactIfDeactivated(m.sender);
+      m.receiver = redactIfDeactivated(m.receiver);
+    });
+
     return data || [];
   },
 
