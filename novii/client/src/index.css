@@ -244,15 +244,20 @@
   }
   /* Hide Radix ScrollArea scrollbars on mobile only (used in chat panes) */
   @media (max-width: 767px) {
+    .chat-scroll [data-orientation],
     .chat-scroll [data-radix-scroll-area-scrollbar] {
       display: none !important;
     }
+    .chat-scroll [data-radix-scroll-area-viewport]::-webkit-scrollbar,
     .chat-scroll::-webkit-scrollbar {
-      display: none;
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
     }
+    .chat-scroll [data-radix-scroll-area-viewport],
     .chat-scroll {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
+      -ms-overflow-style: none !important;
+      scrollbar-width: none !important;
     }
   }
   
