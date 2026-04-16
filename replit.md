@@ -78,7 +78,7 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 
 ### Personalized Recommendation Algorithm
 - **Backend**: `novii/server/algorithm.ts` — comprehensive server-side recommendation engine
-- **Scoring factors**: Author affinity (interaction history), interest matching (hashtag/topic overlap), engagement quality (likes/comments/saves weighted), recency decay, content diversity
+- **Scoring factors**: Author affinity (interaction history), interest matching (hashtag/topic overlap), engagement quality (likes/comments/saves weighted), recency decay, content diversity, discovery boost (new posts < 30min), negative signals (not_interested + skip penalties)
 - **API endpoints**: `GET /api/feed/personalized` (paginated), `GET /api/explore/personalized`, `GET /api/explore/personalized/reels` — all require auth
 - **Client integration**: `api.ts` methods (`getPersonalizedFeed`, `getPersonalizedExplore`, `getPersonalizedExploreReels`) call server endpoints with auth headers, fallback to legacy Supabase-direct queries if unauthenticated or server error
 - **Hooks**: `useInfiniteFeed`, `useExplorePosts`, `useExploreReels` in `use-data.ts` now use personalized endpoints
@@ -90,6 +90,10 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - **Config system**: Settings stored as `algo_*` keys in `platform_settings` table, 60s in-memory cache, validated on save (weight 0-1, integers 1-500)
 - **22 configurable parameters**: Feed/Explore/Reels weights, batch sizes, max per author, verified/official/creator boosts, profile lookback days, enable/disable toggle
 - **Admin UI features**: Slider controls with percentage display, real-time weight sum indicator, modified-field badges, reset to defaults, enable/disable toggle
+- **Discovery Boost**: Posts < 30 min old get up to +0.35 bonus (linear decay), solving cold-start problem for new content
+- **Negative Signals**: `content_signals` table tracks `not_interested` and `skip` events per user. Penalties: author not-interested (1-2x: -0.15, 3+: -0.40), author skip (2-4x: -0.10, 5+: -0.25), hashtag (1x: -0.05, 2+: -0.15). Max penalty capped at -0.60. Signals expire after 7 days. API: `POST /api/content-signals/not-interested`, `POST /api/content-signals/skip`, `DELETE /api/content-signals/:target_id?type=`
+- **Algorithm report**: `novii/docs/algorithm-report.md` — full 8-stage algorithm documentation in Arabic
+- **SQL migration**: `novii/supabase/add_content_signals.sql` — run in Supabase Dashboard to create content_signals table
 
 ### Hashtag System
 - **Database tables**: `hashtags` (name, posts_count, is_banned, is_pinned), `post_hashtags` (post_id, hashtag_id), `reel_hashtags` (reel_id, hashtag_id)

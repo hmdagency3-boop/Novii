@@ -248,6 +248,97 @@ function calculateRecencyScore(createdAt: string): number {
   return 1 / (1 + hoursAgo / 12);
 }
 
+function calculateDiscoveryBoost(createdAt: string): number {
+  const ts = new Date(createdAt).getTime();
+  if (isNaN(ts)) return 0;
+  const minutesAge = Math.max(0, (Date.now() - ts) / 60000);
+  if (minutesAge > 30) return 0;
+  return 0.35 * (1 - minutesAge / 30);
+}
+
+interface NegativeSignalProfile {
+  notInterestedAuthors: Map<string, number>;
+  notInterestedHashtags: Map<string, number>;
+  skippedAuthors: Map<string, number>;
+  totalNegative: number;
+}
+
+async function buildNegativeSignalProfile(
+  db: SupabaseClient,
+  userId: string
+): Promise<NegativeSignalProfile> {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+
+  const { data: signals } = await db
+    .from("content_signals")
+    .select("signal_type, target_type, target_id, author_id, hashtags")
+    .eq("user_id", userId)
+    .gte("created_at", sevenDaysAgo)
+    .limit(300);
+
+  const notInterestedAuthors = new Map<string, number>();
+  const notInterestedHashtags = new Map<string, number>();
+  const skippedAuthors = new Map<string, number>();
+  let totalNegative = 0;
+
+  for (const sig of signals || []) {
+    totalNegative++;
+
+    if (sig.signal_type === "not_interested") {
+      if (sig.author_id) {
+        notInterestedAuthors.set(
+          sig.author_id,
+          (notInterestedAuthors.get(sig.author_id) || 0) + 1
+        );
+      }
+      const tags: string[] = sig.hashtags || [];
+      for (const t of tags) {
+        notInterestedHashtags.set(t, (notInterestedHashtags.get(t) || 0) + 1);
+      }
+    }
+
+    if (sig.signal_type === "skip") {
+      if (sig.author_id) {
+        skippedAuthors.set(
+          sig.author_id,
+          (skippedAuthors.get(sig.author_id) || 0) + 1
+        );
+      }
+    }
+  }
+
+  return { notInterestedAuthors, notInterestedHashtags, skippedAuthors, totalNegative };
+}
+
+function calculateNegativePenalty(
+  negProfile: NegativeSignalProfile,
+  authorId: string,
+  caption: string
+): number {
+  let penalty = 0;
+
+  const niAuthor = negProfile.notInterestedAuthors.get(authorId) || 0;
+  if (niAuthor >= 3) penalty += 0.4;
+  else if (niAuthor >= 1) penalty += 0.15;
+
+  const skipAuthor = negProfile.skippedAuthors.get(authorId) || 0;
+  if (skipAuthor >= 5) penalty += 0.25;
+  else if (skipAuthor >= 2) penalty += 0.1;
+
+  const tags = (caption || "").match(/#([\p{L}\p{N}_]+)/gu) || [];
+  const seenTags = new Set<string>();
+  for (const tag of tags) {
+    const normalized = tag.slice(1).toLowerCase();
+    if (seenTags.has(normalized)) continue;
+    seenTags.add(normalized);
+    const niTag = negProfile.notInterestedHashtags.get(normalized) || 0;
+    if (niTag >= 2) penalty += 0.15;
+    else if (niTag >= 1) penalty += 0.05;
+  }
+
+  return Math.min(penalty, 0.6);
+}
+
 function applyDiversityPenalty(
   posts: ScoredPost[],
   maxPerAuthor: number = 3
@@ -281,11 +372,12 @@ export async function getPersonalizedFeed(
 ): Promise<any[]> {
   const config = await getAlgorithmConfig(db, settingsDb);
 
-  const [profile, followingRes] = await Promise.all([
+  const [profile, followingRes, negProfile] = await Promise.all([
     buildUserInterestProfile(db, userId, config.profile_lookback_days),
     db.from("follows")
       .select("following_id")
       .eq("follower_id", userId),
+    buildNegativeSignalProfile(db, userId),
   ]);
 
   const followingIds = new Set(
@@ -332,6 +424,12 @@ export async function getPersonalizedFeed(
     const recencyScore = calculateRecencyScore(post.created_at);
     if (recencyScore > 0.7) reasons.push("recent");
 
+    const discoveryBoost = calculateDiscoveryBoost(post.created_at);
+    if (discoveryBoost > 0) reasons.push("discovery_boost");
+
+    const negPenalty = calculateNegativePenalty(negProfile, post.user_id, post.caption);
+    if (negPenalty > 0) reasons.push("negative_signal");
+
     let boostScore = 0;
     const p = post.profile;
     if (p?.is_verified) boostScore += config.verified_boost;
@@ -351,12 +449,15 @@ export async function getPersonalizedFeed(
     }
     boostScore = Math.min(boostScore, 1);
 
-    const finalScore =
+    const finalScore = Math.max(0,
       authorScore * config.feed_weight_author +
       interestScore * config.feed_weight_interest +
       engagementScore * config.feed_weight_engagement +
       recencyScore * config.feed_weight_recency +
-      boostScore * config.feed_weight_boost;
+      boostScore * config.feed_weight_boost +
+      discoveryBoost -
+      negPenalty
+    );
 
     return { ...post, _score: finalScore, _reasons: reasons };
   });
@@ -403,11 +504,12 @@ export async function getPersonalizedExplore(
     return chronoPosts || [];
   }
 
-  const [profile, followingRes] = await Promise.all([
+  const [profile, followingRes, negProfile] = await Promise.all([
     buildUserInterestProfile(db, userId, config.profile_lookback_days),
     db.from("follows")
       .select("following_id")
       .eq("follower_id", userId),
+    buildNegativeSignalProfile(db, userId),
   ]);
 
   const followingIds = new Set(
@@ -432,8 +534,6 @@ export async function getPersonalizedExplore(
 
   const ownPosts = posts.filter((p: any) => p.user_id !== userId);
 
-  console.log(`🔍 Explore: fetched ${posts.length} posts, showing ${ownPosts.length} (excluded own)`);
-
   const scored: ScoredPost[] = ownPosts.map((post: any) => {
     const reasons: string[] = [];
 
@@ -444,6 +544,12 @@ export async function getPersonalizedExplore(
     if (engagementScore > 0.5) reasons.push("trending");
 
     const recencyScore = calculateRecencyScore(post.created_at);
+
+    const discoveryBoost = calculateDiscoveryBoost(post.created_at);
+    if (discoveryBoost > 0) reasons.push("discovery_boost");
+
+    const negPenalty = calculateNegativePenalty(negProfile, post.user_id, post.caption);
+    if (negPenalty > 0) reasons.push("negative_signal");
 
     let qualityScore = 0;
     const p = post.profile;
@@ -461,11 +567,14 @@ export async function getPersonalizedExplore(
     }
     qualityScore = Math.min(qualityScore, 1);
 
-    const finalScore =
+    const finalScore = Math.max(0,
       interestScore * config.explore_weight_interest +
       engagementScore * config.explore_weight_engagement +
       recencyScore * config.explore_weight_recency +
-      qualityScore * config.explore_weight_quality;
+      qualityScore * config.explore_weight_quality +
+      discoveryBoost -
+      negPenalty
+    );
 
     return { ...post, _score: finalScore, _reasons: reasons };
   });
@@ -518,11 +627,12 @@ export async function getPersonalizedExploreReels(
     return chronoReels || [];
   }
 
-  const [profile, followingRes] = await Promise.all([
+  const [profile, followingRes, negProfile] = await Promise.all([
     buildUserInterestProfile(db, userId, config.profile_lookback_days),
     db.from("follows")
       .select("following_id")
       .eq("follower_id", userId),
+    buildNegativeSignalProfile(db, userId),
   ]);
 
   const followingIds = new Set(
@@ -542,9 +652,16 @@ export async function getPersonalizedExploreReels(
   const allReels = reels.filter((r: any) => r.user_id !== userId);
 
   const scored: ScoredPost[] = allReels.map((reel: any) => {
+    const reasons: string[] = [];
     const interestScore = calculateInterestScore(profile, reel.caption);
     const engagementScore = calculateEngagementScore(reel);
     const recencyScore = calculateRecencyScore(reel.created_at);
+
+    const discoveryBoost = calculateDiscoveryBoost(reel.created_at);
+    if (discoveryBoost > 0) reasons.push("discovery_boost");
+
+    const negPenalty = calculateNegativePenalty(negProfile, reel.user_id, reel.caption);
+    if (negPenalty > 0) reasons.push("negative_signal");
 
     let boostScore = 0;
     if (reel.profile?.is_verified) boostScore += config.verified_boost * 0.33;
@@ -552,13 +669,16 @@ export async function getPersonalizedExploreReels(
     if (reel.profile?.is_featured) boostScore += 0.2;
     boostScore = Math.min(boostScore, 1);
 
-    const finalScore =
+    const finalScore = Math.max(0,
       interestScore * config.reels_weight_interest +
       engagementScore * config.reels_weight_engagement +
       recencyScore * config.reels_weight_recency +
-      boostScore * 0.15;
+      boostScore * 0.15 +
+      discoveryBoost -
+      negPenalty
+    );
 
-    return { ...reel, _score: finalScore, _reasons: [] };
+    return { ...reel, _score: finalScore, _reasons: reasons };
   });
 
   scored.sort((a: any, b: any) => b._score - a._score);

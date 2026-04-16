@@ -4952,5 +4952,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/content-signals/not-interested", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { target_id, target_type } = req.body;
+      if (!target_id || !target_type || !["post", "reel"].includes(target_type)) {
+        return res.status(400).json({ error: "target_id and target_type (post|reel) required" });
+      }
+
+      const table = target_type === "post" ? "posts" : "reels";
+      const { data: content } = await adminDb
+        .from(table)
+        .select("user_id, caption")
+        .eq("id", target_id)
+        .maybeSingle();
+
+      if (!content) {
+        return res.status(404).json({ error: "Content not found" });
+      }
+
+      const hashtags: string[] = [];
+      if (content.caption) {
+        const tags = (content.caption as string).match(/#([\p{L}\p{N}_]+)/gu) || [];
+        const seen = new Set<string>();
+        for (const t of tags) {
+          const norm = t.slice(1).toLowerCase();
+          if (!seen.has(norm)) {
+            seen.add(norm);
+            hashtags.push(norm);
+          }
+        }
+      }
+
+      const { error } = await adminDb
+        .from("content_signals")
+        .upsert({
+          user_id: req.userId,
+          signal_type: "not_interested",
+          target_type,
+          target_id,
+          author_id: content.user_id || null,
+          hashtags,
+        }, { onConflict: "user_id,target_id,signal_type,target_type" });
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Not interested signal error:", error);
+      res.status(500).json({ error: "Failed to record signal" });
+    }
+  });
+
+  app.post("/api/content-signals/skip", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { target_id, target_type } = req.body;
+      if (!target_id || !target_type || !["post", "reel"].includes(target_type)) {
+        return res.status(400).json({ error: "target_id and target_type (post|reel) required" });
+      }
+
+      const table = target_type === "post" ? "posts" : "reels";
+      const { data: content } = await adminDb
+        .from(table)
+        .select("user_id")
+        .eq("id", target_id)
+        .maybeSingle();
+
+      if (!content) {
+        return res.status(404).json({ error: "Content not found" });
+      }
+
+      const { error } = await adminDb
+        .from("content_signals")
+        .insert({
+          user_id: req.userId,
+          signal_type: "skip",
+          target_type,
+          target_id,
+          author_id: content.user_id || null,
+          hashtags: [],
+        });
+
+      if (error) {
+        if (error.code === '23505') {
+          return res.json({ success: true, duplicate: true });
+        }
+        throw error;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Skip signal error:", error);
+      res.status(500).json({ error: "Failed to record signal" });
+    }
+  });
+
+  app.delete("/api/content-signals/:target_id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { target_id } = req.params;
+      const signal_type = req.query.type as string || "not_interested";
+
+      const { error } = await adminDb
+        .from("content_signals")
+        .delete()
+        .eq("user_id", req.userId)
+        .eq("target_id", target_id)
+        .eq("signal_type", signal_type);
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete signal error:", error);
+      res.status(500).json({ error: "Failed to delete signal" });
+    }
+  });
+
   return httpServer;
 }
