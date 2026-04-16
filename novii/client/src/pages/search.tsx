@@ -64,7 +64,6 @@ export default function Search() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-10 bg-secondary/50 border-transparent focus-visible:bg-background focus-visible:border-primary transition-all rounded-xl"
-              autoFocus
             />
           </div>
         </div>
