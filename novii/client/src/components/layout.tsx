@@ -131,15 +131,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     staleTime: 0,  // Always refetch when profile changes
   });
 
-  // Get userId from URL when on /user page
+  // Get userId from URL when on /user page or /user-posts/:userId
   const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-  const urlUserId = searchParams.get('id');
+  const userPostsMatch = location.match(/^\/user-posts\/([^/?]+)/);
+  const urlUserId = userPostsMatch ? userPostsMatch[1] : searchParams.get('id');
 
   // Fetch profile for other user when on /user page
   const { data: visitedUserProfile } = useQuery({
     queryKey: ['profile', urlUserId],
     queryFn: () => api.getProfileById(urlUserId!),
-    enabled: !!urlUserId && location.startsWith('/user'),
+    enabled: !!urlUserId && (location.startsWith('/user') || location.startsWith('/user-posts')),
   });
 
   useEffect(() => {
