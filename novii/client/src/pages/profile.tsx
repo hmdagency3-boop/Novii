@@ -469,7 +469,7 @@ export default function Profile() {
                             <ProfilePostCard
                               key={`post-${item.id}`}
                               post={item}
-                              onClick={() => { setSelectedPost(item); setPostModalOpen(true); }}
+                              onClick={() => setLocation(`/user-posts/${item.user_id || user?.id}?start=${item.id}`)}
                             />
                           )
                         )}

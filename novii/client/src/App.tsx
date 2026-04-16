@@ -43,6 +43,7 @@ import About from "@/pages/about";
 import ModerationNotice from "@/pages/moderation-notice";
 import HashtagPage from "@/pages/hashtag";
 import MyActivity from "@/pages/my-activity";
+import UserPostsFeed from "@/pages/user-posts-feed";
 
 function BanGuard() {
   const { isBanned } = useAuth();
@@ -209,6 +210,11 @@ function Router() {
       <Route path="/post/:id">
         <ProtectedLayout>
           <PostPage />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/user-posts/:userId">
+        <ProtectedLayout>
+          <UserPostsFeed />
         </ProtectedLayout>
       </Route>
       <Route path="/followers-detail">
