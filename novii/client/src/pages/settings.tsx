@@ -687,6 +687,29 @@ export default function SettingsPage() {
   const t = getTranslation(language.code).settings;
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [hiddenTabs, setHiddenTabs] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/platform-settings/public')
+      .then((r) => r.ok ? r.json() : { hidden_settings_tabs: [] })
+      .then((data) => {
+        if (cancelled) return;
+        const list: string[] = Array.isArray(data?.hidden_settings_tabs) ? data.hidden_settings_tabs : [];
+        setHiddenTabs(new Set(list));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const visibleMenu = useMemo(() => {
+    return settingsMenuStructure
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => !hiddenTabs.has(item.id)),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [hiddenTabs]);
   const { user, signOut } = useAuth();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
@@ -1636,7 +1659,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="pb-32 space-y-6">
-                    {settingsMenuStructure.map((section, idx) => (
+                    {visibleMenu.map((section, idx) => (
                         <div key={idx}>
                             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 px-2">
                                 {(t as any)[section.sectionKey]}

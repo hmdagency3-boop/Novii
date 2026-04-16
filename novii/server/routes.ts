@@ -4323,6 +4323,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/platform-settings/public — public subset of platform settings (no auth required)
+  app.get("/api/platform-settings/public", async (_req: Request, res: Response) => {
+    try {
+      const { data, error } = await adminDb
+        .from('platform_settings')
+        .select('key,value')
+        .in('key', ['hidden_settings_tabs']);
+
+      if (error) {
+        if (error.code === '42P01') return res.json({ hidden_settings_tabs: [] });
+        throw error;
+      }
+
+      const row = (data || []).find((r: any) => r.key === 'hidden_settings_tabs');
+      let hidden: string[] = [];
+      if (row?.value) {
+        try {
+          const parsed = JSON.parse(row.value);
+          if (Array.isArray(parsed)) hidden = parsed.filter((x) => typeof x === 'string');
+        } catch {
+          hidden = [];
+        }
+      }
+      res.set('Cache-Control', 'public, max-age=60');
+      res.json({ hidden_settings_tabs: hidden });
+    } catch (error) {
+      console.error('Public platform settings error:', error);
+      res.json({ hidden_settings_tabs: [] });
+    }
+  });
+
   // GET /api/admin/settings — get platform settings
   app.get("/api/admin/settings", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
