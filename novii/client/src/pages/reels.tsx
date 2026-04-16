@@ -317,6 +317,21 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, isLiked, li
 /* ════════════════════════════════════════════════════
    Hook: visibility-based video playback
 ════════════════════════════════════════════════════ */
+function sendSkipSignal(reelId: string) {
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (!session?.access_token) return;
+    fetch("/api/content-signals/skip", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": session.user.id,
+        "x-user-token": session.access_token,
+      },
+      body: JSON.stringify({ target_id: reelId, target_type: "reel" }),
+    }).catch(() => {});
+  });
+}
+
 function useVideoPlayback(reel: any, muted: boolean, setMuted: React.Dispatch<React.SetStateAction<boolean>>) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -325,6 +340,8 @@ function useVideoPlayback(reel: any, muted: boolean, setMuted: React.Dispatch<Re
   const userPaused = useRef(false);
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
+  const visibleSince = useRef<number | null>(null);
+  const skipSent = useRef(false);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -337,6 +354,8 @@ function useVideoPlayback(reel: any, muted: boolean, setMuted: React.Dispatch<Re
         isVisible.current = entry.isIntersecting;
 
         if (entry.isIntersecting) {
+          visibleSince.current = Date.now();
+          skipSent.current = false;
           userPaused.current = false;
           setPaused(false);
           vid.muted = mutedRef.current;
@@ -347,6 +366,14 @@ function useVideoPlayback(reel: any, muted: boolean, setMuted: React.Dispatch<Re
             vid.play().catch(() => {});
           });
         } else {
+          if (visibleSince.current && !skipSent.current) {
+            const viewDuration = (Date.now() - visibleSince.current) / 1000;
+            if (viewDuration >= 2 && viewDuration <= 5) {
+              sendSkipSignal(reel.id);
+              skipSent.current = true;
+            }
+          }
+          visibleSince.current = null;
           vid.pause();
           vid.currentTime = 0;
           setPaused(false);
@@ -357,7 +384,7 @@ function useVideoPlayback(reel: any, muted: boolean, setMuted: React.Dispatch<Re
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [setMuted]);
+  }, [setMuted, reel.id]);
 
   useEffect(() => {
     const vid = videoRef.current;

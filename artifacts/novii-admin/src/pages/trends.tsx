@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import {
   TrendingUp, TrendingDown, BarChart3, Hash, Users, FileText, Video,
   Star, StarOff, RefreshCw, ArrowUp, ArrowDown, Minus, Flame, Eye,
-  Heart, MessageCircle, Zap, Clock, ChevronDown, Search
+  Heart, MessageCircle, Zap, Clock, ChevronDown, Search, Activity,
+  AlertTriangle, SkipForward, ThumbsDown, Sparkles
 } from "lucide-react";
 import { adminFetch } from "@/lib/admin-api";
 
@@ -24,10 +25,22 @@ interface TrendsData {
   featured: { posts: any[]; reels: any[]; accounts: any[] };
 }
 
-type Section = "overview" | "words" | "posts" | "reels" | "accounts" | "hashtags" | "predictions" | "featured";
+interface AlgoHealthData {
+  discovery_boost: { active_posts: number; active_reels: number; total: number };
+  negative_signals: {
+    total_signals_7d: number;
+    skip_signals_7d: number;
+    not_interested_7d: number;
+    top_negative_hashtags: { hashtag: string; count: number }[];
+    top_skipped_authors: { author_id: string; count: number; username: string; avatar_url: string }[];
+  };
+}
+
+type Section = "overview" | "words" | "posts" | "reels" | "accounts" | "hashtags" | "predictions" | "featured" | "health";
 
 export default function TrendsPage() {
   const [data, setData] = useState<TrendsData | null>(null);
+  const [healthData, setHealthData] = useState<AlgoHealthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(7);
   const [section, setSection] = useState<Section>("overview");
@@ -35,10 +48,10 @@ export default function TrendsPage() {
 
   const loadTrends = () => {
     setLoading(true);
-    adminFetch<TrendsData>(`/trends?days=${days}`)
-      .then(setData)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    Promise.all([
+      adminFetch<TrendsData>(`/trends?days=${days}`).then(setData).catch(console.error),
+      adminFetch<AlgoHealthData>(`/algorithm/health`).then(setHealthData).catch(console.error),
+    ]).finally(() => setLoading(false));
   };
 
   useEffect(() => { loadTrends(); }, [days]);
@@ -77,6 +90,7 @@ export default function TrendsPage() {
     { id: "hashtags", label: "الهاشتاقات", icon: Hash, count: data?.trending_hashtags.length },
     { id: "predictions", label: "التوقعات", icon: Zap, count: data?.predicted_trends.length },
     { id: "featured", label: "المعزّزين", icon: Star, count: data ? (data.featured.posts.length + data.featured.reels.length + data.featured.accounts.length) : 0 },
+    { id: "health", label: "صحة الخوارزمية", icon: Activity },
   ];
 
   return (
@@ -143,6 +157,7 @@ export default function TrendsPage() {
           {section === "hashtags" && <HashtagsSection hashtags={data.trending_hashtags} onTogglePin={toggleHashtagPin} onToggleBan={toggleHashtagBan} />}
           {section === "predictions" && <PredictionsSection predictions={data.predicted_trends} />}
           {section === "featured" && <FeaturedSection featured={data.featured} onTogglePost={toggleFeaturePost} onToggleReel={toggleFeatureReel} onToggleAccount={toggleFeatureAccount} />}
+          {section === "health" && <AlgoHealthSection data={healthData} />}
         </>
       )}
     </div>
@@ -643,6 +658,119 @@ function FeaturedSection({ featured, onTogglePost, onToggleReel, onToggleAccount
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function AlgoHealthSection({ data }: { data: AlgoHealthData | null }) {
+  if (!data) return <div className="text-center py-16 text-[#8e8e8e]">جاري التحميل...</div>;
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard icon={Sparkles} label="محتوى يحصل على دفعة اكتشاف (الآن)" value={data.discovery_boost.total} color="#00c853" />
+        <StatCard icon={FileText} label="بوستات جديدة (< 30 دقيقة)" value={data.discovery_boost.active_posts} color="#0095f6" />
+        <StatCard icon={Video} label="ريلز جديدة (< 30 دقيقة)" value={data.discovery_boost.active_reels} color="#833AB4" />
+        <StatCard icon={AlertTriangle} label="إشارات سلبية (7 أيام)" value={data.negative_signals.total_signals_7d} color="#ff9500" />
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <StatCard icon={SkipForward} label="تخطي سريع" value={data.negative_signals.skip_signals_7d} color="#ed4956" />
+        <StatCard icon={ThumbsDown} label="مش مهتم" value={data.negative_signals.not_interested_7d} color="#262626" />
+        <StatCard icon={Hash} label="هاشتاقات سلبية" value={data.negative_signals.top_negative_hashtags.length} color="#833AB4" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white border border-[#dbdbdb] rounded-xl p-4">
+          <h3 className="text-[14px] font-semibold text-[#262626] mb-3 flex items-center gap-2">
+            <Hash className="w-4 h-4 text-[#ed4956]" />
+            أكثر الهاشتاقات رفضاً (مش مهتم)
+          </h3>
+          {data.negative_signals.top_negative_hashtags.length === 0 ? (
+            <p className="text-[13px] text-[#8e8e8e] py-4 text-center">لا توجد بيانات بعد</p>
+          ) : (
+            <div className="space-y-2">
+              {data.negative_signals.top_negative_hashtags.map((h, i) => (
+                <div key={h.hashtag} className="flex items-center justify-between py-1.5 border-b border-[#efefef] last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-[#8e8e8e] w-5 text-center">{i + 1}</span>
+                    <span className="text-[14px] text-[#262626] font-medium">#{h.hashtag}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[12px] text-[#ed4956] font-semibold tabular-nums">{h.count}</span>
+                    <ThumbsDown className="w-3 h-3 text-[#ed4956]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white border border-[#dbdbdb] rounded-xl p-4">
+          <h3 className="text-[14px] font-semibold text-[#262626] mb-3 flex items-center gap-2">
+            <SkipForward className="w-4 h-4 text-[#ff9500]" />
+            أكثر الحسابات تخطياً (Skip)
+          </h3>
+          {data.negative_signals.top_skipped_authors.length === 0 ? (
+            <p className="text-[13px] text-[#8e8e8e] py-4 text-center">لا توجد بيانات بعد</p>
+          ) : (
+            <div className="space-y-2">
+              {data.negative_signals.top_skipped_authors.map((a, i) => (
+                <div key={a.author_id} className="flex items-center justify-between py-1.5 border-b border-[#efefef] last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-[#8e8e8e] w-5 text-center">{i + 1}</span>
+                    {a.avatar_url ? (
+                      <img src={a.avatar_url} className="w-6 h-6 rounded-full object-cover" alt="" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-[#efefef]" />
+                    )}
+                    <span className="text-[14px] text-[#262626] font-medium">@{a.username}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[12px] text-[#ff9500] font-semibold tabular-nums">{a.count}</span>
+                    <SkipForward className="w-3 h-3 text-[#ff9500]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-br from-[#f8f9fa] to-[#e9ecef] border border-[#dbdbdb] rounded-xl p-5">
+        <h3 className="text-[14px] font-semibold text-[#262626] mb-2 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-[#0095f6]" />
+          ملخص صحة الخوارزمية
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+          <div className="bg-white rounded-lg p-3 border border-[#dbdbdb]">
+            <p className="text-[11px] text-[#8e8e8e] mb-1">دفعة الاكتشاف</p>
+            <p className="text-[14px] text-[#262626]">
+              {data.discovery_boost.total > 0
+                ? `${data.discovery_boost.total} محتوى نشط حالياً يحصل على دفعة`
+                : "لا يوجد محتوى جديد الآن (< 30 دقيقة)"}
+            </p>
+          </div>
+          <div className="bg-white rounded-lg p-3 border border-[#dbdbdb]">
+            <p className="text-[11px] text-[#8e8e8e] mb-1">نسبة التخطي</p>
+            <p className="text-[14px] text-[#262626]">
+              {data.negative_signals.total_signals_7d > 0
+                ? `${Math.round((data.negative_signals.skip_signals_7d / data.negative_signals.total_signals_7d) * 100)}% من الإشارات السلبية هي تخطي سريع`
+                : "لا توجد إشارات سلبية بعد"}
+            </p>
+          </div>
+          <div className="bg-white rounded-lg p-3 border border-[#dbdbdb]">
+            <p className="text-[11px] text-[#8e8e8e] mb-1">تنبيهات</p>
+            <p className="text-[14px] text-[#262626]">
+              {data.negative_signals.top_negative_hashtags.length > 5
+                ? "⚠️ عدد كبير من الهاشتاقات السلبية — راجع المحتوى"
+                : data.negative_signals.top_skipped_authors.some(a => a.count > 20)
+                  ? "⚠️ بعض الحسابات بتتخطى كتير — ممكن يكون سبام"
+                  : "✅ الخوارزمية تعمل بشكل طبيعي"}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

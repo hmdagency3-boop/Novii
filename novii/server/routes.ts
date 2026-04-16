@@ -4573,6 +4573,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/algorithm/health", requireAuth, requireAdmin, checkPermission('can_view_analytics'), async (req: Request, res: Response) => {
+    try {
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60000).toISOString();
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+
+      const [
+        discoveryPostsRes,
+        discoveryReelsRes,
+        skipSignalsRes,
+        niSignalsRes,
+        topSkippedHashtagsRes,
+        totalSignalsRes,
+      ] = await Promise.all([
+        adminDb!.from('posts').select('id', { count: 'exact', head: true }).eq('is_deleted', false).gte('created_at', thirtyMinAgo),
+        adminDb!.from('reels').select('id', { count: 'exact', head: true }).eq('is_deleted', false).gte('created_at', thirtyMinAgo),
+        adminDb!.from('content_signals').select('id', { count: 'exact', head: true }).eq('signal_type', 'skip').gte('created_at', sevenDaysAgo),
+        adminDb!.from('content_signals').select('id', { count: 'exact', head: true }).eq('signal_type', 'not_interested').gte('created_at', sevenDaysAgo),
+        adminDb!.from('content_signals').select('hashtags').eq('signal_type', 'not_interested').gte('created_at', sevenDaysAgo).not('hashtags', 'eq', '{}').limit(500),
+        adminDb!.from('content_signals').select('id', { count: 'exact', head: true }).gte('created_at', sevenDaysAgo),
+      ]);
+
+      const hashtagCounts: Record<string, number> = {};
+      for (const row of topSkippedHashtagsRes.data || []) {
+        for (const tag of (row.hashtags || [])) {
+          hashtagCounts[tag] = (hashtagCounts[tag] || 0) + 1;
+        }
+      }
+      const topNegativeHashtags = Object.entries(hashtagCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 15)
+        .map(([hashtag, count]) => ({ hashtag, count }));
+
+      const skipAuthorRes = await adminDb!
+        .from('content_signals')
+        .select('author_id, profiles!content_signals_author_id_fkey(username, avatar_url)')
+        .eq('signal_type', 'skip')
+        .gte('created_at', sevenDaysAgo)
+        .limit(500);
+
+      const authorSkipCounts: Record<string, { count: number; username: string; avatar_url: string }> = {};
+      for (const row of skipAuthorRes.data || []) {
+        if (!row.author_id) continue;
+        if (!authorSkipCounts[row.author_id]) {
+          authorSkipCounts[row.author_id] = {
+            count: 0,
+            username: (row as any).profiles?.username || 'unknown',
+            avatar_url: (row as any).profiles?.avatar_url || '',
+          };
+        }
+        authorSkipCounts[row.author_id].count++;
+      }
+      const topSkippedAuthors = Object.entries(authorSkipCounts)
+        .sort(([, a], [, b]) => b.count - a.count)
+        .slice(0, 10)
+        .map(([author_id, data]) => ({ author_id, ...data }));
+
+      res.json({
+        discovery_boost: {
+          active_posts: discoveryPostsRes.count || 0,
+          active_reels: discoveryReelsRes.count || 0,
+          total: (discoveryPostsRes.count || 0) + (discoveryReelsRes.count || 0),
+        },
+        negative_signals: {
+          total_signals_7d: totalSignalsRes.count || 0,
+          skip_signals_7d: skipSignalsRes.count || 0,
+          not_interested_7d: niSignalsRes.count || 0,
+          top_negative_hashtags: topNegativeHashtags,
+          top_skipped_authors: topSkippedAuthors,
+        },
+      });
+    } catch (error) {
+      console.error('Algorithm health error:', error);
+      res.status(500).json({ error: 'Failed to fetch algorithm health' });
+    }
+  });
+
   // ========================================
   // ADMIN: ANNOUNCEMENTS & NOTIFICATIONS
   // ========================================
