@@ -2406,7 +2406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from('community_members')
         .select(`
           *,
-          profiles:user_id(username, avatar_url)
+          profiles:user_id(username, full_name, avatar_url, is_verified, is_official)
         `)
         .eq('community_id', communityId)
         .is('kicked_at', null)
