@@ -120,6 +120,7 @@ export default function Messages() {
   const [muteTimeRemaining, setMuteTimeRemaining] = useState<number | null>(null);
   const muteCountdownRef = useRef<NodeJS.Timeout | null>(null);
   const selectedUserIdRef = useRef<string | null>(null);
+  const selectedCommunityIdRef = useRef<string | null>(null);
   const [userKickedStatus, setUserKickedStatus] = useState<{ isKicked: boolean; isMember: boolean }>({ isKicked: false, isMember: false });
   const communitiesSubscriptionRef = useRef<any>(null);
   const membersSubscriptionRef = useRef<any>(null);
@@ -232,6 +233,11 @@ export default function Messages() {
   useEffect(() => {
     selectedUserIdRef.current = selectedUserId;
   }, [selectedUserId]);
+
+  // Keep selectedCommunityIdRef in sync (for community notification closures)
+  useEffect(() => {
+    selectedCommunityIdRef.current = selectedCommunityId;
+  }, [selectedCommunityId]);
 
   // Hide bottom nav in mobile when chat/community is selected
   useEffect(() => {
@@ -1138,6 +1144,79 @@ export default function Messages() {
       supabase.removeChannel(channel);
     };
   }, [currentUser, queryClient]);
+
+  // 🔔 Global community notifications: play sound + show browser notification
+  // for new community messages (when the community isn't currently open).
+  useEffect(() => {
+    if (!currentUser || communities.length === 0) return;
+
+    const myCommunityIds = communities.map((c: any) => c.id);
+    const channel = supabase
+      .channel(`community-notifications-${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'community_messages',
+          filter: `community_id=in.(${myCommunityIds.join(',')})`,
+        },
+        async (payload: any) => {
+          const newMessage = payload.new;
+          // Skip own messages
+          if (newMessage.sender_id === currentUser.id) return;
+          // Skip if user is currently viewing this community
+          if (selectedCommunityIdRef.current === newMessage.community_id) return;
+          // Skip system messages
+          if (newMessage.is_system_message) return;
+
+          const community = communities.find((c: any) => c.id === newMessage.community_id);
+          if (!community) return;
+
+          // Respect notifications mute preference
+          if (community.notifications_muted) return;
+
+          // Bump community list (so unread indicator / order updates)
+          queryClient.invalidateQueries({ queryKey: ['communities', currentUser.id] });
+
+          // Play notification sound
+          if (notificationSoundRef.current) {
+            notificationSoundRef.current.play().catch(() => {});
+          }
+
+          // Browser notification with sender info
+          if (hasNotificationPermission) {
+            const { data: senderProfile } = await supabase
+              .from('profiles')
+              .select('username, full_name, avatar_url')
+              .eq('id', newMessage.sender_id)
+              .single();
+
+            const senderName = senderProfile?.full_name || senderProfile?.username || (isRTL ? 'عضو' : 'Member');
+            const title = `${community.name} • ${senderName}`;
+            const notification = new Notification(title, {
+              body: newMessage.content || (isRTL ? 'رسالة جديدة' : 'New message'),
+              icon: community.avatar_url || senderProfile?.avatar_url || undefined,
+              tag: `community-${newMessage.community_id}`,
+              requireInteraction: false,
+            });
+
+            notification.onclick = () => {
+              window.focus();
+              setSelectedTab('communities');
+              setSelectedUserId(null);
+              setSelectedCommunityId(newMessage.community_id);
+              notification.close();
+            };
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser, communities, hasNotificationPermission, queryClient, isRTL]);
 
   // Real-time subscription for new messages and typing indicators in active chat
   useEffect(() => {
