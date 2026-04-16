@@ -370,6 +370,12 @@ export const api = {
           is_verified: false,
           is_official: false,
           is_private: true,
+          is_online: false,
+          last_seen: null,
+          is_active: false,
+          is_creator: false,
+          is_premium: false,
+          is_popular: false,
           followers_count: 0,
           following_count: 0,
           posts_count: 0,
@@ -1274,7 +1280,7 @@ export const api = {
     if (error) throw error;
 
     // Mark which stories the current user has already viewed
-    const stories = (data || []) as unknown as Story[];
+    const stories = ((data || []).filter((s: any) => !s.profile?.is_deactivated)) as unknown as Story[];
     if (stories.length > 0) {
       const storyIds = stories.map(s => s.id);
       const { data: viewedData } = await supabase
@@ -1295,11 +1301,13 @@ export const api = {
   async getUserStories(userId: string): Promise<Story[]> {
     const user = await getCurrentUser();
 
-    // Privacy gate: private account → must be a follower
-    if (user && user.id !== userId) {
+    // Privacy / deactivation gate
+    if (!user || user.id !== userId) {
       const { data: targetProfile } = await supabase
-        .from('profiles').select('is_private').eq('id', userId).single();
+        .from('profiles').select('is_private, is_deactivated').eq('id', userId).single();
+      if (targetProfile?.is_deactivated) return [];
       if (targetProfile?.is_private) {
+        if (!user) return [];
         const { data: follow } = await supabase
           .from('follows').select('id').eq('follower_id', user.id).eq('following_id', userId).single();
         if (!follow) return [];
@@ -2342,6 +2350,12 @@ export const api = {
         is_verified: false,
         is_official: false,
         is_private: true,
+        is_online: false,
+        last_seen: null,
+        is_active: false,
+        is_creator: false,
+        is_premium: false,
+        is_popular: false,
         followers_count: 0,
         following_count: 0,
         posts_count: 0,
