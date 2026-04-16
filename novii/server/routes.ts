@@ -1353,22 +1353,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Deactivate account (temporary - reversible)
+  // ---------- Helpers: DB-level redaction (radical approach) ----------
+  async function redactProfileInDb(adminDb: any, userId: string, extraFields: Record<string, any> = {}) {
+    // 1) Read the current profile row so we can back it up
+    const { data: original, error: readErr } = await adminDb
+      .from('profiles').select('*').eq('id', userId).single();
+    if (readErr || !original) throw new Error(readErr?.message || 'Profile not found');
+
+    // Skip backup if already redacted (idempotent)
+    const backup = original.deletion_backup ? original.deletion_backup : {
+      full_name: original.full_name,
+      username: original.username,
+      avatar_url: original.avatar_url,
+      cover_url: original.cover_url,
+      bio: original.bio,
+      website: original.website,
+      location: original.location,
+      phone_number: original.phone_number,
+      is_verified: original.is_verified,
+      is_official: original.is_official,
+      is_creator: original.is_creator,
+      is_premium: original.is_premium,
+      is_popular: original.is_popular,
+      is_active: original.is_active,
+      is_private: original.is_private,
+      is_online: original.is_online,
+      last_seen: original.last_seen,
+      followers_count: original.followers_count,
+      following_count: original.following_count,
+      posts_count: original.posts_count,
+    };
+
+    // 2) Overwrite the row with redacted values + the lifecycle flags
+    const redactedUsername = `deleted_user_${String(userId).replace(/-/g, '').slice(0, 8)}`;
+    const { error: upErr } = await adminDb
+      .from('profiles')
+      .update({
+        deletion_backup: backup,
+        full_name: 'User Deleted',
+        username: redactedUsername,
+        avatar_url: null,
+        cover_url: null,
+        bio: '',
+        website: '',
+        location: '',
+        phone_number: null,
+        is_verified: false,
+        is_official: false,
+        is_creator: false,
+        is_premium: false,
+        is_popular: false,
+        is_active: false,
+        is_private: true,
+        is_online: false,
+        last_seen: null,
+        followers_count: 0,
+        following_count: 0,
+        posts_count: 0,
+        ...extraFields,
+      })
+      .eq('id', userId);
+    if (upErr) throw new Error(upErr.message);
+
+    // 3) Hide all the user's content using the existing is_deleted flags
+    await Promise.all([
+      adminDb.from('posts').update({ is_deleted: true }).eq('user_id', userId),
+      adminDb.from('reels').update({ is_deleted: true }).eq('user_id', userId),
+      adminDb.from('comments').update({ is_deleted: true }).eq('user_id', userId),
+      adminDb.from('stories').delete().eq('user_id', userId),
+    ].map(p => p.then(() => null).catch(() => null)));
+  }
+
+  async function restoreProfileInDb(adminDb: any, userId: string, extraFields: Record<string, any> = {}) {
+    const { data: row } = await adminDb
+      .from('profiles').select('deletion_backup').eq('id', userId).single();
+    const backup = row?.deletion_backup || {};
+    await adminDb
+      .from('profiles')
+      .update({
+        ...backup,
+        deletion_backup: null,
+        is_deactivated: false,
+        deactivated_at: null,
+        deletion_requested_at: null,
+        scheduled_deletion_at: null,
+        ...extraFields,
+      })
+      .eq('id', userId);
+
+    // Restore the user's content
+    await Promise.all([
+      adminDb.from('posts').update({ is_deleted: false }).eq('user_id', userId),
+      adminDb.from('reels').update({ is_deleted: false }).eq('user_id', userId),
+      adminDb.from('comments').update({ is_deleted: false }).eq('user_id', userId),
+    ].map(p => p.then(() => null).catch(() => null)));
+  }
+
+  // Deactivate account (temporary - reversible). Same redaction as soft-delete but no scheduled date.
   app.post("/api/account/deactivate", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId!;
       if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
 
-      const { error } = await adminDb
-        .from('profiles')
-        .update({
-          is_deactivated: true,
-          deactivated_at: new Date().toISOString(),
-          is_online: false,
-        })
-        .eq('id', userId);
-
-      if (error) return res.status(500).json({ error: error.message });
+      await redactProfileInDb(adminDb, userId, {
+        is_deactivated: true,
+        deactivated_at: new Date().toISOString(),
+      });
 
       // Sign out all devices
       try { await adminDb.from('user_devices').delete().eq('user_id', userId); } catch {}
@@ -1407,22 +1497,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Password is incorrect' });
       }
 
-      // SOFT DELETE: schedule deletion in 30 days, deactivate immediately
+      // SOFT DELETE: schedule deletion in 30 days, redact + hide content immediately
       const now = new Date();
       const scheduled = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-      const { error: upErr } = await adminDb
-        .from('profiles')
-        .update({
-          is_deactivated: true,
-          deactivated_at: now.toISOString(),
-          deletion_requested_at: now.toISOString(),
-          scheduled_deletion_at: scheduled.toISOString(),
-          is_online: false,
-        })
-        .eq('id', userId);
-
-      if (upErr) return res.status(500).json({ error: upErr.message });
+      await redactProfileInDb(adminDb, userId, {
+        is_deactivated: true,
+        deactivated_at: now.toISOString(),
+        deletion_requested_at: now.toISOString(),
+        scheduled_deletion_at: scheduled.toISOString(),
+      });
 
       // Sign out all other devices
       try { await adminDb.from('user_devices').delete().eq('user_id', userId); } catch {}
@@ -1458,17 +1542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(410).json({ error: 'Grace period has expired' });
       }
 
-      const { error } = await adminDb
-        .from('profiles')
-        .update({
-          is_deactivated: false,
-          deactivated_at: null,
-          deletion_requested_at: null,
-          scheduled_deletion_at: null,
-        })
-        .eq('id', userId);
-
-      if (error) return res.status(500).json({ error: error.message });
+      await restoreProfileInDb(adminDb, userId);
 
       return res.json({ success: true });
     } catch (e: any) {
@@ -1512,17 +1586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.userId!;
       if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
 
-      const { error } = await adminDb
-        .from('profiles')
-        .update({
-          is_deactivated: false,
-          deactivated_at: null,
-          deletion_requested_at: null,
-          scheduled_deletion_at: null,
-        })
-        .eq('id', userId);
-
-      if (error) return res.status(500).json({ error: error.message });
+      await restoreProfileInDb(adminDb, userId);
       return res.json({ success: true });
     } catch (e: any) {
       return res.status(500).json({ error: e?.message || 'Failed to reactivate' });
