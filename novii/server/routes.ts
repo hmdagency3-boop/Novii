@@ -871,8 +871,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.userId!;
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 40);
+      const offset = parseInt(req.query.offset as string) || 0;
       const feedDb = getDb(req);
-      const reels = await getPersonalizedExploreReels(feedDb, userId, limit, adminDb || undefined);
+      const reels = await getPersonalizedExploreReels(feedDb, userId, limit, adminDb || undefined, offset);
       res.json(reels);
     } catch (error) {
       console.error("Personalized explore reels error:", error);

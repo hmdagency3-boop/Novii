@@ -493,7 +493,8 @@ export async function getPersonalizedExploreReels(
   db: SupabaseClient,
   userId: string,
   limit: number = 20,
-  settingsDb?: SupabaseClient
+  settingsDb?: SupabaseClient,
+  offset: number = 0
 ): Promise<any[]> {
   const config = await getAlgorithmConfig(db, settingsDb);
 
@@ -559,5 +560,5 @@ export async function getPersonalizedExploreReels(
   });
 
   scored.sort((a: any, b: any) => b._score - a._score);
-  return scored.slice(0, limit).map(({ _score, ...reel }) => reel);
+  return scored.slice(offset, offset + limit).map(({ _score, ...reel }) => reel);
 }

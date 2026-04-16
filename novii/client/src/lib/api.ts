@@ -713,7 +713,33 @@ export const api = {
 
   // Reels APIs
   async getReels(limit = 20, offset = 0): Promise<Reel[]> {
-    // Optimized: use specific columns with pagination
+    const user = await getCurrentUser();
+    if (user) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || "";
+        const res = await fetch(`/api/explore/personalized/reels?limit=${limit}&offset=${offset}`, {
+          headers: { "x-user-token": token, "x-user-id": user.id },
+        });
+        if (res.ok) {
+          const reels = await res.json();
+          if (reels.length > 0) {
+            const reelIds = reels.map((r: any) => r.id);
+            const { data: likesData } = await supabase
+              .from('likes')
+              .select('reel_id')
+              .eq('user_id', user.id)
+              .in('reel_id', reelIds);
+            const likedIds = new Set(likesData?.map((l: any) => l.reel_id) || []);
+            return reels.map((reel: any) => ({
+              ...reel,
+              is_liked: likedIds.has(reel.id)
+            })) as unknown as Reel[];
+          }
+        }
+      } catch {}
+    }
+
     const { data, error } = await supabase
       .from('reels')
       .select(REEL_WITH_PROFILE)
@@ -724,8 +750,6 @@ export const api = {
     if (error) throw error;
     const reels = data || [];
 
-    // Add is_liked for current user (batch query)
-    const user = await getCurrentUser();
     if (user && reels.length > 0) {
       const reelIds = reels.map(r => r.id);
       const { data: likesData } = await supabase
@@ -733,9 +757,7 @@ export const api = {
         .select('reel_id')
         .eq('user_id', user.id)
         .in('reel_id', reelIds);
-
       const likedIds = new Set(likesData?.map(l => l.reel_id) || []);
-
       return reels.map(reel => ({
         ...reel,
         is_liked: likedIds.has(reel.id)
