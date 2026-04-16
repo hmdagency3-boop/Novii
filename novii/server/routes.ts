@@ -45,6 +45,38 @@ function arrayToUUID(arr: any): string {
   ].join('-');
 }
 
+// ─── Simple in-memory rate limiter (per-IP / per-key) ────────────────
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(req: Request, key: string, max: number, windowMs: number): boolean {
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+    || req.socket.remoteAddress
+    || 'unknown';
+  const bucketKey = `${key}:${req.userId || ip}`;
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(bucketKey);
+  if (!bucket || bucket.resetAt < now) {
+    rateLimitBuckets.set(bucketKey, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (bucket.count >= max) return false;
+  bucket.count++;
+  return true;
+}
+// Clean stale buckets every 10 min
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of rateLimitBuckets) if (v.resetAt < now) rateLimitBuckets.delete(k);
+}, 10 * 60 * 1000).unref?.();
+
+// Strong invite code (12 chars, ~62 bits entropy from crypto.randomBytes)
+function generateStrongInviteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // excludes I,O,1,0 to avoid confusion
+  const bytes = crypto.randomBytes(12);
+  let code = '';
+  for (let i = 0; i < 12; i++) code += chars[bytes[i] % chars.length];
+  return code;
+}
+
 declare global {
   namespace Express {
     interface Request {
@@ -1458,34 +1490,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Communities endpoints - Using Supabase only
   // Create new community
-  app.post("/api/communities/create", async (req: Request, res: Response) => {
+  app.post("/api/communities/create", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
-      const { name, description, isPrivate } = req.body;
+      const { name, description, isPrivate, category } = req.body;
 
       if (!userId || !name) {
         return res.status(400).json({ error: 'User ID and community name required' });
       }
+      if (typeof name !== 'string' || name.trim().length < 2 || name.length > 80) {
+        return res.status(400).json({ error: 'Community name must be 2-80 characters' });
+      }
+      if (description && (typeof description !== 'string' || description.length > 500)) {
+        return res.status(400).json({ error: 'Description must be ≤500 characters' });
+      }
+      // Rate limit: 5 communities created per user/IP per hour
+      if (!rateLimit(req, 'community:create', 5, 60 * 60 * 1000)) {
+        return res.status(429).json({ error: 'Too many communities created. Try again later.' });
+      }
 
       const communityId = crypto.randomUUID();
       const now = new Date().toISOString();
-      
-      // Generate unique 8-char invite code
-      const generateInviteCode = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let code = '';
-        for (let i = 0; i < 8; i++) {
-          code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return code;
-      };
-      const inviteCode = generateInviteCode();
+      const inviteCode = generateStrongInviteCode();
       
       // Create community via Supabase
       const { data: commData, error: commError } = await getDb(req).from('communities').insert({
         id: communityId,
-        name,
-        description: description || null,
+        name: name.trim(),
+        description: description?.trim() || null,
+        category: category?.trim() || null,
         invite_code: inviteCode,
         created_by: userId,
         members_count: 1,
@@ -1554,7 +1587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get user's communities
-  app.get("/api/communities", async (req: Request, res: Response) => {
+  app.get("/api/communities", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       if (!userId) return res.status(401).json({ error: 'User ID required' });
@@ -1617,27 +1650,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Fetched ${communities.length} communities from Supabase`);
       res.json({ data: communities });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Get communities error:", error);
-      res.json({ data: [] });
+      res.status(500).json({ error: error?.message || 'Failed to fetch communities', data: [] });
     }
   });
 
   // Send message to community
-  app.post("/api/communities/:id/send-message", async (req: Request, res: Response) => {
+  app.post("/api/communities/:id/send-message", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
-      const { content, imageUrl } = req.body;
+      const { content, imageUrl, repliedToMessageId } = req.body;
 
       if (!userId || !communityId || !content) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
+      if (typeof content !== 'string' || content.trim().length === 0 || content.length > 4000) {
+        return res.status(400).json({ error: 'Message must be 1-4000 characters' });
+      }
+      // Rate limit: 30 messages / minute / user
+      if (!rateLimit(req, 'community:send', 30, 60 * 1000)) {
+        return res.status(429).json({ error: 'You are sending messages too fast. Please slow down.' });
+      }
+
+      // Fetch community settings (slow mode + who_can_send)
+      const { data: community } = await getDb(req)
+        .from('communities')
+        .select('created_by, slow_mode_seconds, who_can_send')
+        .eq('id', communityId)
+        .single();
 
       // Check if user is member AND check mute/kick status
       const { data: member, error: memberErr } = await getDb(req)
         .from('community_members')
-        .select('id, role, is_muted, muted_until, kicked_at')
+        .select('id, role, is_muted, muted_until, kicked_at, last_message_at')
         .eq('community_id', communityId)
         .eq('user_id', userId)
         .single();
@@ -1649,6 +1696,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user is kicked
       if (member.kicked_at) {
         return res.status(403).json({ error: 'You have been kicked from this community' });
+      }
+
+      // who_can_send check (admins-only mode)
+      const isOwner = community?.created_by === userId;
+      const isAdmin = member.role === 'admin' || isOwner;
+      if (community?.who_can_send === 'admins' && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can send messages in this community' });
+      }
+
+      // Slow mode check (skipped for admins/owner)
+      const slowSec = Number(community?.slow_mode_seconds) || 0;
+      if (slowSec > 0 && !isAdmin && member.last_message_at) {
+        const elapsed = (Date.now() - new Date(member.last_message_at).getTime()) / 1000;
+        if (elapsed < slowSec) {
+          const wait = Math.ceil(slowSec - elapsed);
+          return res.status(429).json({ error: `Slow mode: wait ${wait}s before sending again` });
+        }
       }
 
       // Check if user is muted
@@ -1673,44 +1737,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const messageId = crypto.randomUUID();
+      const nowIso = new Date().toISOString();
       const { error: insertErr } = await getDb(req).from('community_messages').insert({
         id: messageId,
         community_id: communityId,
         sender_id: userId,
-        content,
+        content: content.trim(),
         image_url: imageUrl || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        replied_to_message_id: repliedToMessageId || null,
+        created_at: nowIso,
+        updated_at: nowIso
       });
 
       if (insertErr) throw insertErr;
 
+      // Update last_message_at for slow mode tracking
+      await getDb(req)
+        .from('community_members')
+        .update({ last_message_at: nowIso })
+        .eq('community_id', communityId)
+        .eq('user_id', userId);
+
       console.log(`💬 Message sent to community ${communityId}`);
-      res.json({ success: true, messageId });
+      res.json({ success: true, messageId, createdAt: nowIso });
     } catch (error) {
       console.error("Send community message error:", error);
       res.status(500).json({ error: 'Failed to send message' });
     }
   });
 
-  // Get community messages
-  app.get("/api/communities/:id/messages", async (req: Request, res: Response) => {
+  // Get community messages (with pagination + reply + reactions)
+  app.get("/api/communities/:id/messages", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const { id: communityId } = req.params;
-      const { limit = 50 } = req.query;
+      const limit = Math.min(parseInt((req.query.limit as string) || '50') || 50, 100);
+      const before = req.query.before as string | undefined; // ISO timestamp for pagination
 
       if (!adminDb) return res.json({ data: [] });
 
-      const { data: messages, error } = await adminDb
+      let query = adminDb
         .from('community_messages')
         .select('*, profiles!sender_id(username, full_name, avatar_url, is_verified, is_official)')
         .eq('community_id', communityId)
-        .order('created_at', { ascending: true })
-        .limit(parseInt(limit as string) || 50);
+        .order('created_at', { ascending: false })
+        .limit(limit);
 
+      if (before) query = query.lt('created_at', before);
+
+      const { data: messages, error } = await query;
       if (error) throw error;
 
-      const formatted = (messages || []).map((m: any) => ({
+      const list = (messages || []).reverse(); // chronological
+      const ids = list.map((m: any) => m.id);
+      const replyIds = Array.from(new Set(list.map((m: any) => m.replied_to_message_id).filter(Boolean)));
+
+      // Fetch reply previews
+      let replyMap: Record<string, any> = {};
+      if (replyIds.length) {
+        const { data: replies } = await adminDb
+          .from('community_messages')
+          .select('id, content, sender_id, is_deleted, profiles!sender_id(username)')
+          .in('id', replyIds);
+        (replies || []).forEach((r: any) => {
+          replyMap[r.id] = {
+            id: r.id,
+            content: r.is_deleted ? null : r.content,
+            sender_id: r.sender_id,
+            sender_username: r.profiles?.username,
+            is_deleted: !!r.is_deleted,
+          };
+        });
+      }
+
+      // Fetch reactions
+      let reactionsByMsg: Record<string, any[]> = {};
+      if (ids.length) {
+        const { data: reactions } = await adminDb
+          .from('community_message_reactions')
+          .select('message_id, user_id, reaction')
+          .in('message_id', ids);
+        (reactions || []).forEach((r: any) => {
+          (reactionsByMsg[r.message_id] ||= []).push(r);
+        });
+      }
+
+      const formatted = list.map((m: any) => ({
         ...m,
         username: m.profiles?.username,
         full_name: m.profiles?.full_name,
@@ -1718,17 +1829,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         is_verified: m.profiles?.is_verified,
         is_official: m.profiles?.is_official,
         is_system_message: m.is_system_message ?? false,
+        reply_to: m.replied_to_message_id ? replyMap[m.replied_to_message_id] || null : null,
+        reactions: reactionsByMsg[m.id] || [],
       }));
 
-      res.json({ data: formatted });
-    } catch (error) {
+      res.json({ data: formatted, hasMore: (messages?.length || 0) >= limit });
+    } catch (error: any) {
       console.error("Get community messages error:", error);
-      res.json({ data: [] });
+      res.status(500).json({ error: error?.message || 'Failed to fetch messages', data: [] });
     }
   });
 
   // Delete community message (admin only) - Soft Delete
-  app.delete("/api/communities/:id/messages/:messageId", async (req: Request, res: Response) => {
+  app.delete("/api/communities/:id/messages/:messageId", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId, messageId } = req.params;
@@ -1771,7 +1884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add member to community
-  app.post("/api/communities/:id/add-member", async (req: Request, res: Response) => {
+  app.post("/api/communities/:id/add-member", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -1794,6 +1907,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: 'Only admins can add members' });
       }
 
+      // Check if already a member (active or kicked)
+      const { data: existing } = await getDb(req)
+        .from('community_members')
+        .select('id, kicked_at')
+        .eq('community_id', communityId)
+        .eq('user_id', memberId)
+        .maybeSingle();
+
+      if (existing) {
+        if (existing.kicked_at) {
+          return res.status(409).json({ error: 'User has been kicked from this community' });
+        }
+        return res.status(409).json({ error: 'User is already a member' });
+      }
+
       // Add member
       const { error: insertErr } = await getDb(req).from('community_members').insert({
         id: crypto.randomUUID(),
@@ -1803,9 +1931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         joined_at: new Date().toISOString()
       });
 
-      if (insertErr) {
-        console.warn('Member already exists:', insertErr);
-      }
+      if (insertErr) throw insertErr;
 
       console.log(`👥 Member ${memberId} added to community ${communityId}`);
       res.json({ success: true });
@@ -1816,7 +1942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get community invite code (owner only) 🔐
-  app.get("/api/communities/:id/invite-code", async (req: Request, res: Response) => {
+  app.get("/api/communities/:id/invite-code", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -1855,13 +1981,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Join community with invite code 🎫
-  app.post("/api/communities/join-with-code", async (req: Request, res: Response) => {
+  app.post("/api/communities/join-with-code", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { inviteCode } = req.body;
 
       if (!userId || !inviteCode) {
         return res.status(400).json({ error: 'User ID and invite code required' });
+      }
+      if (typeof inviteCode !== 'string' || inviteCode.length < 4 || inviteCode.length > 32) {
+        return res.status(400).json({ error: 'Invalid invite code format' });
+      }
+      // Rate limit: 10 join attempts per user/IP per 5 min (anti brute-force)
+      if (!rateLimit(req, 'community:join', 10, 5 * 60 * 1000)) {
+        return res.status(429).json({ error: 'Too many join attempts. Try again later.' });
       }
 
       if (!adminDb) {
@@ -1937,7 +2070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mute member (admin or owner only) 🔇
-  app.post("/api/communities/:id/mute-member", async (req: Request, res: Response) => {
+  app.post("/api/communities/:id/mute-member", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2005,7 +2138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Unmute member (admin or owner only) 🔊
-  app.post("/api/communities/:id/unmute-member", async (req: Request, res: Response) => {
+  app.post("/api/communities/:id/unmute-member", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2072,7 +2205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Temporary mute (admin or owner only) ⏱️
-  app.post("/api/communities/:id/temporary-mute", async (req: Request, res: Response) => {
+  app.post("/api/communities/:id/temporary-mute", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2145,7 +2278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Kick member (admin or owner only) 👢
-  app.post("/api/communities/:id/kick-member", async (req: Request, res: Response) => {
+  app.post("/api/communities/:id/kick-member", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2219,7 +2352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Check if user is kicked from community 👢
-  app.get("/api/communities/:id/check-kick-status", async (req: Request, res: Response) => {
+  app.get("/api/communities/:id/check-kick-status", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2259,7 +2392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get community members (with moderation info) 👥
-  app.get("/api/communities/:id/members", async (req: Request, res: Response) => {
+  app.get("/api/communities/:id/members", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2290,7 +2423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Regenerate invite code (owner only) 🔄
-  app.post("/api/communities/:id/regenerate-code", async (req: Request, res: Response) => {
+  app.post("/api/communities/:id/regenerate-code", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2315,16 +2448,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: 'Only community owner can regenerate code' });
       }
 
-      // Generate new invite code
-      const generateInviteCode = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let code = '';
-        for (let i = 0; i < 8; i++) {
-          code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return code;
-      };
-      const newCode = generateInviteCode();
+      // Rate limit: 5 regenerations per owner per hour
+      if (!rateLimit(req, 'community:regen', 5, 60 * 60 * 1000)) {
+        return res.status(429).json({ error: 'Too many regenerations. Try again later.' });
+      }
+      const newCode = generateStrongInviteCode();
 
       // Update community with new code
       const { data: updated, error: updateErr } = await getDb(req)
@@ -2350,7 +2478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Make member admin (community owner only) 👑
-  app.post("/api/communities/:id/make-admin", async (req: Request, res: Response) => {
+  app.post("/api/communities/:id/make-admin", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2401,7 +2529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Remove admin privileges from admin (community owner only) 🔽
-  app.post("/api/communities/:id/remove-admin", async (req: Request, res: Response) => {
+  app.post("/api/communities/:id/remove-admin", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2457,7 +2585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get kicked members (admin or owner only) 👢📋
-  app.get("/api/communities/:id/kicked-members", async (req: Request, res: Response) => {
+  app.get("/api/communities/:id/kicked-members", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2514,7 +2642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Unkick member (admin or owner only) 🔄👢
-  app.post("/api/communities/:id/unkick-member", async (req: Request, res: Response) => {
+  app.post("/api/communities/:id/unkick-member", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2588,7 +2716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update community info (owner only) ✏️
-  app.patch("/api/communities/:id", async (req: Request, res: Response) => {
+  app.patch("/api/communities/:id", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId || req.headers['x-user-id'] as string;
       const { id: communityId } = req.params;
@@ -2638,6 +2766,340 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Update community error:", error);
       res.status(500).json({ error: 'Failed to update community' });
+    }
+  });
+
+  // ── PATCH community settings (slow_mode, who_can_send, who_can_invite) ──
+  app.patch("/api/communities/:id/settings", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId || req.headers['x-user-id'] as string;
+      const { id: communityId } = req.params;
+      const { slowModeSeconds, whoCanSend, whoCanInvite, isPrivate, category } = req.body;
+
+      if (!userId || !communityId) return res.status(400).json({ error: 'Missing required fields' });
+
+      const { data: community } = await getDb(req)
+        .from('communities').select('created_by').eq('id', communityId).single();
+      if (!community || community.created_by !== userId) {
+        return res.status(403).json({ error: 'Only community owner can change settings' });
+      }
+
+      const updateData: any = {};
+      if (slowModeSeconds !== undefined) {
+        const n = Number(slowModeSeconds);
+        if (isNaN(n) || n < 0 || n > 3600) return res.status(400).json({ error: 'slowModeSeconds must be 0-3600' });
+        updateData.slow_mode_seconds = n;
+      }
+      if (whoCanSend !== undefined) {
+        if (!['all', 'admins'].includes(whoCanSend)) return res.status(400).json({ error: 'whoCanSend must be all|admins' });
+        updateData.who_can_send = whoCanSend;
+      }
+      if (whoCanInvite !== undefined) {
+        if (!['all', 'admins'].includes(whoCanInvite)) return res.status(400).json({ error: 'whoCanInvite must be all|admins' });
+        updateData.who_can_invite = whoCanInvite;
+      }
+      if (isPrivate !== undefined) updateData.is_private = !!isPrivate;
+      if (category !== undefined) updateData.category = category?.toString().trim() || null;
+
+      if (!Object.keys(updateData).length) return res.status(400).json({ error: 'No fields to update' });
+
+      const { data: updated, error } = await getDb(req)
+        .from('communities').update(updateData).eq('id', communityId).select().single();
+      if (error) throw error;
+      res.json({ success: true, community: updated });
+    } catch (error: any) {
+      console.error("Update settings error:", error);
+      res.status(500).json({ error: error?.message || 'Failed to update settings' });
+    }
+  });
+
+  // ── Leave community (any member except owner) ──────────────────────
+  app.post("/api/communities/:id/leave", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId || req.headers['x-user-id'] as string;
+      const { id: communityId } = req.params;
+      if (!userId || !communityId) return res.status(400).json({ error: 'Missing required fields' });
+      if (!adminDb) return res.status(500).json({ error: 'Server configuration error' });
+
+      const { data: community } = await adminDb.from('communities').select('created_by').eq('id', communityId).single();
+      if (!community) return res.status(404).json({ error: 'Community not found' });
+      if (community.created_by === userId) {
+        return res.status(403).json({ error: 'Owner cannot leave. Delete the community instead or transfer ownership.' });
+      }
+
+      const { error } = await adminDb
+        .from('community_members').delete()
+        .eq('community_id', communityId).eq('user_id', userId);
+      if (error) throw error;
+
+      // Recompute member count using exact count (head:true returns count without rows)
+      const { count: memberCount } = await adminDb
+        .from('community_members').select('id', { count: 'exact', head: true })
+        .eq('community_id', communityId).is('kicked_at', null);
+      await adminDb.from('communities').update({ members_count: memberCount ?? 0 }).eq('id', communityId);
+
+      console.log(`🚪 User ${userId} left community ${communityId}`);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Leave community error:", error);
+      res.status(500).json({ error: error?.message || 'Failed to leave community' });
+    }
+  });
+
+  // ── Delete community (owner only) ──────────────────────────────────
+  app.delete("/api/communities/:id", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId || req.headers['x-user-id'] as string;
+      const { id: communityId } = req.params;
+      if (!userId || !communityId) return res.status(400).json({ error: 'Missing required fields' });
+      if (!adminDb) return res.status(500).json({ error: 'Server configuration error' });
+
+      const { data: community } = await adminDb.from('communities').select('created_by').eq('id', communityId).single();
+      if (!community) return res.status(404).json({ error: 'Community not found' });
+      if (community.created_by !== userId) return res.status(403).json({ error: 'Only owner can delete community' });
+
+      const { error } = await adminDb.from('communities').delete().eq('id', communityId);
+      if (error) throw error;
+
+      console.log(`🗑️ Community ${communityId} deleted by owner ${userId}`);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete community error:", error);
+      res.status(500).json({ error: error?.message || 'Failed to delete community' });
+    }
+  });
+
+  // ── Delete own message (sender only) ───────────────────────────────
+  app.delete("/api/communities/:id/messages/:messageId/own", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId || req.headers['x-user-id'] as string;
+      const { id: communityId, messageId } = req.params;
+      if (!userId || !communityId || !messageId) return res.status(400).json({ error: 'Missing required fields' });
+
+      const { data: msg } = await getDb(req)
+        .from('community_messages').select('sender_id').eq('id', messageId).eq('community_id', communityId).single();
+      if (!msg) return res.status(404).json({ error: 'Message not found' });
+      if (msg.sender_id !== userId) return res.status(403).json({ error: 'You can only delete your own messages' });
+
+      const { error } = await getDb(req).from('community_messages').update({
+        is_deleted: true,
+        deleted_by: userId,
+        deleted_at: new Date().toISOString(),
+      }).eq('id', messageId);
+      if (error) throw error;
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete own message error:", error);
+      res.status(500).json({ error: error?.message || 'Failed to delete message' });
+    }
+  });
+
+  // ── Edit own message (sender only) ─────────────────────────────────
+  app.patch("/api/communities/:id/messages/:messageId", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId || req.headers['x-user-id'] as string;
+      const { id: communityId, messageId } = req.params;
+      const { content } = req.body;
+
+      if (!userId || !communityId || !messageId || !content) return res.status(400).json({ error: 'Missing required fields' });
+      if (typeof content !== 'string' || content.trim().length === 0 || content.length > 4000) {
+        return res.status(400).json({ error: 'Message must be 1-4000 characters' });
+      }
+
+      const { data: msg } = await getDb(req)
+        .from('community_messages').select('sender_id, is_deleted').eq('id', messageId).eq('community_id', communityId).single();
+      if (!msg) return res.status(404).json({ error: 'Message not found' });
+      if (msg.sender_id !== userId) return res.status(403).json({ error: 'You can only edit your own messages' });
+      if (msg.is_deleted) return res.status(400).json({ error: 'Cannot edit a deleted message' });
+
+      const { error } = await getDb(req).from('community_messages').update({
+        content: content.trim(),
+        is_edited: true,
+        edited_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq('id', messageId);
+      if (error) throw error;
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Edit message error:", error);
+      res.status(500).json({ error: error?.message || 'Failed to edit message' });
+    }
+  });
+
+  // ── Toggle reaction on a community message ─────────────────────────
+  app.post("/api/communities/:id/messages/:messageId/react", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const { id: communityId, messageId } = req.params;
+      const { reaction } = req.body;
+
+      if (!messageId || !reaction) return res.status(400).json({ error: 'Missing required fields' });
+      if (typeof reaction !== 'string' || reaction.length > 16) return res.status(400).json({ error: 'Invalid reaction' });
+
+      // Verify membership (cheap)
+      const { data: member } = await getDb(req)
+        .from('community_members').select('id, kicked_at')
+        .eq('community_id', communityId).eq('user_id', userId).maybeSingle();
+      if (!member || member.kicked_at) return res.status(403).json({ error: 'Not a community member' });
+
+      // Verify message belongs to this community (prevent cross-community reactions)
+      const { data: targetMsg } = await getDb(req)
+        .from('community_messages').select('id, community_id').eq('id', messageId).maybeSingle();
+      if (!targetMsg || targetMsg.community_id !== communityId) {
+        return res.status(404).json({ error: 'Message not found in this community' });
+      }
+
+      // Toggle: if same reaction exists, remove it; else insert
+      const { data: existing } = await getDb(req)
+        .from('community_message_reactions').select('id')
+        .eq('message_id', messageId).eq('user_id', userId).eq('reaction', reaction).maybeSingle();
+
+      if (existing) {
+        await getDb(req).from('community_message_reactions').delete().eq('id', existing.id);
+        return res.json({ success: true, action: 'removed' });
+      }
+      const { error } = await getDb(req).from('community_message_reactions').insert({
+        id: crypto.randomUUID(),
+        message_id: messageId,
+        user_id: userId,
+        reaction,
+        created_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      res.json({ success: true, action: 'added' });
+    } catch (error: any) {
+      console.error("React error:", error);
+      res.status(500).json({ error: error?.message || 'Failed to toggle reaction' });
+    }
+  });
+
+  // ── Toggle notifications mute for community (per user) ─────────────
+  app.post("/api/communities/:id/notifications", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId || req.headers['x-user-id'] as string;
+      const { id: communityId } = req.params;
+      const { muted, mutedUntil } = req.body;
+      if (!userId || !communityId || muted === undefined) return res.status(400).json({ error: 'Missing required fields' });
+
+      const update: any = { notifications_muted: !!muted };
+      if (muted && mutedUntil) {
+        const d = new Date(mutedUntil);
+        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid mutedUntil date' });
+        if (d.getTime() <= Date.now()) return res.status(400).json({ error: 'mutedUntil must be in the future' });
+        update.notifications_muted_until = d.toISOString();
+      } else {
+        update.notifications_muted_until = null;
+      }
+
+      const { error } = await getDb(req)
+        .from('community_members').update(update)
+        .eq('community_id', communityId).eq('user_id', userId);
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Notifications toggle error:", error);
+      res.status(500).json({ error: error?.message || 'Failed to update notifications' });
+    }
+  });
+
+  // ── Explore communities (public, non-private) ──────────────────────
+  app.get("/api/communities/explore", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      if (!adminDb) return res.json({ data: [] });
+      const limit = Math.min(parseInt((req.query.limit as string) || '30') || 30, 100);
+      const category = req.query.category as string | undefined;
+
+      let q = adminDb
+        .from('communities')
+        .select('id, name, description, avatar_url, members_count, category, created_at, profiles!created_by(username, avatar_url, is_official)')
+        .eq('is_private', false)
+        .order('members_count', { ascending: false })
+        .limit(limit);
+      if (category) q = q.eq('category', category);
+
+      const { data, error } = await q;
+      if (error) throw error;
+      res.json({ data: (data || []).map((c: any) => ({
+        ...c,
+        creator_username: c.profiles?.username,
+        creator_avatar: c.profiles?.avatar_url,
+        creator_is_official: c.profiles?.is_official === true,
+      })) });
+    } catch (error: any) {
+      console.error("Explore communities error:", error);
+      res.status(500).json({ error: error?.message || 'Failed to load communities', data: [] });
+    }
+  });
+
+  // ── Search communities by name (non-private) ───────────────────────
+  app.get("/api/communities/search", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      if (!adminDb) return res.json({ data: [] });
+      const query = (req.query.q as string)?.trim();
+      if (!query || query.length < 2) return res.json({ data: [] });
+
+      const limit = Math.min(parseInt((req.query.limit as string) || '20') || 20, 50);
+      const { data, error } = await adminDb
+        .from('communities')
+        .select('id, name, description, avatar_url, members_count, category, is_private, profiles!created_by(username, avatar_url, is_official)')
+        .ilike('name', `%${query}%`)
+        .eq('is_private', false)
+        .limit(limit);
+      if (error) throw error;
+      res.json({ data: (data || []).map((c: any) => ({
+        ...c,
+        creator_username: c.profiles?.username,
+        creator_avatar: c.profiles?.avatar_url,
+        creator_is_official: c.profiles?.is_official === true,
+      })) });
+    } catch (error: any) {
+      console.error("Search communities error:", error);
+      res.status(500).json({ error: error?.message || 'Search failed', data: [] });
+    }
+  });
+
+  // ── Join public community directly (no invite code, only non-private) ──
+  app.post("/api/communities/:id/join", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId || req.headers['x-user-id'] as string;
+      const { id: communityId } = req.params;
+      if (!userId || !communityId) return res.status(400).json({ error: 'Missing required fields' });
+      if (!adminDb) return res.status(500).json({ error: 'Server configuration error' });
+
+      if (!rateLimit(req, 'community:join-pub', 10, 5 * 60 * 1000)) {
+        return res.status(429).json({ error: 'Too many join attempts. Try again later.' });
+      }
+
+      const { data: community } = await adminDb
+        .from('communities').select('id, name, is_private').eq('id', communityId).single();
+      if (!community) return res.status(404).json({ error: 'Community not found' });
+      if (community.is_private) return res.status(403).json({ error: 'This community is private. Use an invite code.' });
+
+      const { data: existing } = await adminDb
+        .from('community_members').select('id, kicked_at')
+        .eq('community_id', communityId).eq('user_id', userId).maybeSingle();
+      if (existing?.kicked_at) {
+        return res.status(403).json({ error: 'You have been kicked from this community and cannot rejoin' });
+      }
+      if (existing) return res.json({ success: true, message: 'Already a member' });
+
+      const { error } = await adminDb.from('community_members').insert({
+        id: crypto.randomUUID(), community_id: communityId, user_id: userId, role: 'member',
+        joined_at: new Date().toISOString(),
+      });
+      if (error && error.code !== '23505') throw error;
+
+      const { count: memberCount } = await adminDb
+        .from('community_members').select('id', { count: 'exact', head: true })
+        .eq('community_id', communityId).is('kicked_at', null);
+      await adminDb.from('communities').update({ members_count: memberCount ?? 1 }).eq('id', communityId);
+
+      res.json({ success: true, communityName: community.name });
+    } catch (error: any) {
+      console.error("Public join error:", error);
+      res.status(500).json({ error: error?.message || 'Failed to join community' });
     }
   });
 

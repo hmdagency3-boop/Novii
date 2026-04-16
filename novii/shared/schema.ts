@@ -140,6 +140,10 @@ export const communities = pgTable("communities", {
   createdBy: uuid("created_by").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   membersCount: integer("members_count").default(1),
   isPrivate: boolean("is_private").default(false),
+  category: text("category"),
+  slowModeSeconds: integer("slow_mode_seconds").default(0),
+  whoCanSend: text("who_can_send").default("all"), // 'all' | 'admins'
+  whoCanInvite: text("who_can_invite").default("admins"), // 'all' | 'admins'
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -150,6 +154,9 @@ export const communityMembers = pgTable("community_members", {
   communityId: uuid("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
   userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   role: text("role").default("member"), // 'admin', 'moderator', 'member'
+  notificationsMuted: boolean("notifications_muted").default(false),
+  notificationsMutedUntil: timestamp("notifications_muted_until"),
+  lastMessageAt: timestamp("last_message_at"),
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 
@@ -160,10 +167,20 @@ export const communityMessages = pgTable("community_messages", {
   senderId: uuid("sender_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   content: text("content").notNull(),
   imageUrl: text("image_url"),
+  repliedToMessageId: uuid("replied_to_message_id"),
   isEdited: boolean("is_edited").default(false),
   editedAt: timestamp("edited_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Community message reactions
+export const communityMessageReactions = pgTable("community_message_reactions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  messageId: uuid("message_id").notNull().references(() => communityMessages.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  reaction: text("reaction").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Notifications table

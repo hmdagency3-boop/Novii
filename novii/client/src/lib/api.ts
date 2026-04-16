@@ -2996,6 +2996,141 @@ export const api = {
     return response.json();
   },
 
+  // ── Community v2 helpers ────────────────────────────────────────────
+  async sendCommunityMessageV2(communityId: string, payload: { content: string; imageUrl?: string; repliedToMessageId?: string }): Promise<any> {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('User not authenticated');
+    const response = await communityFetch(`/api/communities/${communityId}/send-message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to send message');
+    }
+    return response.json();
+  },
+
+  async getCommunityMessagesPage(communityId: string, opts: { limit?: number; before?: string } = {}): Promise<{ data: any[]; hasMore: boolean }> {
+    const params = new URLSearchParams();
+    if (opts.limit) params.set('limit', String(opts.limit));
+    if (opts.before) params.set('before', opts.before);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const response = await communityFetch(`/api/communities/${communityId}/messages${qs}`);
+    if (!response.ok) throw new Error('Failed to load messages');
+    const json = await response.json();
+    return { data: json.data || [], hasMore: !!json.hasMore };
+  },
+
+  async leaveCommunity(communityId: string): Promise<any> {
+    const response = await communityFetch(`/api/communities/${communityId}/leave`, { method: 'POST' });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to leave community');
+    }
+    return response.json();
+  },
+
+  async deleteCommunity(communityId: string): Promise<any> {
+    const response = await communityFetch(`/api/communities/${communityId}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to delete community');
+    }
+    return response.json();
+  },
+
+  async deleteOwnCommunityMessage(communityId: string, messageId: string): Promise<any> {
+    const response = await communityFetch(`/api/communities/${communityId}/messages/${messageId}/own`, { method: 'DELETE' });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to delete message');
+    }
+    return response.json();
+  },
+
+  async editCommunityMessage(communityId: string, messageId: string, content: string): Promise<any> {
+    const response = await communityFetch(`/api/communities/${communityId}/messages/${messageId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to edit message');
+    }
+    return response.json();
+  },
+
+  async toggleCommunityReaction(communityId: string, messageId: string, reaction: string): Promise<any> {
+    const response = await communityFetch(`/api/communities/${communityId}/messages/${messageId}/react`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reaction }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to react');
+    }
+    return response.json();
+  },
+
+  async setCommunityNotifications(communityId: string, muted: boolean, mutedUntil?: string | null): Promise<any> {
+    const response = await communityFetch(`/api/communities/${communityId}/notifications`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ muted, mutedUntil: mutedUntil || null }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to update notifications');
+    }
+    return response.json();
+  },
+
+  async updateCommunitySettings(communityId: string, settings: { slowModeSeconds?: number; whoCanSend?: 'all' | 'admins'; whoCanInvite?: 'all' | 'admins'; isPrivate?: boolean; category?: string | null }): Promise<any> {
+    const response = await communityFetch(`/api/communities/${communityId}/settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to update settings');
+    }
+    return response.json();
+  },
+
+  async exploreCommunities(opts: { limit?: number; category?: string } = {}): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (opts.limit) params.set('limit', String(opts.limit));
+    if (opts.category) params.set('category', opts.category);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const response = await communityFetch(`/api/communities/explore${qs}`);
+    if (!response.ok) return [];
+    const json = await response.json();
+    return json.data || [];
+  },
+
+  async searchCommunities(query: string, limit = 20): Promise<any[]> {
+    if (!query || query.trim().length < 2) return [];
+    const params = new URLSearchParams({ q: query.trim(), limit: String(limit) });
+    const response = await communityFetch(`/api/communities/search?${params.toString()}`);
+    if (!response.ok) return [];
+    const json = await response.json();
+    return json.data || [];
+  },
+
+  async joinPublicCommunity(communityId: string): Promise<any> {
+    const response = await communityFetch(`/api/communities/${communityId}/join`, { method: 'POST' });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to join community');
+    }
+    return response.json();
+  },
+
   saveHashtags(contentId: string, contentType: 'post' | 'reel', caption: string) {
     return saveHashtags(contentId, contentType, caption);
   },

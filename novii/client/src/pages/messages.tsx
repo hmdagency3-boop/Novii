@@ -535,13 +535,37 @@ export default function Messages() {
     }
   });
 
-  // Send community message mutation
+  // Send community message mutation (with optimistic update)
   const sendCommunityMessageMutation = useMutation({
     mutationFn: async ({ communityId, content }: { communityId: string; content: string }) =>
       api.sendCommunityMessage(communityId, content),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['communityMessages', selectedCommunityId, currentUser?.id] });
+    onMutate: async ({ communityId, content }) => {
+      const queryKey = ['communityMessages', selectedCommunityId, currentUser?.id];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<any[]>(queryKey) || [];
+      const optimistic = {
+        id: `temp-${Date.now()}`,
+        community_id: communityId,
+        sender_id: currentUser?.id,
+        content,
+        image_url: null,
+        created_at: new Date().toISOString(),
+        is_deleted: false,
+        is_system_message: false,
+        username: currentUser?.user_metadata?.username || (currentUser as any)?.username,
+        avatar_url: (currentUser as any)?.avatar_url,
+        _optimistic: true,
+      };
+      queryClient.setQueryData(queryKey, [...previous, optimistic]);
       setCommunityMessageInput("");
+      return { previous, queryKey };
+    },
+    onError: (err: any, _vars, ctx) => {
+      if (ctx?.queryKey) queryClient.setQueryData(ctx.queryKey, ctx.previous);
+      toast.error(err?.message || (isRTL ? 'فشل إرسال الرسالة' : 'Failed to send message'));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['communityMessages', selectedCommunityId, currentUser?.id] });
     },
   });
 
@@ -556,6 +580,64 @@ export default function Messages() {
     onError: (error: any) => {
       toast.error(error.message || (isRTL ? 'فشل حذف الرسالة' : 'Failed to delete message'));
     }
+  });
+
+  // Delete own community message mutation (sender)
+  const deleteOwnMessageMutation = useMutation({
+    mutationFn: async ({ communityId, messageId }: { communityId: string; messageId: string }) =>
+      api.deleteOwnCommunityMessage(communityId, messageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['communityMessages', selectedCommunityId, currentUser?.id] });
+      toast.success(isRTL ? 'تم حذف رسالتك' : 'Your message was deleted');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || (isRTL ? 'فشل حذف الرسالة' : 'Failed to delete message'));
+    }
+  });
+
+  // Leave community mutation (member only, not owner)
+  const leaveCommunityMutation = useMutation({
+    mutationFn: async (communityId: string) => api.leaveCommunity(communityId),
+    onSuccess: () => {
+      toast.success(isRTL ? 'لقد غادرت المجتمع' : 'You left the community');
+      queryClient.invalidateQueries({ queryKey: ['communities', currentUser?.id] });
+      setSelectedCommunityId(null);
+      setShowCommunityInfoModal(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || (isRTL ? 'فشل المغادرة' : 'Failed to leave community'));
+    },
+  });
+
+  // Delete community mutation (owner only)
+  const deleteCommunityMutation = useMutation({
+    mutationFn: async (communityId: string) => api.deleteCommunity(communityId),
+    onSuccess: () => {
+      toast.success(isRTL ? 'تم حذف المجتمع' : 'Community deleted');
+      queryClient.invalidateQueries({ queryKey: ['communities', currentUser?.id] });
+      setSelectedCommunityId(null);
+      setShowCommunityInfoModal(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || (isRTL ? 'فشل الحذف' : 'Failed to delete community'));
+    },
+  });
+
+  // Toggle community notifications mute
+  const myMembership = communityMembers.find((m: any) => m.user_id === currentUser?.id);
+  const notificationsMuted = !!myMembership?.notifications_muted;
+  const toggleNotificationsMutation = useMutation({
+    mutationFn: async ({ communityId, muted }: { communityId: string; muted: boolean }) =>
+      api.setCommunityNotifications(communityId, muted),
+    onSuccess: (_, { muted }) => {
+      toast.success(muted
+        ? (isRTL ? 'تم كتم إشعارات المجتمع' : 'Community notifications muted')
+        : (isRTL ? 'تم تفعيل الإشعارات' : 'Community notifications enabled'));
+      refetchMembers();
+    },
+    onError: (error: any) => {
+      toast.error(error.message || (isRTL ? 'فشل تحديث الإشعارات' : 'Failed to update notifications'));
+    },
   });
 
   // Update community info mutation (owner only) ✏️
@@ -3052,6 +3134,57 @@ export default function Messages() {
                         >
                           <Edit className="w-4 h-4" />
                           {isRTL ? "تعديل المعلومات" : "Edit Info"}
+                        </Button>
+                      )}
+
+                      {/* Notifications mute toggle (any member) */}
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => {
+                          if (!selectedCommunityId) return;
+                          toggleNotificationsMutation.mutate({ communityId: selectedCommunityId, muted: !notificationsMuted });
+                        }}
+                        disabled={toggleNotificationsMutation.isPending}
+                        data-testid="button-toggle-community-notifications"
+                      >
+                        {notificationsMuted
+                          ? (isRTL ? "إلغاء كتم الإشعارات" : "Unmute notifications")
+                          : (isRTL ? "كتم الإشعارات" : "Mute notifications")}
+                      </Button>
+
+                      {/* Leave / Delete community */}
+                      {currentCommunity?.created_by === currentUser?.id ? (
+                        <Button
+                          variant="destructive"
+                          className="w-full gap-2"
+                          onClick={() => {
+                            if (!selectedCommunityId) return;
+                            const ok = window.confirm(isRTL
+                              ? `هل تريد حذف مجتمع "${currentCommunity?.name}" نهائياً؟ لا يمكن التراجع.`
+                              : `Permanently delete community "${currentCommunity?.name}"? This cannot be undone.`);
+                            if (ok) deleteCommunityMutation.mutate(selectedCommunityId);
+                          }}
+                          disabled={deleteCommunityMutation.isPending}
+                          data-testid="button-delete-community"
+                        >
+                          {isRTL ? "حذف المجتمع" : "Delete community"}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="destructive"
+                          className="w-full gap-2"
+                          onClick={() => {
+                            if (!selectedCommunityId) return;
+                            const ok = window.confirm(isRTL
+                              ? `هل تريد مغادرة مجتمع "${currentCommunity?.name}"؟`
+                              : `Leave community "${currentCommunity?.name}"?`);
+                            if (ok) leaveCommunityMutation.mutate(selectedCommunityId);
+                          }}
+                          disabled={leaveCommunityMutation.isPending}
+                          data-testid="button-leave-community"
+                        >
+                          {isRTL ? "مغادرة المجتمع" : "Leave community"}
                         </Button>
                       )}
                     </div>
