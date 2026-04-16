@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage, db, getUserDb, adminDb } from "./storage";
-import { getPersonalizedFeed, getPersonalizedExplore, getPersonalizedExploreReels } from "./algorithm";
+import { getPersonalizedFeed, getPersonalizedExplore, getPersonalizedExploreReels, getAlgorithmConfig, getDefaultConfig, clearConfigCache, type AlgorithmConfig } from "./algorithm";
 
 function getDb(req: Request) {
   const token = req.headers['x-user-token'] as string;
@@ -846,7 +846,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const page = parseInt(req.query.page as string) || 0;
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
       const feedDb = getDb(req);
-      const posts = await getPersonalizedFeed(feedDb, userId, page, limit);
+      const posts = await getPersonalizedFeed(feedDb, userId, page, limit, adminDb || undefined);
       res.json(posts);
     } catch (error) {
       console.error("Personalized feed error:", error);
@@ -859,7 +859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.userId!;
       const limit = Math.min(parseInt(req.query.limit as string) || 30, 60);
       const feedDb = getDb(req);
-      const posts = await getPersonalizedExplore(feedDb, userId, limit);
+      const posts = await getPersonalizedExplore(feedDb, userId, limit, adminDb || undefined);
       res.json(posts);
     } catch (error) {
       console.error("Personalized explore error:", error);
@@ -872,7 +872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.userId!;
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 40);
       const feedDb = getDb(req);
-      const reels = await getPersonalizedExploreReels(feedDb, userId, limit);
+      const reels = await getPersonalizedExploreReels(feedDb, userId, limit, adminDb || undefined);
       res.json(reels);
     } catch (error) {
       console.error("Personalized explore reels error:", error);
@@ -3293,6 +3293,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Admin update setting error:', error);
       res.status(500).json({ error: 'Failed to update setting' });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════
+  // ALGORITHM SETTINGS
+  // ═══════════════════════════════════════════════════
+
+  app.get("/api/admin/algorithm", requireAuth, requireAdmin, checkPermission('can_manage_settings'), async (req: Request, res: Response) => {
+    try {
+      const config = await getAlgorithmConfig(adminDb || db);
+      const defaults = getDefaultConfig();
+      res.json({ config, defaults });
+    } catch (error) {
+      console.error("Get algorithm config error:", error);
+      res.status(500).json({ error: "Failed to load algorithm config" });
+    }
+  });
+
+  app.patch("/api/admin/algorithm", requireAuth, requireAdmin, checkPermission('can_manage_settings'), async (req: Request, res: Response) => {
+    try {
+      const updates = req.body as Partial<AlgorithmConfig>;
+      const defaults = getDefaultConfig();
+
+      const weightFields = ["feed_weight_author","feed_weight_interest","feed_weight_engagement","feed_weight_recency","feed_weight_boost","explore_weight_interest","explore_weight_engagement","explore_weight_recency","explore_weight_quality","reels_weight_interest","reels_weight_engagement","reels_weight_recency","verified_boost","official_boost","creator_boost"];
+      const intFields = ["feed_batch_size","feed_max_per_author","explore_batch_size","explore_max_per_author","reels_batch_size","profile_lookback_days"];
+
+      for (const [field, value] of Object.entries(updates)) {
+        if (!(field in defaults)) continue;
+
+        if (field === "enabled") {
+          if (typeof value !== "boolean") continue;
+        } else if (weightFields.includes(field)) {
+          const num = Number(value);
+          if (!isFinite(num) || num < 0 || num > 1) {
+            return res.status(400).json({ error: `${field} must be between 0 and 1` });
+          }
+        } else if (intFields.includes(field)) {
+          const num = Number(value);
+          if (!isFinite(num) || num < 1 || num > 500 || !Number.isInteger(num)) {
+            return res.status(400).json({ error: `${field} must be an integer between 1 and 500` });
+          }
+        }
+
+        const key = `algo_${field}`;
+        const { error } = await (adminDb || db)
+          .from("platform_settings")
+          .upsert({
+            key,
+            value: String(value),
+            updated_by: req.userId,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "key" });
+
+        if (error) throw error;
+      }
+
+      clearConfigCache();
+      await logAdminAction(req, 'update_algorithm', 'setting', undefined, JSON.stringify(updates));
+      const config = await getAlgorithmConfig(adminDb || db);
+      res.json({ success: true, config });
+    } catch (error) {
+      console.error("Update algorithm config error:", error);
+      res.status(500).json({ error: "Failed to update algorithm config" });
+    }
+  });
+
+  app.post("/api/admin/algorithm/reset", requireAuth, requireAdmin, checkPermission('can_manage_settings'), async (req: Request, res: Response) => {
+    try {
+      await (adminDb || db)
+        .from("platform_settings")
+        .delete()
+        .like("key", "algo_%");
+
+      clearConfigCache();
+      await logAdminAction(req, 'reset_algorithm', 'setting', undefined, 'Reset all algorithm settings to defaults');
+      const config = getDefaultConfig();
+      res.json({ success: true, config });
+    } catch (error) {
+      console.error("Reset algorithm config error:", error);
+      res.status(500).json({ error: "Failed to reset algorithm config" });
     }
   });
 

@@ -440,3 +440,43 @@ export async function sendSystemMessage(
     body: JSON.stringify({ content }),
   });
 }
+
+export interface AlgorithmConfig {
+  feed_weight_author: number;
+  feed_weight_interest: number;
+  feed_weight_engagement: number;
+  feed_weight_recency: number;
+  feed_weight_boost: number;
+  feed_batch_size: number;
+  feed_max_per_author: number;
+  explore_weight_interest: number;
+  explore_weight_engagement: number;
+  explore_weight_recency: number;
+  explore_weight_quality: number;
+  explore_batch_size: number;
+  explore_max_per_author: number;
+  reels_weight_interest: number;
+  reels_weight_engagement: number;
+  reels_weight_recency: number;
+  reels_batch_size: number;
+  verified_boost: number;
+  official_boost: number;
+  creator_boost: number;
+  profile_lookback_days: number;
+  enabled: boolean;
+}
+
+export async function fetchAlgorithmConfig(): Promise<{ config: AlgorithmConfig; defaults: AlgorithmConfig }> {
+  return adminFetch("/algorithm");
+}
+
+export async function updateAlgorithmConfig(updates: Partial<AlgorithmConfig>): Promise<{ success: boolean; config: AlgorithmConfig }> {
+  return adminFetch("/algorithm", {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function resetAlgorithmConfig(): Promise<{ success: boolean; config: AlgorithmConfig }> {
+  return adminFetch("/algorithm/reset", { method: "POST" });
+}

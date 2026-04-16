@@ -17,6 +17,7 @@ const tabLabels: Record<TabId, string> = {
   security: "الأمان",
   hashtags: "الهاشتاقات",
   "content-filter": "فلتر المحتوى",
+  algorithm: "الخوارزمية",
   settings: "الإعدادات",
   logs: "السجلات",
 };

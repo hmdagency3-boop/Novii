@@ -82,8 +82,14 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - **API endpoints**: `GET /api/feed/personalized` (paginated), `GET /api/explore/personalized`, `GET /api/explore/personalized/reels` — all require auth
 - **Client integration**: `api.ts` methods (`getPersonalizedFeed`, `getPersonalizedExplore`, `getPersonalizedExploreReels`) call server endpoints with auth headers, fallback to legacy Supabase-direct queries if unauthenticated or server error
 - **Hooks**: `useInfiniteFeed`, `useExplorePosts`, `useExploreReels` in `use-data.ts` now use personalized endpoints
-- **Security**: Uses user's authenticated DB connection (RLS enforced), not adminDb
+- **Security**: Uses user's authenticated DB connection (RLS enforced) for content, adminDb for reading config from `platform_settings`
 - **Legacy fallback**: `getFeedAlgorithmic()` (client-side scoring) preserved as fallback
+- **Disabled mode**: When algorithm is disabled, returns chronological content instead of empty results
+- **Admin control panel**: Full admin page in `artifacts/novii-admin/src/pages/algorithm.tsx` — "الخوارزمية" tab in sidebar under "أدوات"
+- **Admin endpoints**: `GET /api/admin/algorithm` (get config + defaults), `PATCH /api/admin/algorithm` (update with validation), `POST /api/admin/algorithm/reset` (reset to defaults)
+- **Config system**: Settings stored as `algo_*` keys in `platform_settings` table, 60s in-memory cache, validated on save (weight 0-1, integers 1-500)
+- **22 configurable parameters**: Feed/Explore/Reels weights, batch sizes, max per author, verified/official/creator boosts, profile lookback days, enable/disable toggle
+- **Admin UI features**: Slider controls with percentage display, real-time weight sum indicator, modified-field badges, reset to defaults, enable/disable toggle
 
 ### Hashtag System
 - **Database tables**: `hashtags` (name, posts_count, is_banned, is_pinned), `post_hashtags` (post_id, hashtag_id), `reel_hashtags` (reel_id, hashtag_id)

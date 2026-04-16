@@ -12,6 +12,101 @@ interface UserInterestProfile {
   totalInteractions: number;
 }
 
+export interface AlgorithmConfig {
+  feed_weight_author: number;
+  feed_weight_interest: number;
+  feed_weight_engagement: number;
+  feed_weight_recency: number;
+  feed_weight_boost: number;
+  feed_batch_size: number;
+  feed_max_per_author: number;
+  explore_weight_interest: number;
+  explore_weight_engagement: number;
+  explore_weight_recency: number;
+  explore_weight_quality: number;
+  explore_batch_size: number;
+  explore_max_per_author: number;
+  reels_weight_interest: number;
+  reels_weight_engagement: number;
+  reels_weight_recency: number;
+  reels_batch_size: number;
+  verified_boost: number;
+  official_boost: number;
+  creator_boost: number;
+  profile_lookback_days: number;
+  enabled: boolean;
+}
+
+const DEFAULT_CONFIG: AlgorithmConfig = {
+  feed_weight_author: 0.30,
+  feed_weight_interest: 0.25,
+  feed_weight_engagement: 0.20,
+  feed_weight_recency: 0.15,
+  feed_weight_boost: 0.10,
+  feed_batch_size: 80,
+  feed_max_per_author: 3,
+  explore_weight_interest: 0.35,
+  explore_weight_engagement: 0.35,
+  explore_weight_recency: 0.15,
+  explore_weight_quality: 0.15,
+  explore_batch_size: 100,
+  explore_max_per_author: 2,
+  reels_weight_interest: 0.30,
+  reels_weight_engagement: 0.40,
+  reels_weight_recency: 0.20,
+  reels_batch_size: 60,
+  verified_boost: 0.3,
+  official_boost: 0.2,
+  creator_boost: 0.15,
+  profile_lookback_days: 30,
+  enabled: true,
+};
+
+let cachedConfig: AlgorithmConfig | null = null;
+let cacheTime = 0;
+const CACHE_TTL = 60000;
+
+export function getDefaultConfig(): AlgorithmConfig {
+  return { ...DEFAULT_CONFIG };
+}
+
+export async function getAlgorithmConfig(db: SupabaseClient, _settingsDb?: SupabaseClient): Promise<AlgorithmConfig> {
+  const settingsDb = _settingsDb || db;
+  if (cachedConfig && Date.now() - cacheTime < CACHE_TTL) {
+    return cachedConfig;
+  }
+  try {
+    const { data } = await settingsDb
+      .from("platform_settings")
+      .select("key, value")
+      .like("key", "algo_%");
+
+    const config = { ...DEFAULT_CONFIG };
+    if (data) {
+      for (const row of data) {
+        const field = row.key.replace("algo_", "") as keyof AlgorithmConfig;
+        if (field in config) {
+          if (field === "enabled") {
+            (config as any)[field] = row.value === "true";
+          } else {
+            (config as any)[field] = parseFloat(row.value);
+          }
+        }
+      }
+    }
+    cachedConfig = config;
+    cacheTime = Date.now();
+    return config;
+  } catch {
+    return { ...DEFAULT_CONFIG };
+  }
+}
+
+export function clearConfigCache() {
+  cachedConfig = null;
+  cacheTime = 0;
+}
+
 const POST_SELECT = `
   id, user_id, caption, image_url, location,
   likes_count, comments_count, views_count,
@@ -29,9 +124,10 @@ const POST_SELECT = `
 
 async function buildUserInterestProfile(
   db: SupabaseClient,
-  userId: string
+  userId: string,
+  lookbackDays: number = 30
 ): Promise<UserInterestProfile> {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+  const thirtyDaysAgo = new Date(Date.now() - lookbackDays * 86400000).toISOString();
 
   const [likesRes, commentsRes, savesRes] = await Promise.all([
     db.from("likes")
@@ -164,10 +260,13 @@ export async function getPersonalizedFeed(
   db: SupabaseClient,
   userId: string,
   page: number = 0,
-  limit: number = 20
+  limit: number = 20,
+  settingsDb?: SupabaseClient
 ): Promise<any[]> {
+  const config = await getAlgorithmConfig(db, settingsDb);
+
   const [profile, followingRes] = await Promise.all([
-    buildUserInterestProfile(db, userId),
+    buildUserInterestProfile(db, userId, config.profile_lookback_days),
     db.from("follows")
       .select("following_id")
       .eq("follower_id", userId),
@@ -178,7 +277,19 @@ export async function getPersonalizedFeed(
   );
   followingIds.add(userId);
 
-  const batchSize = 80;
+  if (!config.enabled) {
+    const { data: chronoPosts } = await db
+      .from("posts")
+      .select(POST_SELECT)
+      .eq("is_archived", false)
+      .eq("is_deleted", false)
+      .in("user_id", [...followingIds])
+      .order("created_at", { ascending: false })
+      .range(page * limit, page * limit + limit - 1);
+    return chronoPosts || [];
+  }
+
+  const batchSize = config.feed_batch_size;
   const { data: posts, error } = await db
     .from("posts")
     .select(POST_SELECT)
@@ -189,12 +300,6 @@ export async function getPersonalizedFeed(
     .range(0, batchSize - 1);
 
   if (error || !posts) return [];
-
-  const WEIGHT_AUTHOR = 0.30;
-  const WEIGHT_INTEREST = 0.25;
-  const WEIGHT_ENGAGEMENT = 0.20;
-  const WEIGHT_RECENCY = 0.15;
-  const WEIGHT_BOOST = 0.10;
 
   const scored: ScoredPost[] = posts.map((post: any) => {
     const reasons: string[] = [];
@@ -213,9 +318,9 @@ export async function getPersonalizedFeed(
 
     let boostScore = 0;
     const p = post.profile;
-    if (p?.is_verified) boostScore += 0.3;
-    if (p?.is_official) boostScore += 0.2;
-    if (p?.is_creator) boostScore += 0.15;
+    if (p?.is_verified) boostScore += config.verified_boost;
+    if (p?.is_official) boostScore += config.official_boost;
+    if (p?.is_creator) boostScore += config.creator_boost;
     if (post.is_pinned) {
       boostScore += 0.5;
       reasons.push("pinned");
@@ -230,18 +335,18 @@ export async function getPersonalizedFeed(
       (((sessionSeed * 31 + idSum * 17) % 100) / 100) * 0.05;
 
     const finalScore =
-      authorScore * WEIGHT_AUTHOR +
-      interestScore * WEIGHT_INTEREST +
-      engagementScore * WEIGHT_ENGAGEMENT +
-      recencyScore * WEIGHT_RECENCY +
-      boostScore * WEIGHT_BOOST +
+      authorScore * config.feed_weight_author +
+      interestScore * config.feed_weight_interest +
+      engagementScore * config.feed_weight_engagement +
+      recencyScore * config.feed_weight_recency +
+      boostScore * config.feed_weight_boost +
       jitter;
 
     return { ...post, _score: finalScore, _reasons: reasons };
   });
 
   scored.sort((a, b) => b._score - a._score);
-  const diversified = applyDiversityPenalty(scored, 3);
+  const diversified = applyDiversityPenalty(scored, config.feed_max_per_author);
 
   const start = page * limit;
   const paged = diversified.slice(start, start + limit);
@@ -266,10 +371,24 @@ export async function getPersonalizedFeed(
 export async function getPersonalizedExplore(
   db: SupabaseClient,
   userId: string,
-  limit: number = 30
+  limit: number = 30,
+  settingsDb?: SupabaseClient
 ): Promise<any[]> {
+  const config = await getAlgorithmConfig(db, settingsDb);
+
+  if (!config.enabled) {
+    const { data: chronoPosts } = await db
+      .from("posts")
+      .select(POST_SELECT)
+      .eq("is_archived", false)
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false })
+      .range(0, limit - 1);
+    return chronoPosts || [];
+  }
+
   const [profile, followingRes] = await Promise.all([
-    buildUserInterestProfile(db, userId),
+    buildUserInterestProfile(db, userId, config.profile_lookback_days),
     db.from("follows")
       .select("following_id")
       .eq("follower_id", userId),
@@ -280,7 +399,7 @@ export async function getPersonalizedExplore(
   );
   followingIds.add(userId);
 
-  const batchSize = 100;
+  const batchSize = config.explore_batch_size;
   const { data: posts, error } = await db
     .from("posts")
     .select(POST_SELECT)
@@ -295,11 +414,6 @@ export async function getPersonalizedExplore(
     (p: any) => !followingIds.has(p.user_id)
   );
 
-  const WEIGHT_INTEREST = 0.35;
-  const WEIGHT_ENGAGEMENT = 0.35;
-  const WEIGHT_RECENCY = 0.15;
-  const WEIGHT_QUALITY = 0.15;
-
   const scored: ScoredPost[] = nonFollowedPosts.map((post: any) => {
     const reasons: string[] = [];
 
@@ -313,9 +427,9 @@ export async function getPersonalizedExplore(
 
     let qualityScore = 0;
     const p = post.profile;
-    if (p?.is_verified) qualityScore += 0.4;
-    if (p?.is_official) qualityScore += 0.3;
-    if (p?.is_creator) qualityScore += 0.2;
+    if (p?.is_verified) qualityScore += config.verified_boost + 0.1;
+    if (p?.is_official) qualityScore += config.official_boost + 0.1;
+    if (p?.is_creator) qualityScore += config.creator_boost + 0.05;
     if ((p?.followers_count || 0) > 10) qualityScore += 0.1;
     qualityScore = Math.min(qualityScore, 1);
 
@@ -325,17 +439,17 @@ export async function getPersonalizedExplore(
     const jitter = ((idSum * 13) % 100) / 100 * 0.08;
 
     const finalScore =
-      interestScore * WEIGHT_INTEREST +
-      engagementScore * WEIGHT_ENGAGEMENT +
-      recencyScore * WEIGHT_RECENCY +
-      qualityScore * WEIGHT_QUALITY +
+      interestScore * config.explore_weight_interest +
+      engagementScore * config.explore_weight_engagement +
+      recencyScore * config.explore_weight_recency +
+      qualityScore * config.explore_weight_quality +
       jitter;
 
     return { ...post, _score: finalScore, _reasons: reasons };
   });
 
   scored.sort((a, b) => b._score - a._score);
-  const diversified = applyDiversityPenalty(scored, 2);
+  const diversified = applyDiversityPenalty(scored, config.explore_max_per_author);
   const result = diversified.slice(0, limit);
 
   const postIds = result.map((p) => p.id);
@@ -358,10 +472,31 @@ export async function getPersonalizedExplore(
 export async function getPersonalizedExploreReels(
   db: SupabaseClient,
   userId: string,
-  limit: number = 20
+  limit: number = 20,
+  settingsDb?: SupabaseClient
 ): Promise<any[]> {
+  const config = await getAlgorithmConfig(db, settingsDb);
+
+  const REEL_SELECT = `
+    id, user_id, video_url, thumbnail_url, caption,
+    likes_count, comments_count, views_count, created_at,
+    profile:profiles!reels_user_id_fkey(
+      id, username, avatar_url, is_verified, is_official, followers_count
+    )
+  `;
+
+  if (!config.enabled) {
+    const { data: chronoReels } = await db
+      .from("reels")
+      .select(REEL_SELECT)
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false })
+      .range(0, limit - 1);
+    return chronoReels || [];
+  }
+
   const [profile, followingRes] = await Promise.all([
-    buildUserInterestProfile(db, userId),
+    buildUserInterestProfile(db, userId, config.profile_lookback_days),
     db.from("follows")
       .select("following_id")
       .eq("follower_id", userId),
@@ -374,16 +509,10 @@ export async function getPersonalizedExploreReels(
 
   const { data: reels, error } = await db
     .from("reels")
-    .select(`
-      id, user_id, video_url, thumbnail_url, caption,
-      likes_count, comments_count, views_count, created_at,
-      profile:profiles!reels_user_id_fkey(
-        id, username, avatar_url, is_verified, is_official, followers_count
-      )
-    `)
+    .select(REEL_SELECT)
     .eq("is_deleted", false)
     .order("created_at", { ascending: false })
-    .range(0, 60);
+    .range(0, config.reels_batch_size);
 
   if (error || !reels) return [];
 
@@ -397,10 +526,10 @@ export async function getPersonalizedExploreReels(
     const recencyScore = calculateRecencyScore(reel.created_at);
 
     const finalScore =
-      interestScore * 0.30 +
-      engagementScore * 0.40 +
-      recencyScore * 0.20 +
-      (reel.profile?.is_verified ? 0.1 : 0);
+      interestScore * config.reels_weight_interest +
+      engagementScore * config.reels_weight_engagement +
+      recencyScore * config.reels_weight_recency +
+      (reel.profile?.is_verified ? config.verified_boost * 0.33 : 0);
 
     return { ...reel, _score: finalScore };
   });

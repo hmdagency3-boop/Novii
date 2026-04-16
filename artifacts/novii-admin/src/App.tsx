@@ -20,6 +20,7 @@ import AnnouncementsPage from "@/pages/announcements";
 import SecurityPage from "@/pages/security";
 import HashtagsPage from "@/pages/hashtags";
 import ContentFilterPage from "@/pages/content-filter";
+import AlgorithmPage from "@/pages/algorithm";
 
 const pageComponents: Record<TabId, React.FC> = {
   dashboard: DashboardPage,
@@ -37,6 +38,7 @@ const pageComponents: Record<TabId, React.FC> = {
   security: SecurityPage,
   hashtags: HashtagsPage,
   "content-filter": ContentFilterPage,
+  algorithm: AlgorithmPage,
   settings: SettingsPage,
   logs: LogsPage,
 };

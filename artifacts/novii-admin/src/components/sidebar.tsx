@@ -20,10 +20,11 @@ import {
   ShieldAlert,
   Hash,
   Filter,
+  Brain,
 } from "lucide-react";
 import { useState } from "react";
 
-export type TabId = "dashboard" | "users" | "content" | "stories" | "reels" | "communities" | "admins" | "reports" | "verification" | "appeals" | "analytics" | "announcements" | "security" | "hashtags" | "content-filter" | "settings" | "logs";
+export type TabId = "dashboard" | "users" | "content" | "stories" | "reels" | "communities" | "admins" | "reports" | "verification" | "appeals" | "analytics" | "announcements" | "security" | "hashtags" | "content-filter" | "algorithm" | "settings" | "logs";
 
 interface SidebarProps {
   activeTab: TabId;
@@ -45,6 +46,7 @@ const menuItems: { id: TabId; label: string; labelAr: string; icon: React.Elemen
   { id: "reports", label: "Reports", labelAr: "البلاغات", icon: Flag, permission: "can_manage_reports", section: "الطلبات" },
   { id: "verification", label: "Verification", labelAr: "طلبات التوثيق", icon: BadgeCheck, permission: "can_manage_users", section: "الطلبات" },
   { id: "appeals", label: "Appeals", labelAr: "الاستئنافات", icon: Scale, permission: "can_manage_users", section: "الطلبات" },
+  { id: "algorithm", label: "Algorithm", labelAr: "الخوارزمية", icon: Brain, permission: "can_manage_settings", section: "أدوات" },
   { id: "announcements", label: "Announcements", labelAr: "الإعلانات", icon: Megaphone, permission: "can_manage_settings", section: "أدوات" },
   { id: "security", label: "Security", labelAr: "الأمان", icon: ShieldAlert, permission: "can_manage_users", section: "أدوات" },
   { id: "admins", label: "Admins", labelAr: "المشرفين", icon: Shield, permission: "can_manage_admins", section: "النظام" },
