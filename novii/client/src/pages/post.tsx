@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { useLanguage } from "@/lib/language-context";
 
 export default function PostPage() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { language } = useLanguage();
   const isRTL = language.code === 'ar';
   
@@ -17,6 +17,17 @@ export default function PostPage() {
   
   const { data: post, isLoading } = usePost(postId || "");
   const [isModalOpen, setIsModalOpen] = useState(true);
+
+  const handleOpenChange = (open: boolean) => {
+    setIsModalOpen(open);
+    if (!open) {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        navigate('/');
+      }
+    }
+  };
 
   if (!postId) {
     return (
@@ -53,7 +64,7 @@ export default function PostPage() {
       <PostViewerModal
         post={post}
         open={isModalOpen}
-        onOpenChange={setIsModalOpen}
+        onOpenChange={handleOpenChange}
         isRTL={isRTL}
       />
     </Layout>
