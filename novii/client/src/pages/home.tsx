@@ -4,6 +4,7 @@ import PostCard from "@/components/post-card";
 import { CreateStoryModal } from "@/components/create-story-modal";
 import ContactsSyncBanner from "@/components/contacts-sync-banner";
 import { StoryViewerModal } from "@/components/story-viewer-modal";
+import InstallAppBanner from "@/components/install-app-banner";
 import { useInfiniteFeed, useStories, useCurrentProfile, useFollowing } from "@/hooks/use-data";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -171,6 +172,9 @@ export default function Home() {
 
       {/* Restrict width for Home Feed to standard size */}
       <div ref={feedRef} className="flex flex-col gap-0 sm:gap-4 lg:gap-6 lg:pt-6 w-full px-0 sm:px-2 max-w-full lg:max-w-[630px] mx-auto">
+        <div className="px-4 sm:px-0">
+          <InstallAppBanner />
+        </div>
         {storiesLoading || !currentUser ? (
           <div className="flex gap-4 p-4">
             {[...Array(5)].map((_, i) => (
