@@ -1413,6 +1413,7 @@ export default function Messages() {
                               <button
                                 key={user.id}
                                 onClick={() => {
+                                  setSelectedCommunityId(null);
                                   setSelectedUserId(user.id);
                                   setShowNewMessagePopover(false);
                                   setSearchFollowingQuery("");
@@ -1595,7 +1596,10 @@ export default function Messages() {
           {/* Tabs for Chats and Communities */}
           <div className={cn("flex border-b border-border/40", isRTL && "flex-row-reverse")}>
             <button
-              onClick={() => setSelectedTab('chats')}
+              onClick={() => {
+                setSelectedTab('chats');
+                setSelectedCommunityId(null);
+              }}
               className={cn(
                 "flex-1 py-2.5 text-sm font-medium transition-colors relative",
                 selectedTab === 'chats'
@@ -1609,7 +1613,10 @@ export default function Messages() {
               )}
             </button>
             <button
-              onClick={() => setSelectedTab('communities')}
+              onClick={() => {
+                setSelectedTab('communities');
+                setSelectedUserId(null);
+              }}
               className={cn(
                 "flex-1 py-2.5 text-sm font-medium transition-colors relative",
                 selectedTab === 'communities'
