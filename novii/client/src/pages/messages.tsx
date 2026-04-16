@@ -1184,30 +1184,48 @@ export default function Messages() {
             notificationSoundRef.current.play().catch(() => {});
           }
 
-          // Browser notification with sender info
-          if (hasNotificationPermission) {
-            const { data: senderProfile } = await supabase
-              .from('profiles')
-              .select('username, full_name, avatar_url')
-              .eq('id', newMessage.sender_id)
-              .single();
+          // Fetch sender info for the notification
+          const { data: senderProfile } = await supabase
+            .from('profiles')
+            .select('username, full_name, avatar_url')
+            .eq('id', newMessage.sender_id)
+            .single();
 
-            const senderName = senderProfile?.full_name || senderProfile?.username || (isRTL ? 'عضو' : 'Member');
-            const title = `${community.name} • ${senderName}`;
-            const notification = new Notification(title, {
-              body: newMessage.content || (isRTL ? 'رسالة جديدة' : 'New message'),
-              icon: community.avatar_url || senderProfile?.avatar_url || undefined,
-              tag: `community-${newMessage.community_id}`,
-              requireInteraction: false,
-            });
+          const senderName = senderProfile?.full_name || senderProfile?.username || (isRTL ? 'عضو' : 'Member');
 
-            notification.onclick = () => {
-              window.focus();
-              setSelectedTab('communities');
-              setSelectedUserId(null);
-              setSelectedCommunityId(newMessage.community_id);
-              notification.close();
-            };
+          // In-app toast (always works, even inside iframes / when browser perms are denied)
+          toast(`${community.name} • ${senderName}`, {
+            description: newMessage.content || (isRTL ? 'رسالة جديدة' : 'New message'),
+            action: {
+              label: isRTL ? 'فتح' : 'Open',
+              onClick: () => {
+                setSelectedTab('communities');
+                setSelectedUserId(null);
+                setSelectedCommunityId(newMessage.community_id);
+              },
+            },
+          });
+
+          // Native browser notification (only fires when granted & not in restricted iframe)
+          if (hasNotificationPermission && typeof window !== 'undefined' && 'Notification' in window) {
+            try {
+              const notification = new Notification(`${community.name} • ${senderName}`, {
+                body: newMessage.content || (isRTL ? 'رسالة جديدة' : 'New message'),
+                icon: community.avatar_url || senderProfile?.avatar_url || undefined,
+                tag: `community-${newMessage.community_id}`,
+                requireInteraction: false,
+              });
+
+              notification.onclick = () => {
+                window.focus();
+                setSelectedTab('communities');
+                setSelectedUserId(null);
+                setSelectedCommunityId(newMessage.community_id);
+                notification.close();
+              };
+            } catch (err) {
+              // Silently ignore — toast already covers the user.
+            }
           }
         }
       )
