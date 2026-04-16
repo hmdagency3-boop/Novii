@@ -21,6 +21,7 @@ import SecurityPage from "@/pages/security";
 import HashtagsPage from "@/pages/hashtags";
 import ContentFilterPage from "@/pages/content-filter";
 import AlgorithmPage from "@/pages/algorithm";
+import TrendsPage from "@/pages/trends";
 
 const pageComponents: Record<TabId, React.FC> = {
   dashboard: DashboardPage,
@@ -39,6 +40,7 @@ const pageComponents: Record<TabId, React.FC> = {
   hashtags: HashtagsPage,
   "content-filter": ContentFilterPage,
   algorithm: AlgorithmPage,
+  trends: TrendsPage,
   settings: SettingsPage,
   logs: LogsPage,
 };

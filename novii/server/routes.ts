@@ -4415,6 +4415,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // ADMIN: TRENDS DASHBOARD
+  // ========================================
+
+  app.get("/api/admin/trends", requireAuth, requireAdmin, checkPermission('can_view_analytics'), async (req: Request, res: Response) => {
+    try {
+      const days = Math.min(Math.max(parseInt(req.query.days as string) || 7, 1), 30);
+      const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+      const prevCutoff = new Date(Date.now() - days * 2 * 86400000).toISOString();
+
+      const [
+        recentPostsRes, prevPostsRes,
+        recentReelsRes, prevReelsRes,
+        hashtagsRes,
+        featuredPostsRes, featuredReelsRes, featuredAccountsRes
+      ] = await Promise.all([
+        adminDb!.from('posts').select('id, caption, image_url, likes_count, comments_count, views_count, is_featured, created_at, user_id, profiles!posts_user_id_fkey(username, full_name, avatar_url, is_verified, is_featured)').eq('is_deleted', false).gte('created_at', cutoff).order('created_at', { ascending: false }).limit(500),
+        adminDb!.from('posts').select('id, caption, likes_count, comments_count, views_count, created_at').eq('is_deleted', false).gte('created_at', prevCutoff).lt('created_at', cutoff).limit(500),
+        adminDb!.from('reels').select('id, caption, video_url, thumbnail_url, likes_count, comments_count, views_count, is_featured, created_at, user_id, profiles!reels_user_id_fkey(username, full_name, avatar_url, is_verified, is_featured)').eq('is_deleted', false).gte('created_at', cutoff).order('created_at', { ascending: false }).limit(200),
+        adminDb!.from('reels').select('id, likes_count, comments_count, views_count, created_at').eq('is_deleted', false).gte('created_at', prevCutoff).lt('created_at', cutoff).limit(200),
+        adminDb!.from('hashtags').select('*').order('posts_count', { ascending: false }).limit(50),
+        adminDb!.from('posts').select('id, caption, image_url, likes_count, comments_count, views_count, is_featured, created_at, user_id, profiles!posts_user_id_fkey(username, full_name, avatar_url)').eq('is_featured', true).eq('is_deleted', false).limit(50),
+        adminDb!.from('reels').select('id, caption, thumbnail_url, likes_count, views_count, is_featured, created_at, user_id, profiles!reels_user_id_fkey(username, full_name, avatar_url)').eq('is_featured', true).eq('is_deleted', false).limit(50),
+        adminDb!.from('profiles').select('id, username, full_name, avatar_url, is_verified, is_featured, followers_count, posts_count').eq('is_featured', true).limit(50),
+      ]);
+
+      const queryErrors = [recentPostsRes, prevPostsRes, recentReelsRes, prevReelsRes, hashtagsRes, featuredPostsRes, featuredReelsRes, featuredAccountsRes].filter(r => r.error);
+      if (queryErrors.length > 0) {
+        console.error('Trends query errors:', queryErrors.map(r => r.error));
+      }
+
+      const recentPosts = recentPostsRes.data || [];
+      const prevPosts = prevPostsRes.data || [];
+      const recentReels = recentReelsRes.data || [];
+      const prevReels = prevReelsRes.data || [];
+
+      const wordFreq: Record<string, number> = {};
+      const prevWordFreq: Record<string, number> = {};
+
+      function extractWords(caption: string): string[] {
+        if (!caption) return [];
+        const cleaned = caption.replace(/#[\p{L}\p{N}_]+/gu, '').replace(/https?:\/\/\S+/g, '').replace(/[^\p{L}\p{N}\s]/gu, '');
+        return cleaned.split(/\s+/).filter(w => w.length >= 2);
+      }
+
+      for (const p of recentPosts) {
+        for (const w of extractWords(p.caption)) {
+          const key = w.toLowerCase();
+          wordFreq[key] = (wordFreq[key] || 0) + 1;
+        }
+      }
+      for (const p of prevPosts) {
+        for (const w of extractWords(p.caption)) {
+          const key = w.toLowerCase();
+          prevWordFreq[key] = (prevWordFreq[key] || 0) + 1;
+        }
+      }
+
+      const trendingWords = Object.entries(wordFreq)
+        .filter(([, count]) => count >= 2)
+        .map(([word, count]) => {
+          const prev = prevWordFreq[word] || 0;
+          const growth = prev > 0 ? ((count - prev) / prev) * 100 : 100;
+          return { word, count, prev_count: prev, growth: Math.round(growth) };
+        })
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 30);
+
+      function trendScore(item: any): number {
+        const likes = item.likes_count || 0;
+        const comments = item.comments_count || 0;
+        const views = item.views_count || 1;
+        const hoursAge = Math.max((Date.now() - new Date(item.created_at).getTime()) / 3600000, 1);
+        return (likes + comments * 2) / Math.sqrt(hoursAge);
+      }
+
+      const trendingPosts = recentPosts
+        .map((p: any) => ({ ...p, trend_score: Math.round(trendScore(p) * 100) / 100 }))
+        .sort((a: any, b: any) => b.trend_score - a.trend_score)
+        .slice(0, 20);
+
+      const prevPostEngagement = prevPosts.reduce((sum: number, p: any) => sum + (p.likes_count || 0) + (p.comments_count || 0), 0);
+      const currPostEngagement = recentPosts.reduce((sum: number, p: any) => sum + (p.likes_count || 0) + (p.comments_count || 0), 0);
+      const postEngagementGrowth = prevPostEngagement > 0 ? Math.round(((currPostEngagement - prevPostEngagement) / prevPostEngagement) * 100) : 0;
+
+      const trendingReels = recentReels
+        .map((r: any) => ({ ...r, trend_score: Math.round(trendScore(r) * 100) / 100 }))
+        .sort((a: any, b: any) => b.trend_score - a.trend_score)
+        .slice(0, 20);
+
+      const prevReelEngagement = prevReels.reduce((sum: number, r: any) => sum + (r.likes_count || 0) + (r.comments_count || 0) + (r.views_count || 0), 0);
+      const currReelEngagement = recentReels.reduce((sum: number, r: any) => sum + (r.likes_count || 0) + (r.comments_count || 0) + (r.views_count || 0), 0);
+      const reelEngagementGrowth = prevReelEngagement > 0 ? Math.round(((currReelEngagement - prevReelEngagement) / prevReelEngagement) * 100) : 0;
+
+      const authorEngagement: Record<string, { total: number; posts: number; profile: any }> = {};
+      for (const p of recentPosts) {
+        const uid = p.user_id;
+        if (!authorEngagement[uid]) authorEngagement[uid] = { total: 0, posts: 0, profile: p.profiles };
+        authorEngagement[uid].total += (p.likes_count || 0) + (p.comments_count || 0) * 2;
+        authorEngagement[uid].posts += 1;
+      }
+      for (const r of recentReels) {
+        const uid = r.user_id;
+        if (!authorEngagement[uid]) authorEngagement[uid] = { total: 0, posts: 0, profile: r.profiles };
+        authorEngagement[uid].total += (r.likes_count || 0) + (r.comments_count || 0) * 2 + (r.views_count || 0) * 0.1;
+        authorEngagement[uid].posts += 1;
+      }
+
+      const trendingAccounts = Object.entries(authorEngagement)
+        .map(([userId, data]) => ({
+          user_id: userId,
+          username: data.profile?.username || 'unknown',
+          full_name: data.profile?.full_name || '',
+          avatar_url: data.profile?.avatar_url || '',
+          is_verified: data.profile?.is_verified || false,
+          is_featured: data.profile?.is_featured || false,
+          total_engagement: Math.round(data.total),
+          content_count: data.posts,
+          avg_engagement: Math.round(data.total / data.posts),
+        }))
+        .sort((a, b) => b.total_engagement - a.total_engagement)
+        .slice(0, 20);
+
+      const trendingHashtags = (hashtagsRes.data || [])
+        .map((h: any) => ({ ...h, trend_rank: h.posts_count }))
+        .slice(0, 20);
+
+      const predictedTrends = trendingWords
+        .filter(w => w.growth > 50 && w.count >= 3)
+        .map(w => ({ ...w, prediction: w.growth > 200 ? 'viral' : w.growth > 100 ? 'rising_fast' : 'rising' }))
+        .slice(0, 10);
+
+      res.json({
+        period_days: days,
+        overview: {
+          total_posts: recentPosts.length,
+          total_reels: recentReels.length,
+          post_engagement_growth: postEngagementGrowth,
+          reel_engagement_growth: reelEngagementGrowth,
+          total_engagement: currPostEngagement + currReelEngagement,
+        },
+        trending_words: trendingWords,
+        trending_posts: trendingPosts,
+        trending_reels: trendingReels,
+        trending_accounts: trendingAccounts,
+        trending_hashtags: trendingHashtags,
+        predicted_trends: predictedTrends,
+        featured: {
+          posts: featuredPostsRes.data || [],
+          reels: featuredReelsRes.data || [],
+          accounts: featuredAccountsRes.data || [],
+        },
+      });
+    } catch (error) {
+      console.error('Admin trends error:', error);
+      res.status(500).json({ error: 'Failed to fetch trends' });
+    }
+  });
+
+  // ========================================
   // ADMIN: ANNOUNCEMENTS & NOTIFICATIONS
   // ========================================
 
