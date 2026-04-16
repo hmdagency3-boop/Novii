@@ -26,10 +26,6 @@ args = "Novii Admin"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Novii Promo"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "API Server"
 
 [[workflows.workflow]]
@@ -52,18 +48,6 @@ author = "agent"
 task = "shell.exec"
 args = "PORT=18877 BASE_PATH=/novii-admin/ pnpm --filter @workspace/novii-admin run dev"
 waitForPort = 18877
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow]]
-name = "Novii Promo"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=23846 BASE_PATH=/novii-promo/ pnpm --filter @workspace/novii-promo run dev"
-waitForPort = 23846
 
 [workflows.workflow.metadata]
 outputType = "webview"
