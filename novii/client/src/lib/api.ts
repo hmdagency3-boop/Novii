@@ -501,7 +501,7 @@ export const api = {
 
     if (error) throw error;
     const user = await getCurrentUser();
-    const posts = data || [];
+    const posts = (data || []).filter((p: any) => !p.profile?.is_deactivated);
 
     if (user && posts.length > 0) {
       const postIds = posts.map(p => p.id);
@@ -614,7 +614,7 @@ export const api = {
 
     if (error) throw error;
     const user = await getCurrentUser();
-    let posts: any[] = data || [];
+    let posts: any[] = (data || []).filter((p: any) => !p.profile?.is_deactivated);
 
     if (user && posts.length > 0) {
       const postIds = posts.map(p => p.id);
@@ -658,7 +658,7 @@ export const api = {
       .limit(limit);
 
     if (error) throw error;
-    const posts = data || [];
+    const posts = (data || []).filter((p: any) => !p.profile?.is_deactivated);
 
     // Add is_liked and is_saved for current user
     const user = await getCurrentUser();
@@ -691,17 +691,20 @@ export const api = {
       .limit(limit);
 
     if (error) throw error;
-    return (data || []) as unknown as Reel[];
+    return ((data || []).filter((r: any) => !r.profile?.is_deactivated)) as unknown as Reel[];
   },
 
   async getUserPosts(userId: string): Promise<Post[]> {
     const user = await getCurrentUser();
 
-    // Privacy gate: if private account and current user is not the owner → check follow
-    if (user && user.id !== userId) {
+    // Privacy / deactivation gate
+    if (!user || user.id !== userId) {
       const { data: targetProfile } = await supabase
-        .from('profiles').select('is_private').eq('id', userId).single();
+        .from('profiles').select('is_private, is_deactivated').eq('id', userId).single();
+      // Deactivated/pending-deletion → hide everything from non-owner
+      if (targetProfile?.is_deactivated) return [];
       if (targetProfile?.is_private) {
+        if (!user) return [];
         const { data: follow } = await supabase
           .from('follows').select('id').eq('follower_id', user.id).eq('following_id', userId).single();
         if (!follow) return []; // Not a follower → return nothing
@@ -778,7 +781,7 @@ export const api = {
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
-    const reels = data || [];
+    const reels = (data || []).filter((r: any) => !r.profile?.is_deactivated);
 
     if (user && reels.length > 0) {
       const reelIds = reels.map(r => r.id);
@@ -1027,7 +1030,7 @@ export const api = {
       .order('created_at', { ascending: true });
 
     if (error) throw error;
-    const allComments = (allCommentsRaw || []) as unknown as Comment[];
+    const allComments = ((allCommentsRaw || []).filter((c: any) => !c.profile?.is_deactivated)) as unknown as Comment[];
 
     // Build nested structure
     const commentMap = new Map<string, Comment>();
