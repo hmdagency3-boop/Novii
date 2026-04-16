@@ -20,6 +20,18 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - Privacy toggle (is_private) saves to Supabase profiles table
 - Migration SQL in `novii/supabase-migration.sql` (also includes conversations, highlights tables)
 
+### Suggestion Algorithm (Instagram-like)
+- **Endpoint**: `GET /api/suggestions/recommended` — multi-signal recommendation engine
+- **Scoring factors**: Contacts match (30%), Mutual followers (25%), Author affinity from likes/comments/saves (15%), Follower count (10%), Verified/official status (10%), Recent activity (10%)
+- **Suggestion reasons**: Each suggestion includes `suggestion_reason` (Arabic text), `suggestion_reason_detail`, and `suggestion_reason_type` (contact/mutual/interest/verified/popular/suggested)
+- **Contacts sync**: `POST /api/contacts/sync` — receives hashed phone numbers, matches against registered users. Phone numbers are SHA-256 hashed (never stored in plaintext). `POST /api/contacts/set-phone` — saves user's own phone hash + retroactively matches existing contacts.
+- **Dismiss suggestions**: `POST /api/suggestions/dismiss` — hides a user from suggestions permanently
+- **Tables**: `user_contacts` (phone_hash, matched_user_id, contact_name), `suggestion_dismissals` (user_id, dismissed_user_id), `profiles.phone_hash`, `profiles.contacts_synced_at`
+- **SQL migration**: `novii/supabase/add_contacts_and_suggestions.sql`
+- **Band shuffle**: Top results are shuffled within bands of 4 to add variety while maintaining relevance
+- **Sidebar UI**: Shows reason icon + text per suggestion, dismiss (X) button on hover, contacts sync banner for new users
+- **Interest profile reuse**: Uses `buildUserInterestProfile()` from `algorithm.ts` (same data powering Feed/Explore/Reels)
+
 ### Device Tracking System
 - **Schema**: `user_devices` table with fingerprinting (`device_fingerprint`), trust system (`is_trusted`), session tokens, login count, status (`active`/`revoked`)
 - **Backend**: `novii/server/utils/device-detector.ts` — UA parsing, SHA-256 fingerprint generation, geo-location with caching, session token generation

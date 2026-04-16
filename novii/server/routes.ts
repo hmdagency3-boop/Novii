@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage, db, getUserDb, adminDb } from "./storage";
-import { getPersonalizedFeed, getPersonalizedExplore, getPersonalizedExploreReels, getAlgorithmConfig, getDefaultConfig, clearConfigCache, type AlgorithmConfig } from "./algorithm";
+import { getPersonalizedFeed, getPersonalizedExplore, getPersonalizedExploreReels, getAlgorithmConfig, getDefaultConfig, clearConfigCache, buildUserInterestProfile, type AlgorithmConfig } from "./algorithm";
 
 function getDb(req: Request) {
   const token = req.headers['x-user-token'] as string;
@@ -882,128 +882,347 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Advanced recommendation algorithm for suggesting users (Instagram-like)
-  app.get("/api/suggestions/recommended", rateLimitSearch as any, async (req: Request, res: Response) => {
+  app.get("/api/suggestions/recommended", requireAuth as any, rateLimitSearch as any, async (req: Request, res: Response) => {
     try {
       const { limit = 50 } = req.query;
-      const userId = req.userId || req.headers['x-user-id'] as string;
+      const userId = req.userId;
+      const maxResults = Math.min(parseInt(limit as string) || 50, 100);
 
       if (!userId) {
         return res.status(401).json({ error: 'User ID required' });
       }
 
-      // Get users that the current user is NOT following
-      const suggestionsQuery = `
-        WITH user_followers AS (
-          -- Get all people the current user follows
-          SELECT following_id FROM follows WHERE follower_id = $1
-        ),
-        mutual_followers AS (
-          -- Get mutual followers count for each suggested user
-          SELECT 
-            uf.id,
-            COUNT(DISTINCT f.follower_id) as mutual_count
-          FROM profiles uf
-          LEFT JOIN follows f ON f.following_id = uf.id 
-            AND f.follower_id IN (SELECT following_id FROM user_followers)
-          WHERE uf.id != $1
-            AND uf.id NOT IN (SELECT following_id FROM user_followers)
-            AND uf.is_banned = false
-          GROUP BY uf.id
-        ),
-        scored_users AS (
-          SELECT 
-            p.id,
-            p.username,
-            p.full_name,
-            p.avatar_url,
-            p.bio,
-            p.followers_count,
-            p.is_verified,
-            p.is_official,
-            p.is_creator,
-            p.is_premium,
-            p.is_active,
-            p.updated_at,
-            COALESCE(mf.mutual_count, 0) as mutual_followers_count,
-            -- Calculate recommendation score
-            (
-              -- Factor 1: Mutual followers (40%)
-              (COALESCE(mf.mutual_count, 0) * 100) * 0.40 +
-              -- Factor 2: Follower count (logarithmic, 30%)
-              (LOG(p.followers_count + 1) * 50) * 0.30 +
-              -- Factor 3: Verification and status (15%)
-              (CASE 
-                WHEN p.is_verified THEN 50
-                WHEN p.is_official THEN 40
-                WHEN p.is_creator THEN 30
-                WHEN p.is_premium THEN 20
-                ELSE 0
-              END) * 0.15 +
-              -- Factor 4: Recent activity (15%)
-              (CASE 
-                WHEN p.updated_at > NOW() - INTERVAL '7 days' THEN 50
-                WHEN p.updated_at > NOW() - INTERVAL '30 days' THEN 30
-                ELSE 10
-              END) * 0.15
-            ) as recommendation_score
-          FROM profiles p
-          LEFT JOIN mutual_followers mf ON p.id = mf.id
-          WHERE p.id != $1
-            AND p.id NOT IN (SELECT following_id FROM user_followers)
-            AND p.is_banned = false
-            -- 🔥 CRITICAL: Filter only REAL accounts (NO FAKE/DUMMY ACCOUNTS)
-            -- Must have username + full name
-            AND p.username IS NOT NULL
-            AND p.full_name IS NOT NULL
-            AND p.full_name != ''
-            -- Must have at least ONE indicator of a real account:
-            AND (
-              p.avatar_url IS NOT NULL           -- Has profile picture
-              OR p.posts_count > 0               -- Has posted content
-              OR p.followers_count > 0           -- Has followers
-              OR p.is_verified = true            -- Verified account
-              OR p.is_official = true            -- Official account
-              OR p.is_active = true              -- Recently active account
-            )
-        )
-        SELECT 
-          id,
-          username,
-          full_name,
-          avatar_url,
-          bio,
-          followers_count,
-          is_verified,
-          is_official,
-          is_creator,
-          is_premium,
-          is_active,
-          mutual_followers_count,
-          recommendation_score
-        FROM scored_users
-        ORDER BY recommendation_score DESC
-        LIMIT $2;
-      `;
+      const useDb = adminDb || db;
 
-      // Use Supabase to fetch recommendations
-      const { data: suggestions, error } = await db
+      const [
+        followingRes,
+        dismissedRes,
+        contactMatchesRes,
+        interestProfile,
+      ] = await Promise.all([
+        useDb.from('follows').select('following_id').eq('follower_id', userId),
+        useDb.from('suggestion_dismissals').select('dismissed_user_id').eq('user_id', userId),
+        useDb.from('user_contacts').select('matched_user_id, contact_name').eq('user_id', userId).not('matched_user_id', 'is', null),
+        buildUserInterestProfile(useDb, userId, 30),
+      ]);
+
+      const followingIds = new Set((followingRes.data || []).map((f: any) => f.following_id));
+      followingIds.add(userId);
+      const dismissedIds = new Set((dismissedRes.data || []).map((d: any) => d.dismissed_user_id));
+      const contactMatches = new Map<string, string>();
+      for (const c of contactMatchesRes.data || []) {
+        if (c.matched_user_id) contactMatches.set(c.matched_user_id, c.contact_name || '');
+      }
+
+      const mutualCountMap = new Map<string, { count: number; names: string[] }>();
+      if (followingIds.size > 1) {
+        const myFollowingList = [...followingIds].filter(id => id !== userId);
+        const batchSize = 50;
+        for (let i = 0; i < myFollowingList.length; i += batchSize) {
+          const batch = myFollowingList.slice(i, i + batchSize);
+          const { data: fof } = await useDb
+            .from('follows')
+            .select('following_id, follower_id, profiles!follows_follower_id_fkey(username)')
+            .in('follower_id', batch)
+            .not('following_id', 'in', `(${userId})`);
+
+          for (const row of fof || []) {
+            if (followingIds.has(row.following_id) || dismissedIds.has(row.following_id)) continue;
+            const existing = mutualCountMap.get(row.following_id) || { count: 0, names: [] };
+            existing.count++;
+            const uname = (row as any).profiles?.username;
+            if (uname && existing.names.length < 3) existing.names.push(uname);
+            mutualCountMap.set(row.following_id, existing);
+          }
+        }
+      }
+
+      const candidateIds = new Set<string>();
+      for (const id of mutualCountMap.keys()) candidateIds.add(id);
+      for (const id of contactMatches.keys()) { if (!followingIds.has(id) && !dismissedIds.has(id)) candidateIds.add(id); }
+
+      for (const authorId of interestProfile.authorAffinities.keys()) {
+        if (!followingIds.has(authorId) && !dismissedIds.has(authorId)) candidateIds.add(authorId);
+      }
+
+      const { data: topByFollowers } = await useDb
         .from('profiles')
-        .select('id, username, full_name, avatar_url, bio, followers_count, is_verified, is_official, is_creator, is_premium, is_active')
-        .neq('id', userId)
+        .select('id')
         .eq('is_banned', false)
         .not('username', 'is', null)
         .not('full_name', 'is', null)
+        .neq('full_name', '')
         .order('followers_count', { ascending: false })
-        .limit(parseInt(limit as string) || 50);
+        .limit(200);
+      for (const p of topByFollowers || []) {
+        if (!followingIds.has(p.id) && !dismissedIds.has(p.id)) candidateIds.add(p.id);
+      }
 
-      if (error) throw error;
-      
-      const recommendationsList = (suggestions || []) as any[];
-      console.log(`🎯 Generated ${recommendationsList.length} recommendations for user ${userId} (only REAL accounts)`);
-      res.json({ data: recommendationsList });
+      if (candidateIds.size === 0) {
+        return res.json({ data: [] });
+      }
+
+      const candidateArray = [...candidateIds].slice(0, 500);
+      const batchSize2 = 100;
+      let allCandidates: any[] = [];
+      for (let i = 0; i < candidateArray.length; i += batchSize2) {
+        const batch = candidateArray.slice(i, i + batchSize2);
+        const { data: profiles } = await useDb
+          .from('profiles')
+          .select('id, username, full_name, avatar_url, bio, followers_count, posts_count, is_verified, is_official, is_creator, is_premium, is_active, is_banned, updated_at')
+          .in('id', batch)
+          .eq('is_banned', false)
+          .not('username', 'is', null)
+          .not('full_name', 'is', null);
+        allCandidates = allCandidates.concat(profiles || []);
+      }
+
+      allCandidates = allCandidates.filter(p =>
+        p.full_name && p.full_name !== '' &&
+        (p.avatar_url || p.posts_count > 0 || p.followers_count > 0 || p.is_verified || p.is_official || p.is_active)
+      );
+
+      interface ScoredSuggestion {
+        profile: any;
+        score: number;
+        reason: string;
+        reason_detail: string;
+        reason_type: string;
+      }
+
+      const maxMutual = Math.max(...[...mutualCountMap.values()].map(v => v.count), 1);
+      const maxFollowers = Math.max(...allCandidates.map(p => p.followers_count || 0), 1);
+      const maxAffinity = interestProfile.authorAffinities.size > 0
+        ? Math.max(...interestProfile.authorAffinities.values(), 1) : 1;
+
+      const scored: ScoredSuggestion[] = allCandidates.map(p => {
+        const mutual = mutualCountMap.get(p.id);
+        const mutualScore = mutual ? Math.min(mutual.count / maxMutual, 1) : 0;
+
+        const isContact = contactMatches.has(p.id);
+        const contactScore = isContact ? 1 : 0;
+
+        const affinity = interestProfile.authorAffinities.get(p.id) || 0;
+        const affinityScore = Math.min(affinity / maxAffinity, 1);
+
+        const followerScore = Math.log(p.followers_count + 1) / Math.log(maxFollowers + 1);
+
+        let statusScore = 0;
+        if (p.is_verified) statusScore = 1;
+        else if (p.is_official) statusScore = 0.9;
+        else if (p.is_creator) statusScore = 0.7;
+        else if (p.is_premium) statusScore = 0.5;
+
+        let activityScore = 0;
+        if (p.updated_at) {
+          const daysSince = (Date.now() - new Date(p.updated_at).getTime()) / 86400000;
+          if (daysSince < 1) activityScore = 1;
+          else if (daysSince < 7) activityScore = 0.8;
+          else if (daysSince < 30) activityScore = 0.5;
+          else activityScore = 0.1;
+        }
+
+        const totalScore =
+          (contactScore * 100) * 0.30 +
+          (mutualScore * 100) * 0.25 +
+          (affinityScore * 100) * 0.15 +
+          (followerScore * 100) * 0.10 +
+          (statusScore * 100) * 0.10 +
+          (activityScore * 100) * 0.10;
+
+        let reason = '';
+        let reason_detail = '';
+        let reason_type = 'popular';
+
+        if (isContact) {
+          const contactName = contactMatches.get(p.id);
+          reason_type = 'contact';
+          reason = 'من جهات اتصالك';
+          reason_detail = contactName ? `مسجّل باسم "${contactName}" في جهات اتصالك` : 'رقمه محفوظ في جهات اتصالك';
+        } else if (mutual && mutual.count > 0) {
+          reason_type = 'mutual';
+          if (mutual.count === 1 && mutual.names.length > 0) {
+            reason = `يتابعه @${mutual.names[0]}`;
+          } else if (mutual.count <= 3 && mutual.names.length > 0) {
+            reason = `يتابعه @${mutual.names[0]} و${mutual.count - 1} آخرين`;
+          } else {
+            reason = `يتابعه ${mutual.count} من أصدقائك`;
+          }
+          reason_detail = mutual.names.length > 0 ? `بما فيهم @${mutual.names.join(' و@')}` : '';
+        } else if (affinityScore > 0.3) {
+          reason_type = 'interest';
+          reason = 'محتواه يعجبك';
+          reason_detail = 'بناءً على تفاعلاتك السابقة';
+        } else if (statusScore > 0) {
+          reason_type = 'verified';
+          reason = p.is_verified ? 'حساب موثّق' : p.is_official ? 'حساب رسمي' : p.is_creator ? 'صانع محتوى' : 'مميز';
+          reason_detail = `${p.followers_count} متابع`;
+        } else if (p.followers_count > 100) {
+          reason_type = 'popular';
+          reason = 'شائع على نوفي';
+          reason_detail = `${p.followers_count} متابع`;
+        } else {
+          reason_type = 'suggested';
+          reason = 'مقترح لك';
+          reason_detail = 'قد يعجبك محتواه';
+        }
+
+        return { profile: p, score: totalScore, reason, reason_detail, reason_type };
+      });
+
+      scored.sort((a, b) => b.score - a.score);
+
+      const seed = Date.now();
+      const bandSize = 4;
+      for (let i = 0; i < scored.length && i < maxResults * 2; i += bandSize) {
+        const end = Math.min(i + bandSize, scored.length);
+        for (let j = end - 1; j > i; j--) {
+          const x = Math.sin(seed * (j + 1) * 9301 + 49297) * 10000;
+          const r = Math.abs(x - Math.floor(x));
+          const k = i + Math.floor(r * (j - i + 1));
+          [scored[j], scored[k]] = [scored[k], scored[j]];
+        }
+      }
+
+      const results = scored.slice(0, maxResults).map(s => ({
+        id: s.profile.id,
+        username: s.profile.username,
+        full_name: s.profile.full_name,
+        avatar_url: s.profile.avatar_url,
+        bio: s.profile.bio,
+        followers_count: s.profile.followers_count,
+        is_verified: s.profile.is_verified,
+        is_official: s.profile.is_official,
+        is_creator: s.profile.is_creator,
+        is_premium: s.profile.is_premium,
+        is_active: s.profile.is_active,
+        mutual_followers_count: mutualCountMap.get(s.profile.id)?.count || 0,
+        suggestion_reason: s.reason,
+        suggestion_reason_detail: s.reason_detail,
+        suggestion_reason_type: s.reason_type,
+      }));
+
+      console.log(`🎯 Generated ${results.length} smart recommendations for ${userId} (contacts: ${contactMatches.size}, mutual graph: ${mutualCountMap.size})`);
+      res.json({ data: results });
     } catch (error) {
       console.error("Recommendation error:", error);
       res.status(500).json({ error: 'Failed to generate recommendations', data: [] });
+    }
+  });
+
+  // POST /api/suggestions/dismiss — hide a suggestion
+  app.post("/api/suggestions/dismiss", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId;
+      const { dismissed_user_id } = req.body;
+      if (!userId || !dismissed_user_id) return res.status(400).json({ error: 'Missing user or dismissed_user_id' });
+
+      const useDb = adminDb || db;
+      await useDb.from('suggestion_dismissals').upsert({
+        user_id: userId,
+        dismissed_user_id,
+      }, { onConflict: 'user_id,dismissed_user_id' });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Dismiss suggestion error:", error);
+      res.status(500).json({ error: 'Failed to dismiss suggestion' });
+    }
+  });
+
+  // POST /api/contacts/sync — sync phone contacts
+  app.post("/api/contacts/sync", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const { contacts } = req.body;
+      if (!Array.isArray(contacts) || contacts.length === 0) {
+        return res.status(400).json({ error: 'No contacts provided' });
+      }
+
+      if (contacts.length > 5000) {
+        return res.status(400).json({ error: 'Too many contacts (max 5000)' });
+      }
+
+      const useDb = adminDb || db;
+
+      const PHONE_PEPPER = process.env.PHONE_HASH_PEPPER || 'novii_contacts_v1_pepper';
+      const phoneHashes: { hash: string; name: string }[] = [];
+      for (const c of contacts) {
+        const phone = (c.phone || '').replace(/[\s\-\(\)\.]/g, '').trim();
+        if (!phone || phone.length < 6) continue;
+        const hash = crypto.createHmac('sha256', PHONE_PEPPER).update(phone).digest('hex');
+        phoneHashes.push({ hash, name: c.name || '' });
+      }
+
+      if (phoneHashes.length === 0) {
+        return res.json({ matched: 0 });
+      }
+
+      const hashList = phoneHashes.map(h => h.hash);
+      const { data: matchedProfiles } = await useDb
+        .from('profiles')
+        .select('id, phone_hash')
+        .in('phone_hash', hashList)
+        .neq('id', userId);
+
+      const matchedMap = new Map<string, string>();
+      for (const p of matchedProfiles || []) {
+        if (p.phone_hash) matchedMap.set(p.phone_hash, p.id);
+      }
+
+      const upsertRows = phoneHashes.map(h => ({
+        user_id: userId,
+        phone_hash: h.hash,
+        contact_name: h.name || null,
+        matched_user_id: matchedMap.get(h.hash) || null,
+      }));
+
+      const batchSize = 200;
+      for (let i = 0; i < upsertRows.length; i += batchSize) {
+        const batch = upsertRows.slice(i, i + batchSize);
+        await useDb.from('user_contacts').upsert(batch, { onConflict: 'user_id,phone_hash' });
+      }
+
+      await useDb.from('profiles').update({ contacts_synced_at: new Date().toISOString() }).eq('id', userId);
+
+      const matchedCount = upsertRows.filter(r => r.matched_user_id).length;
+      console.log(`📱 Contacts sync for ${userId}: ${phoneHashes.length} hashes, ${matchedCount} matches`);
+      res.json({ success: true, total: phoneHashes.length, matched: matchedCount });
+    } catch (error) {
+      console.error("Contacts sync error:", error);
+      res.status(500).json({ error: 'Failed to sync contacts' });
+    }
+  });
+
+  // POST /api/contacts/set-phone — save user's own phone hash
+  app.post("/api/contacts/set-phone", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const { phone } = req.body;
+      const cleanPhone = (phone || '').replace(/[\s\-\(\)\.]/g, '').trim();
+      if (!cleanPhone || cleanPhone.length < 6) {
+        return res.status(400).json({ error: 'Invalid phone number' });
+      }
+
+      const PHONE_PEPPER = process.env.PHONE_HASH_PEPPER || 'novii_contacts_v1_pepper';
+      const hash = crypto.createHmac('sha256', PHONE_PEPPER).update(cleanPhone).digest('hex');
+      const useDb = adminDb || db;
+
+      await useDb.from('profiles').update({ phone_hash: hash }).eq('id', userId);
+
+      await useDb.from('user_contacts')
+        .update({ matched_user_id: userId })
+        .eq('phone_hash', hash)
+        .neq('user_id', userId);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Set phone error:", error);
+      res.status(500).json({ error: 'Failed to save phone' });
     }
   });
 

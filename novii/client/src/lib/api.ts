@@ -2222,39 +2222,20 @@ export const api = {
   },
 
   // Suggestions with advanced recommendation algorithm
-  async getSuggestedUsers(limit = 50): Promise<Profile[]> {
+  async getSuggestedUsers(limit = 50): Promise<any[]> {
     const user = await getCurrentUser();
     if (!user) return [];
 
     try {
-      // Call the advanced recommendation algorithm endpoint
-      const response = await fetch('/api/suggestions/recommended', {
-        headers: {
-          'x-user-id': user.id,
-        },
+      const response = await fetch('/api/suggestions/recommended?limit=' + limit, {
+        headers: { 'x-user-id': user.id },
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch recommendations');
-      }
-
+      if (!response.ok) throw new Error('Failed to fetch recommendations');
       const { data } = await response.json();
-      return (data || []).map((profile: any) => ({
-        id: profile.id,
-        username: profile.username,
-        full_name: profile.full_name,
-        avatar_url: profile.avatar_url,
-        bio: profile.bio,
-        followers_count: profile.followers_count,
-        is_verified: profile.is_verified,
-        is_official: profile.is_official,
-        is_creator: profile.is_creator,
-        is_premium: profile.is_premium,
-        is_active: profile.is_active,
-      })) as Profile[];
+      return data || [];
     } catch (error) {
       console.error('Error fetching suggestions:', error);
-      // Fallback to basic suggestions from Supabase
       try {
         const { data, error: supabaseError } = await supabase
           .from('profiles')
@@ -2262,14 +2243,44 @@ export const api = {
           .neq('id', user.id)
           .order('followers_count', { ascending: false })
           .limit(limit);
-
         if (supabaseError) throw supabaseError;
         return data || [];
-      } catch (fallbackError) {
-        console.error('Fallback suggestion error:', fallbackError);
+      } catch {
         return [];
       }
     }
+  },
+
+  async dismissSuggestion(dismissedUserId: string): Promise<void> {
+    const user = await getCurrentUser();
+    if (!user) return;
+    await fetch('/api/suggestions/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+      body: JSON.stringify({ dismissed_user_id: dismissedUserId }),
+    });
+  },
+
+  async syncContacts(contacts: { phone: string; name: string }[]): Promise<{ total: number; matched: number }> {
+    const user = await getCurrentUser();
+    if (!user) return { total: 0, matched: 0 };
+    const response = await fetch('/api/contacts/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+      body: JSON.stringify({ contacts }),
+    });
+    if (!response.ok) throw new Error('Failed to sync contacts');
+    return response.json();
+  },
+
+  async setPhoneHash(phone: string): Promise<void> {
+    const user = await getCurrentUser();
+    if (!user) return;
+    await fetch('/api/contacts/set-phone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+      body: JSON.stringify({ phone }),
+    });
   },
 
   async getProfileById(userId: string): Promise<Profile | null> {

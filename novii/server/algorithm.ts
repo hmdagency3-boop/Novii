@@ -138,7 +138,7 @@ const POST_SELECT = `
   )
 `;
 
-async function buildUserInterestProfile(
+export async function buildUserInterestProfile(
   db: SupabaseClient,
   userId: string,
   lookbackDays: number = 30
