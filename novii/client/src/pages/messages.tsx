@@ -2026,11 +2026,10 @@ export default function Messages() {
         )}>
             {selectedCommunityId && communities.find(c => c.id === selectedCommunityId) ? (
                 <>
-                    {/* Community Chat Header */}
+                    {/* Community Chat Header — sticky so it stays pinned at top of the messages scroll area without overlay/keyboard glitches */}
                     <div className={cn(
                         "h-16 border-b flex items-center justify-between px-4 shadow-sm",
-                        "fixed top-0 left-0 right-0 w-full z-50",
-                        "md:relative md:shrink-0 md:static md:top-auto md:left-auto md:right-auto md:w-auto md:z-20",
+                        "sticky top-0 left-0 right-0 w-full z-50 shrink-0",
                         currentCommunity?.creator_is_official 
                           ? "bg-gradient-to-r from-purple-900/30 via-purple-800/20 to-amber-700/30 border-b border-purple-500/30 shadow-lg shadow-purple-500/10" 
                           : "border-border/30 bg-gradient-to-r from-background via-background to-primary/5"
@@ -2106,7 +2105,7 @@ export default function Messages() {
                         <BugSwarmAnimation />
                       )}
                       <ScrollArea className={cn(
-                          "flex-1 w-full overflow-y-auto transition-all duration-300 m-0 p-0 pt-16 md:pt-0",
+                          "flex-1 w-full overflow-y-auto transition-all duration-300 m-0 p-0",
                           currentCommunity?.creator_is_official && currentCommunity?.name !== "Bug Hunter"
                             ? "bg-gradient-to-b from-purple-950/40 via-black to-purple-950/20"
                             : currentCommunity?.name === "Bug Hunter"
@@ -2269,6 +2268,8 @@ export default function Messages() {
                             )}
                             
                             <div ref={messagesEndRef} />
+                            {/* Mobile spacer so the last message clears the fixed composer above the keyboard */}
+                            <div className="h-20 md:hidden" aria-hidden />
                           </div>
                         )}
                       </ScrollArea>
@@ -2523,6 +2524,8 @@ export default function Messages() {
                             )}
                             
                             <div ref={messagesEndRef} />
+                            {/* Mobile spacer so the last message clears the fixed composer above the keyboard */}
+                            <div className="h-20 md:hidden" aria-hidden />
                           </div>
                         )}
                     </ScrollArea>
@@ -2669,9 +2672,9 @@ export default function Messages() {
         </div>
       </div>
 
-      {/* Fixed Input Box - Bottom of Screen for Mobile */}
+      {/* Mobile input pinned to bottom of viewport. Uses 100dvh on the page wrapper so the on-screen keyboard shrinks the viewport and this stays visible just above the keyboard. */}
       {(selectedUserId || selectedCommunityId) && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 border-0 bg-background z-50 flex flex-col px-0 py-0 m-0 gap-0">
+        <div className="md:hidden fixed inset-x-0 bottom-0 border-t border-border/40 bg-background z-50 flex flex-col px-0 py-0 m-0 gap-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           {/* Image Preview for Direct Messages */}
           {previewUrl && (
             <div className="py-0 px-0 relative w-full m-0">
