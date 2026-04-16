@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, Loader2, Languages, Sparkles, ArrowRight, Heart, X } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Loader2, Languages, Sparkles, ArrowRight, Heart, X, Phone, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -15,9 +15,41 @@ import { cn } from "@/lib/utils";
 
 const logo = "/assets/novii_logo_new.png";
 
+const countryCodes = [
+  { code: "+966", flag: "🇸🇦", name: "Saudi Arabia", nameAr: "السعودية" },
+  { code: "+971", flag: "🇦🇪", name: "UAE", nameAr: "الإمارات" },
+  { code: "+973", flag: "🇧🇭", name: "Bahrain", nameAr: "البحرين" },
+  { code: "+974", flag: "🇶🇦", name: "Qatar", nameAr: "قطر" },
+  { code: "+968", flag: "🇴🇲", name: "Oman", nameAr: "عُمان" },
+  { code: "+965", flag: "🇰🇼", name: "Kuwait", nameAr: "الكويت" },
+  { code: "+20", flag: "🇪🇬", name: "Egypt", nameAr: "مصر" },
+  { code: "+962", flag: "🇯🇴", name: "Jordan", nameAr: "الأردن" },
+  { code: "+961", flag: "🇱🇧", name: "Lebanon", nameAr: "لبنان" },
+  { code: "+964", flag: "🇮🇶", name: "Iraq", nameAr: "العراق" },
+  { code: "+212", flag: "🇲🇦", name: "Morocco", nameAr: "المغرب" },
+  { code: "+216", flag: "🇹🇳", name: "Tunisia", nameAr: "تونس" },
+  { code: "+213", flag: "🇩🇿", name: "Algeria", nameAr: "الجزائر" },
+  { code: "+218", flag: "🇱🇾", name: "Libya", nameAr: "ليبيا" },
+  { code: "+249", flag: "🇸🇩", name: "Sudan", nameAr: "السودان" },
+  { code: "+967", flag: "🇾🇪", name: "Yemen", nameAr: "اليمن" },
+  { code: "+963", flag: "🇸🇾", name: "Syria", nameAr: "سوريا" },
+  { code: "+970", flag: "🇵🇸", name: "Palestine", nameAr: "فلسطين" },
+  { code: "+1", flag: "🇺🇸", name: "USA", nameAr: "أمريكا" },
+  { code: "+44", flag: "🇬🇧", name: "UK", nameAr: "بريطانيا" },
+  { code: "+33", flag: "🇫🇷", name: "France", nameAr: "فرنسا" },
+  { code: "+49", flag: "🇩🇪", name: "Germany", nameAr: "ألمانيا" },
+  { code: "+90", flag: "🇹🇷", name: "Turkey", nameAr: "تركيا" },
+  { code: "+91", flag: "🇮🇳", name: "India", nameAr: "الهند" },
+  { code: "+92", flag: "🇵🇰", name: "Pakistan", nameAr: "باكستان" },
+];
+
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
+  const [authMethod, setAuthMethod] = useState<"email" | "phone">("email");
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [countryCode, setCountryCode] = useState("+966");
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -32,18 +64,21 @@ export default function AuthPage() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [isSendingReset, setIsSendingReset] = useState(false);
+
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpCountdown, setOtpCountdown] = useState(0);
+
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithPhone, verifyPhoneOtp } = useAuth();
   const { language, setLanguage, direction } = useLanguage();
   const t = getTranslation(language.code);
   const isRTL = direction === "rtl";
   
-  // Check for ban message in URL
   const isBanned = new URLSearchParams(location.split('?')[1]).get('banned') === 'true';
   const banMessage = new URLSearchParams(location.split('?')[1]).get('message');
   
-  // Show ban notification if banned
   useEffect(() => {
     if (isBanned && banMessage) {
       toast({
@@ -52,10 +87,16 @@ export default function AuthPage() {
         description: decodeURIComponent(banMessage),
         duration: 10000,
       });
-      // Clear URL params
       setLocation('/auth');
     }
   }, [isBanned, banMessage, toast, language.code, setLocation]);
+
+  useEffect(() => {
+    if (otpCountdown > 0) {
+      const timer = setTimeout(() => setOtpCountdown(otpCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCountdown]);
 
   const months = language.code === 'ar' 
     ? ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
@@ -81,9 +122,36 @@ export default function AuthPage() {
     return { score, label: t.auth.very_strong, color: "bg-green-500" };
   };
 
-  const passwordStrength = !isLogin ? getPasswordStrength(password) : null;
+  const passwordStrength = !isLogin && authMethod === "email" ? getPasswordStrength(password) : null;
+
+  const getFullPhone = () => `${countryCode}${phoneNumber.replace(/^0+/, '')}`;
+
+  const validatePhoneNumber = (phone: string): boolean => {
+    const cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
+    return cleaned.length >= 7 && cleaned.length <= 15 && /^\d+$/.test(cleaned);
+  };
 
   const validateForm = (): boolean => {
+    if (authMethod === "phone") {
+      if (!phoneNumber || !validatePhoneNumber(phoneNumber)) {
+        toast({
+          variant: "destructive",
+          title: t.auth.invalid_phone,
+          description: t.auth.invalid_phone_desc,
+        });
+        return false;
+      }
+      if (!isLogin && (!fullName || !username || !birthMonth || !birthDay || !birthYear || !gender)) {
+        toast({
+          variant: "destructive",
+          title: t.auth.validation_error,
+          description: t.auth.fill_all_fields,
+        });
+        return false;
+      }
+      return true;
+    }
+
     if (!email || !password) {
       toast({
         variant: "destructive",
@@ -124,6 +192,98 @@ export default function AuthPage() {
     }
 
     return true;
+  };
+
+  const handleSendOtp = async () => {
+    if (!validateForm()) return;
+    
+    setIsLoading(true);
+    try {
+      const fullPhone = getFullPhone();
+      await signInWithPhone(fullPhone);
+      setOtpStep(true);
+      setOtpCountdown(60);
+      toast({
+        title: t.auth.otp_sent,
+        description: t.auth.otp_sent_desc,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: t.auth.error,
+        description: error.message || t.auth.generic_error,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      toast({
+        variant: "destructive",
+        title: t.auth.invalid_otp,
+        description: t.auth.invalid_otp_desc,
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const fullPhone = getFullPhone();
+      await verifyPhoneOtp(fullPhone, otpCode);
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+
+      if (user?.id && !isLogin) {
+        try {
+          await api.createProfile(user.id, username, gender);
+        } catch (profileError) {
+          console.error('Profile creation failed:', profileError);
+        }
+      }
+
+      if (user?.id) {
+        try {
+          await api.trackDevice(user.id);
+        } catch (deviceError) {
+          console.error('Device tracking failed:', deviceError);
+        }
+      }
+
+      setLocation("/");
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: t.auth.otp_error,
+        description: error.message || t.auth.otp_error_desc,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (otpCountdown > 0) return;
+    setIsLoading(true);
+    try {
+      const fullPhone = getFullPhone();
+      await signInWithPhone(fullPhone);
+      setOtpCountdown(60);
+      toast({
+        title: t.auth.otp_sent,
+        description: t.auth.otp_sent_desc,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: t.auth.error,
+        description: error.message || t.auth.generic_error,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -176,6 +336,15 @@ export default function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (authMethod === "phone") {
+      if (otpStep) {
+        await handleVerifyOtp();
+      } else {
+        await handleSendOtp();
+      }
+      return;
+    }
+
     if (!validateForm()) return;
     
     setIsLoading(true);
@@ -184,60 +353,43 @@ export default function AuthPage() {
       if (isLogin) {
         await signIn(email, password);
         
-        // Track device on login
         try {
           const { data: { session } } = await supabase.auth.getSession();
           const user = session?.user;
-          console.log('🔐 Login successful, user ID:', user?.id);
           if (user?.id) {
-            console.log('📱 Tracking device for user:', user.id);
-            const result = await api.trackDevice(user.id);
-            console.log('✅ Device tracked successfully:', result);
+            await api.trackDevice(user.id);
           }
         } catch (deviceError) {
-          console.error('❌ Device tracking failed:', deviceError);
-          // Don't block login if device tracking fails
+          console.error('Device tracking failed:', deviceError);
         }
         
-        // Redirect to home page
         setLocation("/");
       } else {
         await signUp(email, password);
         
-        // Create profile with gender
         try {
           const { data: { session } } = await supabase.auth.getSession();
           const user = session?.user;
-          console.log('🔐 Signup successful, user ID:', user?.id);
           if (user?.id) {
-            console.log('📱 Creating profile with gender:', gender);
             await api.createProfile(user.id, username, gender);
-            console.log('✅ Profile created with gender:', gender);
           }
         } catch (profileError) {
-          console.error('❌ Profile creation failed:', profileError);
-          // Don't block signup if profile creation fails
+          console.error('Profile creation failed:', profileError);
         }
 
-        // Track device on signup
         try {
           const { data: { session: s2 } } = await supabase.auth.getSession();
           const user = s2?.user;
           if (user?.id) {
-            console.log('📱 Tracking device for user:', user.id);
-            const result = await api.trackDevice(user.id);
-            console.log('✅ Device tracked successfully:', result);
+            await api.trackDevice(user.id);
           }
         } catch (deviceError) {
-          console.error('❌ Device tracking failed:', deviceError);
-          // Don't block signup if device tracking fails
+          console.error('Device tracking failed:', deviceError);
         }
         
-        // Redirect to home page
         setLocation("/");
       }
     } catch (error: any) {
-      // Check if this is a ban-related error
       if (error.message && (error.message.includes('banned') || error.message.includes('محظور'))) {
         toast({
           variant: "destructive",
@@ -257,21 +409,183 @@ export default function AuthPage() {
     }
   };
 
+  const resetForm = () => {
+    setPassword("");
+    setConfirmPassword("");
+    setFullName("");
+    setUsername("");
+    setBirthMonth("");
+    setBirthDay("");
+    setBirthYear("");
+    setGender("");
+    setPhoneNumber("");
+    setOtpStep(false);
+    setOtpCode("");
+    setOtpCountdown(0);
+  };
+
+  const PhoneInput = () => (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowCountryPicker(!showCountryPicker)}
+            className="flex items-center gap-1.5 bg-background/50 border border-border/80 rounded-lg h-9 sm:h-11 px-3 text-sm hover:border-primary/50 transition-colors min-w-[100px]"
+          >
+            <span className="text-base">{countryCodes.find(c => c.code === countryCode)?.flag}</span>
+            <span className="text-foreground font-medium" dir="ltr">{countryCode}</span>
+            <ChevronDown className="w-3 h-3 text-muted-foreground" />
+          </button>
+          {showCountryPicker && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowCountryPicker(false)} />
+              <div className="absolute top-full mt-1 z-50 bg-card border border-border rounded-xl shadow-2xl max-h-60 overflow-y-auto w-64 animate-in fade-in slide-in-from-top-2 duration-200">
+                {countryCodes.map((c) => (
+                  <button
+                    key={c.code}
+                    type="button"
+                    onClick={() => {
+                      setCountryCode(c.code);
+                      setShowCountryPicker(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-primary/10 transition-colors text-sm ${countryCode === c.code ? 'bg-primary/5 text-primary' : ''}`}
+                  >
+                    <span className="text-lg">{c.flag}</span>
+                    <span className="flex-1 text-start">{isRTL ? c.nameAr : c.name}</span>
+                    <span className="text-muted-foreground font-mono text-xs" dir="ltr">{c.code}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <Input
+          type="tel"
+          placeholder={isRTL ? "5XX XXX XXX" : "5XX XXX XXX"}
+          value={phoneNumber}
+          onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d\s]/g, ''))}
+          className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm flex-1"
+          dir="ltr"
+        />
+      </div>
+    </div>
+  );
+
+  const OtpVerification = () => (
+    <div className="space-y-4">
+      <div className="text-center space-y-2">
+        <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-3">
+          <Phone className="w-7 h-7 text-primary" />
+        </div>
+        <h3 className="font-bold text-lg">{t.auth.verify_otp}</h3>
+        <p className="text-sm text-muted-foreground">
+          {t.auth.otp_sent_desc}
+        </p>
+        <p className="text-xs text-primary font-mono" dir="ltr">{getFullPhone()}</p>
+      </div>
+
+      <div className="flex justify-center" dir="ltr">
+        <Input
+          type="text"
+          inputMode="numeric"
+          maxLength={6}
+          placeholder="000000"
+          value={otpCode}
+          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          className="bg-background/50 border-border/80 text-foreground text-center text-2xl tracking-[0.5em] font-mono h-14 w-64 focus:border-primary focus:ring-primary/20 transition-all duration-200"
+        />
+      </div>
+
+      <Button
+        type="submit"
+        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-10 sm:h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300"
+        disabled={isLoading || otpCode.length !== 6}
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            {t.auth.loading}
+          </>
+        ) : (
+          <>
+            {t.auth.verify_otp}
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </>
+        )}
+      </Button>
+
+      <div className="flex items-center justify-center gap-2">
+        <button
+          type="button"
+          onClick={handleResendOtp}
+          disabled={otpCountdown > 0 || isLoading}
+          className={`text-sm font-medium transition-colors ${
+            otpCountdown > 0 ? 'text-muted-foreground cursor-not-allowed' : 'text-primary hover:text-primary/80 cursor-pointer'
+          }`}
+        >
+          {otpCountdown > 0 
+            ? `${t.auth.resend_in} ${otpCountdown}${t.auth.seconds}` 
+            : t.auth.resend_otp}
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          setOtpStep(false);
+          setOtpCode("");
+        }}
+        className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {isRTL ? "← تغيير رقم الهاتف" : "← Change phone number"}
+      </button>
+    </div>
+  );
+
+  const AuthMethodToggle = () => (
+    <div className="flex rounded-xl bg-background/50 border border-border/60 p-1 gap-1">
+      <button
+        type="button"
+        onClick={() => { setAuthMethod("email"); setOtpStep(false); setOtpCode(""); }}
+        className={cn(
+          "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all duration-200",
+          authMethod === "email" 
+            ? "bg-primary text-primary-foreground shadow-sm" 
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        )}
+      >
+        <Mail className="w-3.5 h-3.5" />
+        {t.auth.use_email}
+      </button>
+      <button
+        type="button"
+        onClick={() => { setAuthMethod("phone"); }}
+        className={cn(
+          "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all duration-200",
+          authMethod === "phone" 
+            ? "bg-primary text-primary-foreground shadow-sm" 
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        )}
+      >
+        <Phone className="w-3.5 h-3.5" />
+        {t.auth.use_phone}
+      </button>
+    </div>
+  );
+
   return (
     <div className={cn(
       "min-h-screen bg-gradient-to-br from-background via-background to-background flex items-center justify-center p-4 pt-8 sm:pt-4 relative overflow-hidden",
       "dark"
     )} dir={isRTL ? "rtl" : "ltr"}>
-      {/* Animated background gradients */}
       <div className="absolute inset-0 overflow-hidden">
-        {/* Gradient orbs with animations */}
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-pink-500/40 via-purple-500/30 to-transparent rounded-full blur-3xl opacity-60 animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-cyan-500/30 via-purple-500/20 to-transparent rounded-full blur-3xl opacity-50 animate-pulse delay-1000"></div>
         <div className="absolute top-1/3 right-1/3 w-80 h-80 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full blur-3xl opacity-40 animate-blob"></div>
         <div className="absolute bottom-1/4 left-1/4 w-72 h-72 bg-gradient-to-tr from-cyan-500/15 to-purple-500/15 rounded-full blur-3xl opacity-30 animate-blob delay-2000"></div>
       </div>
 
-      {/* Language Toggle */}
       <div className="absolute top-6 right-6 z-20">
         <Button
           onClick={() => setLanguage(language.code === 'ar' ? 'en' : 'ar')}
@@ -283,9 +597,7 @@ export default function AuthPage() {
         </Button>
       </div>
 
-      {/* Main Container */}
       <div className="w-full max-w-7xl flex gap-12 items-center relative z-10">
-        {/* Left side - Marketing content (Desktop only) */}
         <div className="hidden lg:flex flex-1 flex-col items-center justify-center space-y-12">
           <div className="space-y-8 animate-in fade-in slide-in-from-left-8 duration-700">
             <div className="space-y-4">
@@ -318,22 +630,13 @@ export default function AuthPage() {
             </div>
           </div>
 
-          {/* Phone Mockup + floating cards */}
           <div className="relative flex items-center justify-center w-full animate-in zoom-in duration-700 delay-300" style={{height: '420px'}}>
-
-            {/* Glow behind phone */}
             <div className="absolute w-52 h-52 bg-gradient-to-br from-primary/40 via-pink-500/30 to-cyan-500/20 rounded-full blur-3xl" />
-
-            {/* Phone frame */}
             <div className="relative z-20 w-44 h-[340px] rounded-[2.5rem] bg-zinc-900 shadow-[0_0_0_2px_rgba(139,92,246,0.4),0_32px_64px_rgba(0,0,0,0.7)] border border-white/10 flex flex-col overflow-hidden">
-              {/* Notch */}
               <div className="flex justify-center pt-2 pb-1 shrink-0">
                 <div className="w-16 h-1.5 bg-zinc-700 rounded-full" />
               </div>
-
-              {/* Screen content — mini Novii UI */}
               <div className="flex-1 bg-[#0d0d14] flex flex-col overflow-hidden">
-                {/* Top bar */}
                 <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5 shrink-0">
                   <span className="text-[8px] font-bold bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent">Novii</span>
                   <div className="flex gap-1">
@@ -345,23 +648,18 @@ export default function AuthPage() {
                     </div>
                   </div>
                 </div>
-
-                {/* Stories row */}
                 <div className="flex gap-1.5 px-2 py-1.5 shrink-0">
                   {['violet','pink','cyan','purple'].map((c, i) => (
                     <div key={i} className={`w-7 h-7 rounded-full border-2 ${i === 0 ? 'border-violet-500' : i === 1 ? 'border-pink-500' : i === 2 ? 'border-cyan-500' : 'border-purple-500'} bg-white/5 shrink-0`} />
                   ))}
                 </div>
-
-                {/* Posts feed */}
                 <div className="flex-1 overflow-hidden flex flex-col gap-1.5 px-2 pb-2">
                   {[
-                    {color:'violet', likes:'1.2K', wide: false},
-                    {color:'pink', likes:'847', wide: true},
-                    {color:'cyan', likes:'3.4K', wide: false},
+                    {color:'violet', likes:'1.2K'},
+                    {color:'pink', likes:'847'},
+                    {color:'cyan', likes:'3.4K'},
                   ].map((post, i) => (
                     <div key={i} className="bg-white/5 rounded-lg overflow-hidden shrink-0">
-                      {/* Post header */}
                       <div className="flex items-center gap-1.5 p-1.5">
                         <div className={`w-4 h-4 rounded-full bg-gradient-to-br ${i===0?'from-violet-500 to-purple-600':i===1?'from-pink-500 to-rose-600':'from-cyan-500 to-blue-600'}`} />
                         <div className="flex-1">
@@ -369,9 +667,7 @@ export default function AuthPage() {
                         </div>
                         <div className="w-1 h-1 rounded-full bg-white/20" />
                       </div>
-                      {/* Image placeholder */}
                       <div className={`h-12 bg-gradient-to-br ${i===0?'from-violet-900/60 to-purple-900/40':i===1?'from-pink-900/60 to-rose-900/40':'from-cyan-900/60 to-blue-900/40'} mx-1.5 rounded-md`} />
-                      {/* Interactions */}
                       <div className="flex items-center gap-2 px-1.5 py-1">
                         <div className={`w-2.5 h-2.5 ${i===0?'text-violet-400':i===1?'text-pink-400':'text-cyan-400'}`}>♥</div>
                         <span className={`text-[6px] ${i===0?'text-violet-400':i===1?'text-pink-400':'text-cyan-400'}`}>{post.likes}</span>
@@ -380,22 +676,17 @@ export default function AuthPage() {
                     </div>
                   ))}
                 </div>
-
-                {/* Bottom nav */}
                 <div className="flex justify-around items-center px-2 py-1.5 border-t border-white/5 shrink-0">
                   {['⌂','⊙','＋','♡','◯'].map((icon, i) => (
                     <div key={i} className={`text-[10px] ${i===0?'text-violet-400':'text-white/30'}`}>{icon}</div>
                   ))}
                 </div>
               </div>
-
-              {/* Home indicator */}
               <div className="flex justify-center py-1.5 shrink-0 bg-zinc-900">
                 <div className="w-10 h-1 bg-zinc-600 rounded-full" />
               </div>
             </div>
 
-            {/* Floating card — new follower */}
             <div className="absolute top-6 -left-4 z-30 bg-card/90 backdrop-blur-md border border-violet-500/30 rounded-2xl px-3 py-2 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-700 delay-500 flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-white text-xs shrink-0">م</div>
               <div>
@@ -404,7 +695,6 @@ export default function AuthPage() {
               </div>
             </div>
 
-            {/* Floating card — likes */}
             <div className="absolute bottom-12 -right-6 z-30 bg-card/90 backdrop-blur-md border border-pink-500/30 rounded-2xl px-3 py-2 shadow-2xl animate-in fade-in slide-in-from-right-4 duration-700 delay-700 flex items-center gap-2">
               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center text-white text-xs shrink-0">♥</div>
               <div>
@@ -413,7 +703,6 @@ export default function AuthPage() {
               </div>
             </div>
 
-            {/* Floating badge — active users */}
             <div className="absolute top-14 -right-2 z-30 bg-card/90 backdrop-blur-md border border-cyan-500/30 rounded-full px-2.5 py-1.5 shadow-xl animate-in fade-in slide-in-from-top-2 duration-700 delay-600 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
               <span className="text-[9px] font-medium text-foreground">
@@ -421,7 +710,6 @@ export default function AuthPage() {
               </span>
             </div>
 
-            {/* Floating badge — posts */}
             <div className="absolute bottom-6 left-0 z-30 bg-card/90 backdrop-blur-md border border-border/50 rounded-full px-2.5 py-1.5 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-700 delay-800 flex items-center gap-1.5">
               <span className="text-[9px]">📸</span>
               <span className="text-[9px] font-medium text-foreground">
@@ -431,16 +719,11 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* Right side - Auth Form */}
         <div className="flex-1 max-w-md w-full flex flex-col max-h-[100dvh] py-4 animate-in fade-in slide-in-from-right-8 duration-700 delay-100">
-          {/* Form Card */}
           <div className="relative group flex-1 min-h-0 flex flex-col">
-            {/* Glowing border effect */}
             <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-purple-500 to-pink-500 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
             
-            {/* Main form container */}
             <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl p-5 sm:p-8 space-y-4 sm:space-y-6 shadow-2xl overflow-y-auto flex-1 min-h-0">
-              {/* Header */}
               <div className="text-center space-y-2 sm:space-y-4">
                 <div className="flex justify-center mb-2 animate-in zoom-in duration-500">
                   <div className="relative group">
@@ -455,14 +738,17 @@ export default function AuthPage() {
                   <div className="h-1 w-16 bg-gradient-to-r from-pink-500 to-cyan-500 rounded-full animate-in fade-in duration-700 delay-200"></div>
                 </div>
                 <p className="text-sm text-muted-foreground animate-in fade-in duration-700 delay-300">
-                  {isLogin ? t.auth.login_subtitle : t.auth.signup_subtitle}
+                  {authMethod === "phone" && isLogin
+                    ? t.auth.phone_login_subtitle
+                    : isLogin ? t.auth.login_subtitle : t.auth.signup_subtitle}
                 </p>
               </div>
 
-              {/* Form Content */}
+              <AuthMethodToggle />
+
               {!isLogin ? (
-                <>
-                  <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-3.5 overflow-visible">
+                <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-3.5 overflow-visible">
+                  {authMethod === "email" ? (
                     <Input
                       type="email"
                       placeholder={t.auth.mobile_or_email}
@@ -472,230 +758,262 @@ export default function AuthPage() {
                       className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
                       dir="ltr"
                     />
+                  ) : otpStep ? (
+                    <OtpVerification />
+                  ) : (
+                    <PhoneInput />
+                  )}
 
-                    <Input
-                      type="text"
-                      placeholder={t.auth.full_name}
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                      className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
-                    />
-
-                    <Input
-                      type="text"
-                      placeholder={t.auth.username}
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      required
-                      className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
-                      dir="ltr"
-                    />
-
-                    <div className="relative">
+                  {!(authMethod === "phone" && otpStep) && (
+                    <>
                       <Input
-                        type={showPassword ? "text" : "password"}
-                        placeholder={t.auth.password}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        type="text"
+                        placeholder={t.auth.full_name}
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        required
+                        className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
+                      />
+
+                      <Input
+                        type="text"
+                        placeholder={t.auth.username}
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
                         required
                         className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
                         dir="ltr"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">{language.code === 'ar' ? 'الجنس' : 'Gender'}</label>
-                      <Select value={gender} onValueChange={setGender}>
-                        <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-9 sm:h-11 text-sm hover:border-primary/50 transition-colors">
-                          <SelectValue placeholder={language.code === 'ar' ? 'اختر الجنس' : 'Select gender'} />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border" side="bottom" align="start" sideOffset={8}>
-                          <SelectItem value="male" className="text-foreground hover:bg-primary/10">
-                            {language.code === 'ar' ? 'ذكر' : 'Male'}
-                          </SelectItem>
-                          <SelectItem value="female" className="text-foreground hover:bg-primary/10">
-                            {language.code === 'ar' ? 'أنثى' : 'Female'}
-                          </SelectItem>
-                          <SelectItem value="other" className="text-foreground hover:bg-primary/10">
-                            {language.code === 'ar' ? 'آخر' : 'Other'}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">{t.auth.date_of_birth}</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Select value={birthMonth} onValueChange={setBirthMonth}>
-                          <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
-                            <SelectValue placeholder={t.auth.month} />
-                          </SelectTrigger>
-                          <SelectContent className="bg-card border-border" side="bottom" align="start" sideOffset={4}>
-                            {months.map((month, index) => (
-                              <SelectItem key={index} value={String(index + 1)} className="text-foreground hover:bg-primary/10">
-                                {month}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <Select value={birthDay} onValueChange={setBirthDay}>
-                          <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
-                            <SelectValue placeholder={t.auth.day} />
-                          </SelectTrigger>
-                          <SelectContent className="bg-card border-border max-h-60" side="bottom" align="start" sideOffset={4}>
-                            {days.map((day) => (
-                              <SelectItem key={day} value={String(day)} className="text-foreground hover:bg-primary/10">
-                                {day}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <Select value={birthYear} onValueChange={setBirthYear}>
-                          <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
-                            <SelectValue placeholder={t.auth.year} />
-                          </SelectTrigger>
-                          <SelectContent className="bg-card border-border max-h-60" side="bottom" align="start" sideOffset={4}>
-                            {years.map((year) => (
-                              <SelectItem key={year} value={String(year)} className="text-foreground hover:bg-primary/10">
-                                {year}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {t.auth.dob_info2}
-                    </p>
-
-                    <Button
-                      type="submit"
-                      className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-10 sm:h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          {t.auth.loading}
-                        </>
-                      ) : (
-                        <>
-                          {t.auth.signup_button}
-                          <ArrowRight className="w-4 h-4 ml-2" />
-                        </>
+                      {authMethod === "email" && (
+                        <div className="relative">
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder={t.auth.password}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
+                            dir="ltr"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       )}
-                    </Button>
-                  </form>
-                </>
-              ) : (
-                <>
-                  <form onSubmit={handleSubmit} className="space-y-5">
-                    <div className="space-y-2.5">
-                      <label className="text-sm font-medium text-foreground">{t.auth.email}</label>
-                      <div className="relative">
-                        <Mail className="absolute right-3 top-3.5 w-5 h-5 text-muted-foreground pointer-events-none" />
-                        <Input
-                          type="email"
-                          placeholder="example@email.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          required
-                          className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground pr-10 h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200"
-                          dir="ltr"
-                        />
-                      </div>
-                    </div>
 
-                    <div className="space-y-2.5">
-                      <label className="text-sm font-medium text-foreground">{t.auth.password}</label>
-                      <div className="relative">
-                        <Lock className="absolute right-3 top-3.5 w-5 h-5 text-muted-foreground pointer-events-none" />
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          required
-                          className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground pr-10 pl-10 h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200"
-                          dir="ltr"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute left-3 top-3.5 text-muted-foreground hover:text-foreground transition-colors"
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">{language.code === 'ar' ? 'الجنس' : 'Gender'}</label>
+                        <Select value={gender} onValueChange={setGender}>
+                          <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-9 sm:h-11 text-sm hover:border-primary/50 transition-colors">
+                            <SelectValue placeholder={language.code === 'ar' ? 'اختر الجنس' : 'Select gender'} />
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border-border" side="bottom" align="start" sideOffset={8}>
+                            <SelectItem value="male" className="text-foreground hover:bg-primary/10">
+                              {language.code === 'ar' ? 'ذكر' : 'Male'}
+                            </SelectItem>
+                            <SelectItem value="female" className="text-foreground hover:bg-primary/10">
+                              {language.code === 'ar' ? 'أنثى' : 'Female'}
+                            </SelectItem>
+                            <SelectItem value="other" className="text-foreground hover:bg-primary/10">
+                              {language.code === 'ar' ? 'آخر' : 'Other'}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">{t.auth.date_of_birth}</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Select value={birthMonth} onValueChange={setBirthMonth}>
+                            <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
+                              <SelectValue placeholder={t.auth.month} />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border" side="bottom" align="start" sideOffset={4}>
+                              {months.map((month, index) => (
+                                <SelectItem key={index} value={String(index + 1)} className="text-foreground hover:bg-primary/10">
+                                  {month}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <Select value={birthDay} onValueChange={setBirthDay}>
+                            <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
+                              <SelectValue placeholder={t.auth.day} />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border max-h-60" side="bottom" align="start" sideOffset={4}>
+                              {days.map((day) => (
+                                <SelectItem key={day} value={String(day)} className="text-foreground hover:bg-primary/10">
+                                  {day}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <Select value={birthYear} onValueChange={setBirthYear}>
+                            <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
+                              <SelectValue placeholder={t.auth.year} />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border max-h-60" side="bottom" align="start" sideOffset={4}>
+                              {years.map((year) => (
+                                <SelectItem key={year} value={String(year)} className="text-foreground hover:bg-primary/10">
+                                  {year}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {t.auth.dob_info2}
+                      </p>
+
+                      <Button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-10 sm:h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            {t.auth.loading}
+                          </>
+                        ) : (
+                          <>
+                            {authMethod === "phone" ? t.auth.send_otp : t.auth.signup_button}
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  )}
+                </form>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  {authMethod === "phone" ? (
+                    otpStep ? (
+                      <OtpVerification />
+                    ) : (
+                      <>
+                        <div className="space-y-2.5">
+                          <label className="text-sm font-medium text-foreground">{t.auth.phone_number}</label>
+                          <PhoneInput />
+                        </div>
+                        <Button
+                          type="submit"
+                          className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300 mt-6"
+                          disabled={isLoading}
                         >
-                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              {t.auth.loading}
+                            </>
+                          ) : (
+                            <>
+                              {t.auth.send_otp}
+                              <ArrowRight className="w-4 h-4 ml-2" />
+                            </>
+                          )}
+                        </Button>
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <div className="space-y-2.5">
+                        <label className="text-sm font-medium text-foreground">{t.auth.email}</label>
+                        <div className="relative">
+                          <Mail className="absolute right-3 top-3.5 w-5 h-5 text-muted-foreground pointer-events-none" />
+                          <Input
+                            type="email"
+                            placeholder="example@email.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                            className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground pr-10 h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200"
+                            dir="ltr"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2.5">
+                        <label className="text-sm font-medium text-foreground">{t.auth.password}</label>
+                        <div className="relative">
+                          <Lock className="absolute right-3 top-3.5 w-5 h-5 text-muted-foreground pointer-events-none" />
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground pr-10 pl-10 h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200"
+                            dir="ltr"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute left-3 top-3.5 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2">
+                        <label className="flex items-center gap-2.5 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-primary/20 transition-all"
+                          />
+                          <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">{t.auth.remember_me}</span>
+                        </label>
+                        <button 
+                          type="button" 
+                          onClick={() => setShowForgotPassword(true)}
+                          className="text-sm text-primary hover:text-primary/80 font-medium transition-colors">
+                          {t.auth.forgot_password}
                         </button>
                       </div>
-                    </div>
 
-                    <div className="flex items-center justify-between pt-2">
-                      <label className="flex items-center gap-2.5 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          checked={rememberMe}
-                          onChange={(e) => setRememberMe(e.target.checked)}
-                          className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-primary/20 transition-all"
-                        />
-                        <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">{t.auth.remember_me}</span>
-                      </label>
-                      <button 
-                        type="button" 
-                        onClick={() => setShowForgotPassword(true)}
-                        className="text-sm text-primary hover:text-primary/80 font-medium transition-colors">
-                        {t.auth.forgot_password}
-                      </button>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300 mt-6"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          {t.auth.loading}
-                        </>
-                      ) : (
-                        <>
-                          {t.auth.login_button}
-                          <ArrowRight className="w-4 h-4 ml-2" />
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                </>
+                      <Button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300 mt-6"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            {t.auth.loading}
+                          </>
+                        ) : (
+                          <>
+                            {t.auth.login_button}
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  )}
+                </form>
               )}
             </div>
           </div>
 
-          {/* Toggle Form */}
           <div className="mt-3 sm:mt-6 bg-card/50 backdrop-blur-md border border-border/50 rounded-xl p-3 sm:p-4 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
             <p className="text-sm text-muted-foreground">
               {isLogin ? t.auth.no_account : t.auth.have_account}
               <button
                 onClick={() => {
                   setIsLogin(!isLogin);
-                  setPassword("");
-                  setConfirmPassword("");
-                  setFullName("");
-                  setUsername("");
-                  setBirthMonth("");
-                  setBirthDay("");
-                  setBirthYear("");
-                  setGender("");
+                  resetForm();
                 }}
                 className="text-primary hover:text-primary/80 font-semibold ml-2 transition-colors"
               >
@@ -704,7 +1022,6 @@ export default function AuthPage() {
             </p>
           </div>
 
-          {/* Footer */}
           <div className="mt-3 sm:mt-8 text-center pb-4 space-y-2">
             <Link href="/features">
               <span className="text-xs text-primary/70 hover:text-primary cursor-pointer transition-colors">
@@ -743,11 +1060,9 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Forgot Password Modal */}
       {showForgotPassword && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-in fade-in zoom-in duration-300">
-            {/* Header */}
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
                 {language.code === 'ar' ? "إعادة تعيين كلمة المرور" : "Reset Password"}
@@ -763,14 +1078,12 @@ export default function AuthPage() {
               </button>
             </div>
 
-            {/* Description */}
             <p className="text-sm text-muted-foreground">
               {language.code === 'ar'
                 ? "أدخل بريدك الإلكتروني وسنرسل إليك رابط إعادة تعيين كلمة المرور"
                 : "Enter your email and we'll send you a password reset link"}
             </p>
 
-            {/* Form */}
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">
@@ -789,7 +1102,6 @@ export default function AuthPage() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-2 pt-2">
                 <Button
                   type="button"

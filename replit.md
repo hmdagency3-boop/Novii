@@ -8,6 +8,16 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 
 Arabic social media platform (React + Vite frontend, Express backend) using Supabase for data/auth and Cloudinary for media.
 
+### Authentication System
+- **Email signup/login**: Standard email + password via Supabase Auth (`signUp`, `signInWithPassword`)
+- **Phone signup/login**: Phone number + OTP via Supabase Auth (`signInWithOtp`, `verifyOtp` type='sms')
+- **Auth method toggle**: UI toggle between "Email" and "Phone Number" on both login and signup forms
+- **Country codes**: 25 pre-configured country codes (Arab + international) with flags
+- **OTP flow**: Send code → 60s countdown → 6-digit input → verify → create profile + track device
+- **Phone auth requirement**: Supabase Phone Auth must be enabled in dashboard (Authentication → Providers → Phone) with SMS provider (Twilio/MessageBird/Vonage)
+- **Auth context**: `novii/client/src/lib/auth-context.tsx` — `signInWithPhone(phone)`, `verifyPhoneOtp(phone, token)`
+- **Auth page**: `novii/client/src/pages/auth.tsx` — full email/phone dual-mode with OTP verification
+
 ### Settings System
 - **SettingsProvider context**: `novii/client/src/lib/settings-context.tsx` — single source of truth for all settings and user lists app-wide
 - **Settings storage**: `novii/client/src/lib/settings-storage.ts` — Supabase-backed per-user settings (DB read/write layer)
