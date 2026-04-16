@@ -2378,6 +2378,65 @@ export const api = {
     };
   },
 
+  async getMyLikedPosts(): Promise<Post[]> {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data: likes, error } = await supabase
+      .from('likes')
+      .select('post_id, created_at')
+      .eq('user_id', user.id)
+      .not('post_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) throw error;
+
+    const ids = (likes || []).map((l: any) => l.post_id).filter(Boolean);
+    if (ids.length === 0) return [];
+
+    const { data: posts, error: postsErr } = await supabase
+      .from('posts')
+      .select(POST_WITH_PROFILE)
+      .in('id', ids)
+      .eq('is_archived', false);
+    if (postsErr) throw postsErr;
+
+    const order = new Map(ids.map((id: string, i: number) => [id, i]));
+    return ((posts as unknown as Post[]) || []).sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+  },
+
+  async getMyCommentedPosts(): Promise<Post[]> {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data: comments, error } = await supabase
+      .from('comments')
+      .select('post_id, created_at')
+      .eq('user_id', user.id)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (error) throw error;
+
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const c of (comments || []) as any[]) {
+      if (c.post_id && !seen.has(c.post_id)) { seen.add(c.post_id); ids.push(c.post_id); }
+      if (ids.length >= 200) break;
+    }
+    if (ids.length === 0) return [];
+
+    const { data: posts, error: postsErr } = await supabase
+      .from('posts')
+      .select(POST_WITH_PROFILE)
+      .in('id', ids)
+      .eq('is_archived', false);
+    if (postsErr) throw postsErr;
+
+    const order = new Map(ids.map((id, i) => [id, i]));
+    return ((posts as unknown as Post[]) || []).sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+  },
+
   async updateTimeSpent(seconds: number) {
     const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');

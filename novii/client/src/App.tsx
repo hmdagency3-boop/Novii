@@ -42,6 +42,7 @@ import Help from "@/pages/help";
 import About from "@/pages/about";
 import ModerationNotice from "@/pages/moderation-notice";
 import HashtagPage from "@/pages/hashtag";
+import MyActivity from "@/pages/my-activity";
 
 function BanGuard() {
   const { isBanned } = useAuth();
@@ -218,6 +219,12 @@ function Router() {
       <Route path="/moderation/:id">
         <ProtectedLayout>
           <ModerationNotice />
+        </ProtectedLayout>
+      </Route>
+
+      <Route path="/my-activity/:type">
+        <ProtectedLayout>
+          <MyActivity />
         </ProtectedLayout>
       </Route>
 

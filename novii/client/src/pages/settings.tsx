@@ -92,8 +92,8 @@ function TimeSpentStats() {
   else if (seconds > 600) { activityLabel = isRtl ? 'متوسط' : 'Moderate'; activityTone = 'text-sky-500'; activityDot = 'bg-sky-500'; }
 
   const statItems = stats ? [
-    { icon: Heart, label: isRtl ? 'إعجابات' : 'Likes', value: stats.likes_given },
-    { icon: MessageCircle, label: isRtl ? 'تعليقات' : 'Comments', value: stats.comments_created },
+    { icon: Heart, label: isRtl ? 'إعجابات' : 'Likes', value: stats.likes_given, href: '/my-activity/likes' },
+    { icon: MessageCircle, label: isRtl ? 'تعليقات' : 'Comments', value: stats.comments_created, href: '/my-activity/comments' },
     { icon: TrendingUp, label: isRtl ? 'منشورات' : 'Posts', value: stats.posts_created },
     { icon: Bookmark, label: isRtl ? 'محفوظ' : 'Saved', value: stats.posts_saved },
   ] : [];
@@ -161,15 +161,15 @@ function TimeSpentStats() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {statItems.map((item, idx) => {
           const Icon = item.icon;
-          return (
-            <div
-              key={idx}
-              className="rounded-xl border border-border bg-card p-5 hover:border-foreground/20 transition-colors"
-            >
+          const inner = (
+            <>
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 rounded-lg bg-muted/60">
                   <Icon className="w-4 h-4 text-foreground/70" />
                 </div>
+                {item.href && (
+                  <ChevronRight className={cn("w-4 h-4 text-muted-foreground/60", isRtl && "rotate-180")} />
+                )}
               </div>
               <p className="text-2xl font-bold tabular-nums tracking-tight mb-0.5">
                 {item.value.toLocaleString()}
@@ -177,6 +177,20 @@ function TimeSpentStats() {
               <p className="text-xs text-muted-foreground font-medium">
                 {item.label}
               </p>
+            </>
+          );
+          const baseClass = "rounded-xl border border-border bg-card p-5 transition-colors block";
+          return item.href ? (
+            <Link
+              key={idx}
+              href={item.href}
+              className={cn(baseClass, "hover:border-foreground/30 hover:bg-muted/20 cursor-pointer")}
+            >
+              {inner}
+            </Link>
+          ) : (
+            <div key={idx} className={cn(baseClass, "hover:border-foreground/20")}>
+              {inner}
             </div>
           );
         })}
