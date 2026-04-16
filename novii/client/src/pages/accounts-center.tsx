@@ -57,7 +57,7 @@ export default function AccountsCenter() {
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["my-profile-center", user?.id],
-    queryFn: async () => (user?.id ? await api.getProfile(user.id) : null),
+    queryFn: async () => (user?.id ? await api.getProfileById(user.id) : null),
     enabled: !!user?.id,
   });
 
@@ -728,7 +728,7 @@ function DataSection({ isRTL }: { isRTL: boolean }) {
 
   const { data: privacyProfile } = useQuery({
     queryKey: ["my-profile-privacy", user?.id],
-    queryFn: async () => (user?.id ? await api.getProfile(user.id) : null),
+    queryFn: async () => (user?.id ? await api.getProfileById(user.id) : null),
     enabled: !!user?.id,
   });
 
