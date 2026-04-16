@@ -60,6 +60,12 @@ uri = "file://attached_assets/generated_images/bug_hunter_community.png"
 type = "image"
 title = "bug hunter community avatar"
 
+[[generated]]
+id = "hG-WWD4tXYRwUBOK0P5Bt"
+uri = "file://attached_assets/generated_images/novii_lab_community.png"
+type = "image"
+title = "novii lab community avatar"
+
 [[outputs]]
 id = "Sxt43qrZdflnEo09LgUX4"
 uri = "file://attached_assets/generated_images/novii_beta_invite_9x16.png"
@@ -83,3 +89,9 @@ id = "2KR3f9k7LdE-U2RX0dh5o"
 uri = "file://attached_assets/generated_images/bug_hunter_community.png"
 type = "image"
 title = "Bug Hunter Community Avatar"
+
+[[outputs]]
+id = "5DjTkvdQhS-oL87JunyAd"
+uri = "file://attached_assets/generated_images/novii_lab_community.png"
+type = "image"
+title = "Novii Lab Community Avatar"
