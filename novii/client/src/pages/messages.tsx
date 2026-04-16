@@ -3592,50 +3592,62 @@ export default function Messages() {
           currentUserId={currentUser?.id}
         />
       )}
-      {/* Long-press chat context menu (frosted glass) */}
+      {/* Long-press chat action sheet (frosted glass) */}
       {chatMenu && (() => {
         const isPinned = pinnedConvIds.has(chatMenu.userId);
         const isMuted = mutedConvIds.has(chatMenu.userId);
-        const menuWidth = 240;
-        const menuHeight = 130;
-        const padding = 12;
-        const vw = typeof window !== 'undefined' ? window.innerWidth : 360;
-        const vh = typeof window !== 'undefined' ? window.innerHeight : 640;
-        const left = Math.min(Math.max(padding, chatMenu.x - menuWidth / 2), vw - menuWidth - padding);
-        const top = Math.min(Math.max(padding, chatMenu.y - menuHeight - 8), vh - menuHeight - padding);
         return (
           <div
-            className="fixed inset-0 z-[100] animate-in fade-in duration-150"
+            className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-200"
             onClick={() => setChatMenu(null)}
             onContextMenu={(e) => { e.preventDefault(); setChatMenu(null); }}
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-black/40" />
             <div
               role="menu"
               onClick={(e) => e.stopPropagation()}
-              className="absolute rounded-2xl overflow-hidden border border-white/15 shadow-2xl ring-1 ring-black/10 animate-in zoom-in-95 duration-150"
+              className="relative w-full max-w-md mx-3 mb-3 rounded-3xl overflow-hidden border border-white/20 shadow-2xl animate-in slide-in-from-bottom-4 duration-300"
               style={{
-                left,
-                top,
-                width: menuWidth,
-                background: 'rgba(20,20,28,0.55)',
-                backdropFilter: 'saturate(180%) blur(24px)',
-                WebkitBackdropFilter: 'saturate(180%) blur(24px)',
+                background: 'rgba(28,28,38,0.55)',
+                backdropFilter: 'saturate(200%) blur(40px)',
+                WebkitBackdropFilter: 'saturate(200%) blur(40px)',
               }}
             >
-              <div className="px-3 pt-3 pb-2 text-[11px] uppercase tracking-wider text-white/60 truncate">
-                {chatMenu.username}
+              {/* Drag handle */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-white/30" />
               </div>
+
+              {/* Header with username */}
+              <div className="px-5 pt-1 pb-3 text-center">
+                <p className="text-[15px] font-semibold text-white truncate">{chatMenu.username}</p>
+              </div>
+
+              <div className="h-px bg-white/10" />
+
+              {/* Pin */}
               <button
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white hover:bg-white/10 active:bg-white/15 transition-colors"
+                className={cn(
+                  "w-full flex items-center gap-4 px-5 py-4 text-[15px] text-white hover:bg-white/10 active:bg-white/15 transition-colors",
+                  isRTL && "flex-row-reverse text-right"
+                )}
                 onClick={() => { togglePinConv(chatMenu.userId); setChatMenu(null); }}
               >
-                <span className="text-base leading-none">{isPinned ? '📍' : '📌'}</span>
-                <span>{isPinned ? (isRTL ? 'إلغاء التثبيت' : 'Unpin chat') : (isRTL ? 'تثبيت المحادثة' : 'Pin chat')}</span>
+                <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
+                  <span className="text-lg leading-none">{isPinned ? '📍' : '📌'}</span>
+                </div>
+                <span className="flex-1">{isPinned ? (isRTL ? 'إلغاء التثبيت' : 'Unpin chat') : (isRTL ? 'تثبيت المحادثة' : 'Pin chat')}</span>
               </button>
-              <div className="h-px bg-white/10 mx-2" />
+
+              <div className="h-px bg-white/10 mx-5" />
+
+              {/* Mute */}
               <button
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white hover:bg-white/10 active:bg-white/15 transition-colors"
+                className={cn(
+                  "w-full flex items-center gap-4 px-5 py-4 text-[15px] text-white hover:bg-white/10 active:bg-white/15 transition-colors",
+                  isRTL && "flex-row-reverse text-right"
+                )}
                 onClick={() => {
                   setMutedConvIds(prev => {
                     const next = new Set(prev);
@@ -3647,8 +3659,19 @@ export default function Messages() {
                   setChatMenu(null);
                 }}
               >
-                {isMuted ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                <span>{isMuted ? (isRTL ? 'إلغاء الكتم' : 'Unmute') : (isRTL ? 'كتم الإشعارات' : 'Mute notifications')}</span>
+                <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
+                  {isMuted ? <Volume2 className="w-4 h-4 text-white" /> : <VolumeX className="w-4 h-4 text-white" />}
+                </div>
+                <span className="flex-1">{isMuted ? (isRTL ? 'إلغاء الكتم' : 'Unmute') : (isRTL ? 'كتم الإشعارات' : 'Mute notifications')}</span>
+              </button>
+
+              {/* Cancel */}
+              <div className="h-2" />
+              <button
+                className="w-full px-5 py-4 text-[15px] font-medium text-white/90 border-t border-white/10 hover:bg-white/10 active:bg-white/15 transition-colors"
+                onClick={() => setChatMenu(null)}
+              >
+                {isRTL ? 'إلغاء' : 'Cancel'}
               </button>
             </div>
           </div>
