@@ -1,5 +1,5 @@
 import Layout from "@/components/layout";
-import { Search, Play, Eye, Hash, TrendingUp, Pin } from "lucide-react";
+import { Search, Play, Eye, Hash, TrendingUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useExplorePosts, useExploreReels } from "@/hooks/use-data";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -104,7 +104,6 @@ function ExploreContent() {
                 onClick={() => navigate(`/hashtag/${t.name}`)}
                 className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-accent hover:bg-accent/80 transition-colors"
               >
-                {t.is_pinned && <Pin className="w-3 h-3 text-purple-500" />}
                 <Hash className="w-3 h-3 text-purple-500" />
                 <span className="text-sm font-medium">{t.name}</span>
                 <span className="text-[11px] text-muted-foreground">{t.posts_count}</span>
