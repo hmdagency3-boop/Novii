@@ -416,13 +416,30 @@ export async function getPersonalizedExplore(
     .order("created_at", { ascending: false })
     .range(0, batchSize - 1);
 
-  if (error || !posts) return [];
+  if (error) {
+    console.error("🔍 Explore query error:", error.message);
+    return [];
+  }
+  if (!posts) return [];
+
+  console.log(`🔍 Explore: fetched ${posts.length} posts, user follows ${followingIds.size - 1} accounts`);
 
   const nonFollowedPosts = posts.filter(
     (p: any) => !followingIds.has(p.user_id)
   );
 
-  const scored: ScoredPost[] = nonFollowedPosts.map((post: any) => {
+  const featuredPosts = posts.filter(
+    (p: any) => p.is_featured || p.profile?.is_featured
+  );
+  const featuredFromFollowed = featuredPosts.filter(
+    (p: any) => followingIds.has(p.user_id) && !nonFollowedPosts.some((nf: any) => nf.id === p.id)
+  );
+
+  const combinedPosts = [...nonFollowedPosts, ...featuredFromFollowed];
+
+  console.log(`🔍 Explore: ${nonFollowedPosts.length} from non-followed, ${featuredFromFollowed.length} featured from followed, ${combinedPosts.length} total`);
+
+  const scored: ScoredPost[] = combinedPosts.map((post: any) => {
     const reasons: string[] = [];
 
     const interestScore = calculateInterestScore(profile, post.caption);
