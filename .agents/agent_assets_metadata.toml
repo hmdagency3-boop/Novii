@@ -54,6 +54,12 @@ uri = "file://attached_assets/generated_images/novii_beta_invite_16x9.png"
 type = "image"
 title = "novii beta banner clean"
 
+[[generated]]
+id = "qsxKaW33Y0XqiMr8y4SMy"
+uri = "file://attached_assets/generated_images/bug_hunter_community.png"
+type = "image"
+title = "bug hunter community avatar"
+
 [[outputs]]
 id = "Sxt43qrZdflnEo09LgUX4"
 uri = "file://attached_assets/generated_images/novii_beta_invite_9x16.png"
@@ -71,3 +77,9 @@ id = "RQyGdosYQKw1FUFz86y29"
 uri = "file://novii/docs/algorithm-report.md"
 type = "text"
 title = "تقرير خوارزمية Novii الكامل"
+
+[[outputs]]
+id = "2KR3f9k7LdE-U2RX0dh5o"
+uri = "file://attached_assets/generated_images/bug_hunter_community.png"
+type = "image"
+title = "Bug Hunter Community Avatar"
