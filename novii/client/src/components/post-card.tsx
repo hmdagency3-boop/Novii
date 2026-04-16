@@ -26,6 +26,7 @@ import { PostCommentsSheet } from "./post-comments-sheet";
 import { UserHoverCard } from "./user-hover-card";
 import { StoryAwareAvatar } from "./story-aware-avatar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { usePinchZoom } from "@/hooks/use-pinch-zoom";
 import { useLanguage } from "@/lib/language-context";
 import { useSettings } from "@/lib/settings-context";
 import { ReportDialog } from "./report-dialog";
@@ -74,6 +75,7 @@ export default function PostCard({ post }: PostCardProps) {
   const { data: currentUser } = useCurrentUser();
   const { direction } = useLanguage();
   const isMobile = useIsMobile();
+  const { containerRef, isZoomed, imageStyle, resetZoom } = usePinchZoom();
   const { settings } = useSettings();
   const t = direction === "rtl";
   const shouldHideLikes = hideLikes || (currentUser?.id === post.user_id ? settings.likes.hide_like_counts_own : settings.likes.hide_like_counts_others);
@@ -316,14 +318,19 @@ export default function PostCard({ post }: PostCardProps) {
 
       {/* Image */}
       <div 
+        ref={containerRef}
         className="relative w-full aspect-square lg:aspect-[4/5] bg-muted overflow-hidden cursor-pointer group"
-        onDoubleClick={handleDoubleTap}
+        onDoubleClick={isZoomed ? resetZoom : handleDoubleTap}
+        onClick={isZoomed ? resetZoom : undefined}
+        style={{ touchAction: "pan-y" }}
       >
         <img 
             src={post.image_url || "https://via.placeholder.com/600x600?text=No+Image"} 
             alt="Post content" 
             loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" 
+            className="w-full h-full object-cover"
+            style={imageStyle}
+            draggable={false}
         />
         
         {/* Gradient Overlay on Hover */}
