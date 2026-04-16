@@ -1,13 +1,21 @@
 import Layout from "@/components/layout";
-import { Search, Play, Eye } from "lucide-react";
+import { Search, Play, Eye, Hash, TrendingUp, Pin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useExplorePosts, useExploreReels } from "@/hooks/use-data";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
 import { useGuestPrompt } from "@/components/guest-login-prompt";
 import { ReelViewerModal } from "@/components/reel-viewer-modal";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation } from "wouter";
 import type { Post, Reel } from "@/lib/api";
+
+interface TrendingHashtag {
+  id: string;
+  name: string;
+  posts_count: number;
+  is_pinned: boolean;
+}
 
 type ExploreItem = 
   | { kind: 'post'; data: Post }
@@ -19,6 +27,15 @@ function ExploreContent() {
   const { user } = useAuth();
   const { showPrompt } = useGuestPrompt();
   const [selectedReel, setSelectedReel] = useState<Reel | null>(null);
+  const [trendingTags, setTrendingTags] = useState<TrendingHashtag[]>([]);
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    fetch("/api/hashtags/trending")
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setTrendingTags(data || []))
+      .catch(() => {});
+  }, []);
 
   const isLoading = postsLoading || reelsLoading;
 
@@ -73,6 +90,29 @@ function ExploreContent() {
           />
         </div>
       </div>
+
+      {trendingTags.length > 0 && (
+        <div className="px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-4 h-4 text-purple-500" />
+            <span className="text-sm font-semibold">هاشتاقات رائجة</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none" dir="rtl">
+            {trendingTags.slice(0, 10).map((t) => (
+              <button
+                key={t.id}
+                onClick={() => navigate(`/hashtag/${t.name}`)}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-accent hover:bg-accent/80 transition-colors"
+              >
+                {t.is_pinned && <Pin className="w-3 h-3 text-purple-500" />}
+                <Hash className="w-3 h-3 text-purple-500" />
+                <span className="text-sm font-medium">{t.name}</span>
+                <span className="text-[11px] text-muted-foreground">{t.posts_count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="p-2 md:p-4 max-w-4xl mx-auto w-full">
         {isLoading ? (
