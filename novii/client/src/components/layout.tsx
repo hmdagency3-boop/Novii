@@ -446,7 +446,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         
         {/* Mobile Header */}
         {!hasOwnHeader && (
-            <header dir="ltr" className="md:hidden sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md px-4 h-14 flex items-center justify-between">
+            <header dir="ltr" className="md:hidden w-full border-b border-border bg-background px-4 h-14 flex items-center justify-between">
                 {/* Left Side */}
                 <div className="flex items-center gap-2 flex-1">
                     {location === "/profile" ? (
