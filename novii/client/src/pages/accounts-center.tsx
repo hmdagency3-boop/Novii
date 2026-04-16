@@ -45,7 +45,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 
-type SectionId = "personal" | "security" | "data" | "ownership" | null;
+type SectionId = "personal" | "security" | "data" | null;
 
 export default function AccountsCenter() {
   const { user, signOut } = useAuth();
@@ -92,13 +92,6 @@ export default function AccountsCenter() {
       title: isRTL ? "معلوماتك وأذوناتك" : "Your Information & Permissions",
       description: isRTL ? "تنزيل بياناتك، سجل النشاط" : "Download your data, activity log",
       color: "from-emerald-500 to-teal-500",
-    },
-    {
-      id: "ownership" as const,
-      icon: AlertTriangle,
-      title: isRTL ? "ملكية الحساب والتحكم" : "Account Ownership & Control",
-      description: isRTL ? "تعطيل مؤقت أو حذف نهائي للحساب" : "Deactivate temporarily or delete permanently",
-      color: "from-orange-500 to-red-500",
     },
   ];
 
@@ -224,7 +217,6 @@ export default function AccountsCenter() {
             {activeSection === "personal" && <PersonalDetailsSection profile={profile} user={user} isRTL={isRTL} />}
             {activeSection === "security" && <SecuritySection user={user} isRTL={isRTL} />}
             {activeSection === "data" && <DataSection isRTL={isRTL} />}
-            {activeSection === "ownership" && <OwnershipSection user={user} isRTL={isRTL} signOut={signOut} />}
           </div>
         </div>
       </div>
@@ -851,151 +843,6 @@ function DataSection({ isRTL }: { isRTL: boolean }) {
                 />
               </div>
             )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============ ACCOUNT OWNERSHIP ============
-function OwnershipSection({ user, isRTL, signOut }: { user: any; isRTL: boolean; signOut: () => Promise<void> }) {
-  const { toast } = useToast();
-  const [showDeactivate, setShowDeactivate] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
-  const [deactivating, setDeactivating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deletePw, setDeletePw] = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState("");
-
-  const handleDeactivate = async () => {
-    setDeactivating(true);
-    try {
-      await accountApi.deactivate();
-      toast({ title: isRTL ? "✅ تم تعطيل الحساب" : "✅ Account Deactivated" });
-      setTimeout(() => signOut(), 1500);
-    } catch (e: any) {
-      toast({ variant: "destructive", title: isRTL ? "❌ خطأ" : "❌ Error", description: e.message });
-      setDeactivating(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (deleteConfirm !== "DELETE") {
-      toast({ variant: "destructive", title: isRTL ? "❌ خطأ" : "❌ Error", description: isRTL ? 'اكتب DELETE للتأكيد' : 'Type DELETE to confirm' });
-      return;
-    }
-    if (!deletePw) {
-      toast({ variant: "destructive", title: isRTL ? "❌ خطأ" : "❌ Error", description: isRTL ? "أدخل كلمة المرور" : "Enter password" });
-      return;
-    }
-    setDeleting(true);
-    try {
-      await accountApi.deleteAccount(deletePw, deleteConfirm);
-      toast({ title: isRTL ? "✅ تم حذف الحساب" : "✅ Account Deleted" });
-      setTimeout(() => signOut(), 1500);
-    } catch (e: any) {
-      toast({ variant: "destructive", title: isRTL ? "❌ خطأ" : "❌ Error", description: e.message });
-      setDeleting(false);
-    }
-  };
-
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <h2 className="text-2xl font-bold mb-2">{isRTL ? "ملكية الحساب والتحكم" : "Account Ownership & Control"}</h2>
-      <p className="text-sm text-muted-foreground mb-8">
-        {isRTL ? "خيارات لإدارة دورة حياة حسابك" : "Options to manage your account lifecycle"}
-      </p>
-
-      <div className="space-y-4">
-        {/* Deactivate */}
-        <div className="border border-yellow-500/30 rounded-2xl p-6 bg-yellow-500/5">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-yellow-500/20 flex items-center justify-center shrink-0">
-              <PauseCircle className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-lg mb-1">{isRTL ? "تعطيل الحساب مؤقتاً" : "Deactivate Account"}</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {isRTL
-                  ? "ملفك الشخصي ومنشوراتك ستختفي حتى ترجع وتسجل الدخول مرة تانية. ممكن ترجع وقت ما تحب"
-                  : "Your profile and posts will be hidden until you log back in. You can come back anytime."}
-              </p>
-              {!showDeactivate ? (
-                <Button variant="outline" onClick={() => setShowDeactivate(true)} className="border-yellow-500/50 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-500/10">
-                  {isRTL ? "تعطيل الحساب" : "Deactivate Account"}
-                </Button>
-              ) : (
-                <div className="flex gap-2">
-                  <Button onClick={handleDeactivate} disabled={deactivating} className="bg-yellow-500 hover:bg-yellow-600 text-white">
-                    {deactivating ? <><Spinner className="w-4 h-4 mr-2" />{isRTL ? "..." : "..."}</> : (isRTL ? "تأكيد التعطيل" : "Confirm Deactivate")}
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowDeactivate(false)}>{isRTL ? "إلغاء" : "Cancel"}</Button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Sign out */}
-        <div className="border border-border rounded-2xl p-6 bg-card">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
-              <LogOut className="w-6 h-6 text-muted-foreground" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-lg mb-1">{isRTL ? "تسجيل الخروج" : "Sign Out"}</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {isRTL ? "تسجيل الخروج من هذا الجهاز فقط" : "Sign out from this device only"}
-              </p>
-              <Button variant="outline" onClick={() => signOut()}>
-                <LogOut className="w-4 h-4 mr-2" />
-                {isRTL ? "تسجيل الخروج" : "Sign Out"}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Delete */}
-        <div className="border-2 border-red-500/30 rounded-2xl p-6 bg-red-500/5">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center shrink-0">
-              <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-lg mb-1 text-red-700 dark:text-red-400">{isRTL ? "حذف الحساب نهائياً" : "Delete Account Permanently"}</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {isRTL
-                  ? "⚠️ سيتم حذف ملفك الشخصي ومنشوراتك وتعليقاتك ومتابعينك بشكل نهائي. لا يمكن استرجاع الحساب بعد الحذف"
-                  : "⚠️ Your profile, posts, comments, and followers will be permanently deleted. This cannot be undone."}
-              </p>
-
-              {!showDelete ? (
-                <Button variant="outline" onClick={() => setShowDelete(true)} className="border-red-500/50 text-red-700 dark:text-red-400 hover:bg-red-500/10">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  {isRTL ? "حذف حسابي" : "Delete My Account"}
-                </Button>
-              ) : (
-                <div className="space-y-4 bg-background/50 border border-red-500/30 rounded-xl p-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold">{isRTL ? "كلمة المرور" : "Password"}</label>
-                    <Input type="password" value={deletePw} onChange={(e) => setDeletePw(e.target.value)} dir="ltr" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold">{isRTL ? 'اكتب DELETE للتأكيد' : 'Type DELETE to confirm'}</label>
-                    <Input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" dir="ltr" className="font-mono" />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={handleDelete} disabled={deleting || deleteConfirm !== "DELETE" || !deletePw} className="bg-red-500 hover:bg-red-600 text-white flex-1">
-                      {deleting ? <><Spinner className="w-4 h-4 mr-2" />{isRTL ? "جاري الحذف..." : "Deleting..."}</> : (isRTL ? "حذف نهائي" : "Delete Forever")}
-                    </Button>
-                    <Button variant="outline" onClick={() => { setShowDelete(false); setDeletePw(""); setDeleteConfirm(""); }}>
-                      {isRTL ? "إلغاء" : "Cancel"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>

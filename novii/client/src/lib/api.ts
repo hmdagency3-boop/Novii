@@ -3194,31 +3194,6 @@ export const accountApi = {
     if (!res.ok) throw new Error(data.error || 'Failed to change email');
     return data;
   },
-  async deactivate() {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) throw new Error('Not authenticated');
-    const res = await fetch('/api/account/deactivate', {
-      method: 'POST',
-      headers: { 'x-user-token': token },
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to deactivate');
-    return data;
-  },
-  async deleteAccount(password: string, confirmation: string) {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) throw new Error('Not authenticated');
-    const res = await fetch('/api/account/delete', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'x-user-token': token },
-      body: JSON.stringify({ password, confirmation }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to delete account');
-    return data;
-  },
   async exportData(): Promise<Blob> {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
