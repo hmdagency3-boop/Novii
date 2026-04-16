@@ -270,35 +270,6 @@ async function saveHashtags(
   } catch {}
 }
 
-// Redact a deactivated user's profile to a generic "User Deleted" placeholder.
-// Used in chat lists, messages, and anywhere else a profile row is embedded.
-function redactIfDeactivated(p: any): any {
-  if (!p || !p.is_deactivated) return p;
-  return {
-    ...p,
-    full_name: 'User Deleted',
-    username: 'deleted_user',
-    avatar_url: null,
-    cover_url: null,
-    bio: '',
-    website: '',
-    location: '',
-    phone_number: null,
-    is_verified: false,
-    is_official: false,
-    is_private: true,
-    is_online: false,
-    last_seen: null,
-    is_active: false,
-    is_creator: false,
-    is_premium: false,
-    is_popular: false,
-    followers_count: 0,
-    following_count: 0,
-    posts_count: 0,
-  };
-}
-
 export const api = {
   // Profile APIs
   async getCurrentProfile(): Promise<Profile | null> {
@@ -381,36 +352,6 @@ export const api = {
       .single();
 
     if (error) throw error;
-    if (!data) return null;
-    // Redact deactivated/pending-deletion accounts for anyone but the owner
-    if ((data as any).is_deactivated) {
-      const me = await getCurrentUser();
-      if (!me || me.id !== (data as any).id) {
-        return {
-          ...(data as any),
-          full_name: 'User Deleted',
-          username: 'deleted_user',
-          avatar_url: null,
-          cover_url: null,
-          bio: '',
-          website: '',
-          location: '',
-          phone_number: null,
-          is_verified: false,
-          is_official: false,
-          is_private: true,
-          is_online: false,
-          last_seen: null,
-          is_active: false,
-          is_creator: false,
-          is_premium: false,
-          is_popular: false,
-          followers_count: 0,
-          following_count: 0,
-          posts_count: 0,
-        } as any;
-      }
-    }
     return data;
   },
 
@@ -536,7 +477,7 @@ export const api = {
 
     if (error) throw error;
     const user = await getCurrentUser();
-    const posts = (data || []).filter((p: any) => !p.profile?.is_deactivated);
+    const posts = data || [];
 
     if (user && posts.length > 0) {
       const postIds = posts.map(p => p.id);
@@ -649,7 +590,7 @@ export const api = {
 
     if (error) throw error;
     const user = await getCurrentUser();
-    let posts: any[] = (data || []).filter((p: any) => !p.profile?.is_deactivated);
+    let posts: any[] = data || [];
 
     if (user && posts.length > 0) {
       const postIds = posts.map(p => p.id);
@@ -693,7 +634,7 @@ export const api = {
       .limit(limit);
 
     if (error) throw error;
-    const posts = (data || []).filter((p: any) => !p.profile?.is_deactivated);
+    const posts = data || [];
 
     // Add is_liked and is_saved for current user
     const user = await getCurrentUser();
@@ -726,20 +667,17 @@ export const api = {
       .limit(limit);
 
     if (error) throw error;
-    return ((data || []).filter((r: any) => !r.profile?.is_deactivated)) as unknown as Reel[];
+    return (data || []) as unknown as Reel[];
   },
 
   async getUserPosts(userId: string): Promise<Post[]> {
     const user = await getCurrentUser();
 
-    // Privacy / deactivation gate
-    if (!user || user.id !== userId) {
+    // Privacy gate: if private account and current user is not the owner → check follow
+    if (user && user.id !== userId) {
       const { data: targetProfile } = await supabase
-        .from('profiles').select('is_private, is_deactivated').eq('id', userId).single();
-      // Deactivated/pending-deletion → hide everything from non-owner
-      if (targetProfile?.is_deactivated) return [];
+        .from('profiles').select('is_private').eq('id', userId).single();
       if (targetProfile?.is_private) {
-        if (!user) return [];
         const { data: follow } = await supabase
           .from('follows').select('id').eq('follower_id', user.id).eq('following_id', userId).single();
         if (!follow) return []; // Not a follower → return nothing
@@ -816,7 +754,7 @@ export const api = {
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
-    const reels = (data || []).filter((r: any) => !r.profile?.is_deactivated);
+    const reels = data || [];
 
     if (user && reels.length > 0) {
       const reelIds = reels.map(r => r.id);
@@ -1065,7 +1003,7 @@ export const api = {
       .order('created_at', { ascending: true });
 
     if (error) throw error;
-    const allComments = ((allCommentsRaw || []).filter((c: any) => !c.profile?.is_deactivated)) as unknown as Comment[];
+    const allComments = (allCommentsRaw || []) as unknown as Comment[];
 
     // Build nested structure
     const commentMap = new Map<string, Comment>();
@@ -1309,7 +1247,7 @@ export const api = {
     if (error) throw error;
 
     // Mark which stories the current user has already viewed
-    const stories = ((data || []).filter((s: any) => !s.profile?.is_deactivated)) as unknown as Story[];
+    const stories = (data || []) as unknown as Story[];
     if (stories.length > 0) {
       const storyIds = stories.map(s => s.id);
       const { data: viewedData } = await supabase
@@ -1330,13 +1268,11 @@ export const api = {
   async getUserStories(userId: string): Promise<Story[]> {
     const user = await getCurrentUser();
 
-    // Privacy / deactivation gate
-    if (!user || user.id !== userId) {
+    // Privacy gate: private account → must be a follower
+    if (user && user.id !== userId) {
       const { data: targetProfile } = await supabase
-        .from('profiles').select('is_private, is_deactivated').eq('id', userId).single();
-      if (targetProfile?.is_deactivated) return [];
+        .from('profiles').select('is_private').eq('id', userId).single();
       if (targetProfile?.is_private) {
-        if (!user) return [];
         const { data: follow } = await supabase
           .from('follows').select('id').eq('follower_id', user.id).eq('following_id', userId).single();
         if (!follow) return [];
@@ -1794,12 +1730,6 @@ export const api = {
 
     if (error) throw error;
 
-    // Redact deactivated user profiles in chat list
-    (data || []).forEach((m: any) => {
-      m.sender = redactIfDeactivated(m.sender);
-      m.receiver = redactIfDeactivated(m.receiver);
-    });
-
     // Group messages by conversation (unique pair of users)
     const conversations = new Map();
     (data || []).forEach(message => {
@@ -1861,12 +1791,7 @@ export const api = {
       console.error('❌ Error fetching messages:', error);
       throw error;
     }
-
-    (data || []).forEach((m: any) => {
-      m.sender = redactIfDeactivated(m.sender);
-      m.receiver = redactIfDeactivated(m.receiver);
-    });
-
+    
     return data || [];
   },
 
@@ -2375,32 +2300,6 @@ export const api = {
     if (!profile) return null;
 
     const currentUser = await getCurrentUser();
-    // Redact deactivated/pending-deletion accounts for anyone but the owner
-    if ((profile as any).is_deactivated && (!currentUser || currentUser.id !== profile.id)) {
-      return {
-        ...(profile as any),
-        full_name: 'User Deleted',
-        username: 'deleted_user',
-        avatar_url: null,
-        cover_url: null,
-        bio: '',
-        website: '',
-        location: '',
-        phone_number: null,
-        is_verified: false,
-        is_official: false,
-        is_private: true,
-        is_online: false,
-        last_seen: null,
-        is_active: false,
-        is_creator: false,
-        is_premium: false,
-        is_popular: false,
-        followers_count: 0,
-        following_count: 0,
-        posts_count: 0,
-      } as any;
-    }
 
     // Calculate correct counts from follows table
     const { count: followersCount } = await supabase
@@ -3318,46 +3217,6 @@ export const accountApi = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to delete account');
-    return data as { success: boolean; scheduled_deletion_at: string; days_remaining: number };
-  },
-  async getStatus() {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) throw new Error('Not authenticated');
-    const res = await fetch('/api/account/status', { headers: { 'x-user-token': token } });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to fetch status');
-    return data as {
-      is_deactivated: boolean;
-      deactivated_at: string | null;
-      deletion_requested_at: string | null;
-      scheduled_deletion_at: string | null;
-      days_remaining: number;
-      pending_deletion: boolean;
-    };
-  },
-  async cancelDeletion() {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) throw new Error('Not authenticated');
-    const res = await fetch('/api/account/cancel-deletion', {
-      method: 'POST',
-      headers: { 'x-user-token': token },
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to cancel deletion');
-    return data;
-  },
-  async reactivate() {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) throw new Error('Not authenticated');
-    const res = await fetch('/api/account/reactivate', {
-      method: 'POST',
-      headers: { 'x-user-token': token },
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to reactivate');
     return data;
   },
   async exportData(): Promise<Blob> {
