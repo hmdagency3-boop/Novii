@@ -43,7 +43,7 @@ const DEFAULT_CONFIG: AlgorithmConfig = {
   feed_weight_engagement: 0.20,
   feed_weight_recency: 0.15,
   feed_weight_boost: 0.10,
-  feed_batch_size: 80,
+  feed_batch_size: 40,
   feed_max_per_author: 3,
   explore_weight_interest: 0.35,
   explore_weight_engagement: 0.35,
@@ -65,6 +65,30 @@ const DEFAULT_CONFIG: AlgorithmConfig = {
 let cachedConfig: AlgorithmConfig | null = null;
 let cacheTime = 0;
 const CACHE_TTL = 60000;
+
+// Per-user short-term caches for the expensive profile builds used on every feed request.
+// These pieces rarely change within a minute, so caching them turns 3 extra Supabase
+// round-trips into 0 on repeat scrolls/refreshes.
+const USER_PROFILE_TTL = 60 * 1000;
+const FOLLOWING_TTL = 60 * 1000;
+const NEG_PROFILE_TTL = 60 * 1000;
+
+const userProfileCache = new Map<string, { value: UserInterestProfile; expires: number }>();
+const followingCache = new Map<string, { value: Set<string>; expires: number }>();
+const negProfileCache = new Map<string, { value: NegativeSignalProfile; expires: number }>();
+
+function getCached<T>(map: Map<string, { value: T; expires: number }>, key: string): T | null {
+  const entry = map.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expires) { map.delete(key); return null; }
+  return entry.value;
+}
+
+export function invalidateUserFeedCaches(userId: string) {
+  userProfileCache.delete(userId);
+  followingCache.delete(userId);
+  negProfileCache.delete(userId);
+}
 
 export function getDefaultConfig(): AlgorithmConfig {
   return { ...DEFAULT_CONFIG };
@@ -143,6 +167,8 @@ export async function buildUserInterestProfile(
   userId: string,
   lookbackDays: number = 30
 ): Promise<UserInterestProfile> {
+  const cached = getCached(userProfileCache, userId);
+  if (cached) return cached;
   const thirtyDaysAgo = new Date(Date.now() - lookbackDays * 86400000).toISOString();
 
   const [likesRes, commentsRes, savesRes] = await Promise.all([
@@ -195,7 +221,9 @@ export async function buildUserInterestProfile(
   for (const item of commentsRes.data || []) processInteraction(item, 3);
   for (const item of savesRes.data || []) processInteraction(item, 2);
 
-  return { authorAffinities, hashtagInterests, totalInteractions };
+  const result = { authorAffinities, hashtagInterests, totalInteractions };
+  userProfileCache.set(userId, { value: result, expires: Date.now() + USER_PROFILE_TTL });
+  return result;
 }
 
 function calculateAuthorAffinityScore(
@@ -267,6 +295,8 @@ async function buildNegativeSignalProfile(
   db: SupabaseClient,
   userId: string
 ): Promise<NegativeSignalProfile> {
+  const cached = getCached(negProfileCache, userId);
+  if (cached) return cached;
   const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
 
   const { data: signals } = await db
@@ -307,7 +337,18 @@ async function buildNegativeSignalProfile(
     }
   }
 
-  return { notInterestedAuthors, notInterestedHashtags, skippedAuthors, totalNegative };
+  const result = { notInterestedAuthors, notInterestedHashtags, skippedAuthors, totalNegative };
+  negProfileCache.set(userId, { value: result, expires: Date.now() + NEG_PROFILE_TTL });
+  return result;
+}
+
+async function getFollowingIdsCached(db: SupabaseClient, userId: string): Promise<Set<string>> {
+  const cached = getCached(followingCache, userId);
+  if (cached) return new Set(cached);
+  const { data } = await db.from("follows").select("following_id").eq("follower_id", userId);
+  const set = new Set<string>((data || []).map((f: any) => f.following_id));
+  followingCache.set(userId, { value: new Set(set), expires: Date.now() + FOLLOWING_TTL });
+  return set;
 }
 
 function calculateNegativePenalty(
@@ -374,15 +415,11 @@ export async function getPersonalizedFeed(
 
   const [profile, followingRes, negProfile] = await Promise.all([
     buildUserInterestProfile(db, userId, config.profile_lookback_days),
-    db.from("follows")
-      .select("following_id")
-      .eq("follower_id", userId),
+    getFollowingIdsCached(db, userId),
     buildNegativeSignalProfile(db, userId),
   ]);
 
-  const followingIds = new Set(
-    (followingRes.data || []).map((f: any) => f.following_id)
-  );
+  const followingIds = new Set(followingRes);
   followingIds.add(userId);
 
   if (!config.enabled) {
@@ -511,15 +548,11 @@ export async function getPersonalizedExplore(
 
   const [profile, followingRes, negProfile] = await Promise.all([
     buildUserInterestProfile(db, userId, config.profile_lookback_days),
-    db.from("follows")
-      .select("following_id")
-      .eq("follower_id", userId),
+    getFollowingIdsCached(db, userId),
     buildNegativeSignalProfile(db, userId),
   ]);
 
-  const followingIds = new Set(
-    (followingRes.data || []).map((f: any) => f.following_id)
-  );
+  const followingIds = new Set(followingRes);
   followingIds.add(userId);
 
   const batchSize = config.explore_batch_size;
@@ -634,15 +667,11 @@ export async function getPersonalizedExploreReels(
 
   const [profile, followingRes, negProfile] = await Promise.all([
     buildUserInterestProfile(db, userId, config.profile_lookback_days),
-    db.from("follows")
-      .select("following_id")
-      .eq("follower_id", userId),
+    getFollowingIdsCached(db, userId),
     buildNegativeSignalProfile(db, userId),
   ]);
 
-  const followingIds = new Set(
-    (followingRes.data || []).map((f: any) => f.following_id)
-  );
+  const followingIds = new Set(followingRes);
   followingIds.add(userId);
 
   const { data: reels, error } = await db

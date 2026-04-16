@@ -108,19 +108,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (session?.access_token) {
-      banCheckInterval.current = setInterval(() => {
-        checkBanStatus();
-      }, 30000);
+    if (!session?.access_token) return;
 
-      const handleFocus = () => checkBanStatus();
-      window.addEventListener('focus', handleFocus);
+    // Poll every 5 minutes instead of every 30 seconds — ban status rarely changes
+    banCheckInterval.current = setInterval(() => {
+      checkBanStatus();
+    }, 5 * 60 * 1000);
 
-      return () => {
-        if (banCheckInterval.current) clearInterval(banCheckInterval.current);
-        window.removeEventListener('focus', handleFocus);
-      };
-    }
+    // Debounce focus checks so rapid tab switches don't hammer the server
+    let lastFocusCheck = Date.now();
+    const handleFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusCheck < 60 * 1000) return; // at most once per minute
+      lastFocusCheck = now;
+      checkBanStatus();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      if (banCheckInterval.current) clearInterval(banCheckInterval.current);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [session?.access_token, checkBanStatus]);
 
   const signUp = async (email: string, password: string) => {
