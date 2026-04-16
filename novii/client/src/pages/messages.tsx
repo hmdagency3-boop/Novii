@@ -3600,8 +3600,8 @@ export default function Messages() {
       {chatMenu && (() => {
         const isPinned = pinnedConvIds.has(chatMenu.userId);
         const isMuted = mutedConvIds.has(chatMenu.userId);
-        const menuWidth = 220;
-        const menuHeight = 108;
+        const menuWidth = 170;
+        const menuHeight = 100;
         const padding = 12;
         const vw = typeof window !== 'undefined' ? window.innerWidth : 360;
         const vh = typeof window !== 'undefined' ? window.innerHeight : 640;
@@ -3641,7 +3641,7 @@ export default function Messages() {
                 {isPinned
                   ? <PinOff className="w-[22px] h-[22px] text-white shrink-0" strokeWidth={2} />
                   : <Pin className="w-[22px] h-[22px] text-white shrink-0" strokeWidth={2} />}
-                <span className="flex-1 font-normal">{isPinned ? (isRTL ? 'إلغاء التثبيت' : 'Unpin chat') : (isRTL ? 'تثبيت المحادثة' : 'Pin chat')}</span>
+                <span className="flex-1 font-normal">{isPinned ? (isRTL ? 'إلغاء التثبيت' : 'Unpin') : (isRTL ? 'تثبيت' : 'Pin')}</span>
               </button>
 
               <div className="h-[0.5px] bg-white/15" />
@@ -3667,7 +3667,7 @@ export default function Messages() {
                 {isMuted
                   ? <Bell className="w-[22px] h-[22px] shrink-0" strokeWidth={2} />
                   : <BellOff className="w-[22px] h-[22px] shrink-0" strokeWidth={2} />}
-                <span className="flex-1 font-normal">{isMuted ? (isRTL ? 'إلغاء الكتم' : 'Unmute') : (isRTL ? 'كتم الإشعارات' : 'Mute notifications')}</span>
+                <span className="flex-1 font-normal">{isMuted ? (isRTL ? 'إلغاء الكتم' : 'Unmute') : (isRTL ? 'كتم' : 'Mute')}</span>
               </button>
             </div>
           </div>
