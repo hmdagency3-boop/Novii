@@ -1386,33 +1386,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // 2) Overwrite the row with redacted values + the lifecycle flags
     const redactedUsername = `deleted_user_${String(userId).replace(/-/g, '').slice(0, 8)}`;
-    const { error: upErr } = await adminDb
-      .from('profiles')
-      .update({
-        deletion_backup: backup,
-        full_name: 'User Deleted',
-        username: redactedUsername,
-        avatar_url: null,
-        cover_url: null,
-        bio: '',
-        website: '',
-        location: '',
-        phone_number: null,
-        is_verified: false,
-        is_official: false,
-        is_creator: false,
-        is_premium: false,
-        is_popular: false,
-        is_active: false,
-        is_private: true,
-        is_online: false,
-        last_seen: null,
-        followers_count: 0,
-        following_count: 0,
-        posts_count: 0,
-        ...extraFields,
-      })
-      .eq('id', userId);
+    const basePayload: Record<string, any> = {
+      full_name: 'User Deleted',
+      username: redactedUsername,
+      avatar_url: null,
+      cover_url: null,
+      bio: '',
+      website: '',
+      location: '',
+      phone_number: null,
+      is_verified: false,
+      is_official: false,
+      is_creator: false,
+      is_premium: false,
+      is_popular: false,
+      is_active: false,
+      is_private: true,
+      is_online: false,
+      last_seen: null,
+      followers_count: 0,
+      following_count: 0,
+      posts_count: 0,
+      ...extraFields,
+    };
+    // Try with backup, fall back without if the column doesn't exist
+    let upErr: any = null;
+    {
+      const r = await adminDb
+        .from('profiles')
+        .update({ ...basePayload, deletion_backup: backup })
+        .eq('id', userId);
+      upErr = r.error;
+    }
+    if (upErr && /deletion_backup/i.test(upErr.message || '')) {
+      const r = await adminDb.from('profiles').update(basePayload).eq('id', userId);
+      upErr = r.error;
+    }
     if (upErr) throw new Error(upErr.message);
 
     // 3) Hide all the user's content using the existing is_deleted flags
@@ -3189,6 +3198,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Explore communities (public, non-private) ──────────────────────
   app.get("/api/communities/explore", requireAuth as any, async (req: Request, res: Response) => {
     try {
+      if (!rateLimit(req, 'community:explore', 60, 60 * 1000)) {
+        return res.status(429).json({ error: 'Too many requests', data: [] });
+      }
       if (!adminDb) return res.json({ data: [] });
       const limit = Math.min(parseInt((req.query.limit as string) || '30') || 30, 100);
       const category = req.query.category as string | undefined;
@@ -3218,6 +3230,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Search communities by name (non-private) ───────────────────────
   app.get("/api/communities/search", requireAuth as any, async (req: Request, res: Response) => {
     try {
+      if (!rateLimit(req, 'community:search', 60, 60 * 1000)) {
+        return res.status(429).json({ error: 'Too many requests', data: [] });
+      }
       if (!adminDb) return res.json({ data: [] });
       const query = (req.query.q as string)?.trim();
       if (!query || query.length < 2) return res.json({ data: [] });
@@ -4727,6 +4742,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
     } catch {}
+  })();
+
+  // ---------- Startup: ensure deletion_backup column + backfill existing deactivated profiles ----------
+  (async () => {
+    console.log('🔍 [redaction startup] adminDb available:', !!adminDb);
+    if (!adminDb) { console.warn('⚠️ adminDb missing — skipping redaction backfill'); return; }
+    try {
+      // 1) Try adding the column via exec_sql RPC (no-op if it already exists or RPC missing)
+      try {
+        await adminDb.rpc('exec_sql', {
+          query: `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS deletion_backup JSONB;`,
+        });
+      } catch {}
+
+      // 2) Detect whether deletion_backup exists by attempting a tiny select
+      let hasBackupColumn = true;
+      try {
+        const probe = await adminDb.from('profiles').select('deletion_backup').limit(1);
+        if (probe.error) hasBackupColumn = false;
+      } catch { hasBackupColumn = false; }
+
+      // 3) Find all currently deactivated profiles that haven't been redacted yet
+      const fields = hasBackupColumn ? 'id, full_name, deletion_backup' : 'id, full_name';
+      const { data: pending, error: pendErr } = await adminDb
+        .from('profiles')
+        .select(fields)
+        .eq('is_deactivated', true);
+
+      console.log(`🔍 [redaction startup] hasBackupColumn=${hasBackupColumn} pending=${pending?.length || 0} err=${pendErr?.message || 'none'}`);
+
+      // Always re-apply redaction for ALL deactivated profiles to make sure
+      // their posts/reels/comments/stories are also hidden — even if the
+      // profile row itself was already redacted in a previous run.
+      const toRedact = pending || [];
+
+      if (toRedact.length > 0) {
+        console.log(`🧹 Backfilling redaction for ${toRedact.length} deactivated profile(s)... (backup column: ${hasBackupColumn})`);
+        for (const p of toRedact) {
+          try {
+            await redactProfileInDb(adminDb, p.id);
+          } catch (e: any) {
+            console.warn(`  ⚠️ Failed to redact ${p.id}:`, e?.message);
+          }
+        }
+        console.log('✅ Redaction backfill complete');
+      }
+      if (!hasBackupColumn) {
+        console.log('ℹ️  Run this SQL in Supabase to enable restore-on-cancel: ALTER TABLE profiles ADD COLUMN IF NOT EXISTS deletion_backup JSONB;');
+      }
+    } catch (e: any) {
+      console.warn('⚠️ Account redaction startup task skipped:', e?.message);
+    }
   })();
 
   app.post("/api/verification/request", requireAuth as any, async (req: Request, res: Response) => {
