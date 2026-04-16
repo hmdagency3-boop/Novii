@@ -963,7 +963,6 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
-            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -982,7 +981,6 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -999,7 +997,6 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -1077,7 +1074,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -1095,7 +1091,6 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -1113,7 +1108,6 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -1252,7 +1246,6 @@ export default function SettingsPage() {
                 <ToggleSwitch checked={settings.content.sensitive_content} onCheckedChange={(checked) => updateNestedSettings('content', { sensitive_content: checked })} />
               </div>
             </div>
-            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -1270,7 +1263,6 @@ export default function SettingsPage() {
                 <ToggleSwitch checked={settings.likes.hide_like_counts_others} onCheckedChange={(checked) => updateNestedSettings('likes', { hide_like_counts_others: checked })} />
               </div>
             </div>
-            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -1288,7 +1280,6 @@ export default function SettingsPage() {
                 <ToggleSwitch checked={settings.archiving.auto_archive_reels} onCheckedChange={(checked) => updateNestedSettings('archiving', { auto_archive_reels: checked })} />
               </div>
             </div>
-            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -1320,7 +1311,6 @@ export default function SettingsPage() {
                 <ToggleSwitch checked={settings.accessibility.reduce_motion} onCheckedChange={(checked) => updateNestedSettings('accessibility', { reduce_motion: checked })} />
               </div>
             </div>
-            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
@@ -1371,7 +1361,6 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-green-600 mt-4 text-center">{direction === 'rtl' ? 'يتم الحفظ تلقائياً' : 'Auto-saved'}</p>
           </div>
         );
 
