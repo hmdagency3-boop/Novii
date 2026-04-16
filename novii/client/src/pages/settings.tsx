@@ -29,9 +29,8 @@ import { AvatarUploader } from "@/components/avatar-uploader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { IdCardScanner } from "@/components/id-card-scanner";
 import { FaceScanner } from "@/components/face-scanner";
-import { useUserStatistics, useUserDevices, useRemoveDevice, useTrustDevice, useRevokeAllDevices, useDeviceHeartbeat } from "@/hooks/use-data";
-import type { UserDevice } from "@/lib/api";
-import { changePassword, type UserSettings, type StoredUser } from "@/lib/settings-storage";
+import { useUserStatistics } from "@/hooks/use-data";
+import type { UserSettings, StoredUser } from "@/lib/settings-storage";
 import { useSettings } from "@/lib/settings-context";
 
 // Type definition for menu items
@@ -64,287 +63,6 @@ function formatTimeSpent(seconds: number): string {
   }
 }
 
-function getDeviceIcon(deviceType: string, osName: string) {
-  if (deviceType === 'mobile') return Smartphone;
-  if (deviceType === 'tablet') return Smartphone;
-  return Monitor;
-}
-
-function getTimeAgo(date: string, direction: string) {
-  const now = new Date();
-  const d = new Date(date);
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHrs = Math.floor(diffMin / 60);
-  const diffDays = Math.floor(diffHrs / 24);
-
-  if (direction === 'rtl') {
-    if (diffMin < 1) return 'الآن';
-    if (diffMin < 60) return `منذ ${diffMin} دقيقة`;
-    if (diffHrs < 24) return `منذ ${diffHrs} ساعة`;
-    if (diffDays < 7) return `منذ ${diffDays} يوم`;
-    return d.toLocaleDateString('ar');
-  }
-  if (diffMin < 1) return 'Just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString('en');
-}
-
-function ConnectedDevicesSection({ direction, user }: { direction: string; user?: any }) {
-  const { data: devices, isLoading } = useUserDevices(user?.id);
-  const removeDevice = useRemoveDevice();
-  const trustDevice = useTrustDevice();
-  const revokeAll = useRevokeAllDevices();
-
-  const currentSessionToken = (() => {
-    try { return sessionStorage.getItem('novii_device_session'); } catch (_) { return null; }
-  })();
-
-  const isCurrentDevice = (device: UserDevice) =>
-    currentSessionToken && device.session_token === currentSessionToken;
-
-  const handleRemoveDevice = async (deviceId: string) => {
-    try {
-      await removeDevice.mutateAsync(deviceId);
-      toast.success(direction === 'rtl' ? 'تم إزالة الجهاز بنجاح' : 'Device removed');
-    } catch (error) {
-      toast.error(direction === 'rtl' ? 'خطأ في إزالة الجهاز' : 'Failed to remove device');
-    }
-  };
-
-  const handleTrustToggle = async (device: UserDevice) => {
-    try {
-      await trustDevice.mutateAsync({ deviceId: device.id, trusted: !device.is_trusted });
-      toast.success(
-        direction === 'rtl'
-          ? (device.is_trusted ? 'تم إلغاء الثقة بالجهاز' : 'تم تأمين الجهاز كموثوق')
-          : (device.is_trusted ? 'Device untrusted' : 'Device trusted')
-      );
-    } catch (error) {
-      toast.error(direction === 'rtl' ? 'خطأ في تحديث حالة الجهاز' : 'Failed to update device');
-    }
-  };
-
-  const handleRevokeAll = async () => {
-    if (!user?.id) return;
-    const currentDevice = devices?.find(d => isCurrentDevice(d));
-    try {
-      await revokeAll.mutateAsync({ userId: user.id, exceptDeviceId: currentDevice?.id });
-      toast.success(direction === 'rtl' ? 'تم تسجيل الخروج من جميع الأجهزة الأخرى' : 'Logged out from all other devices');
-    } catch (error) {
-      toast.error(direction === 'rtl' ? 'خطأ في تسجيل الخروج' : 'Failed to log out devices');
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner className="w-8 h-8" />
-      </div>
-    );
-  }
-
-  const currentDevice = devices?.find(d => isCurrentDevice(d));
-  const otherDevices = devices?.filter(d => !isCurrentDevice(d)) || [];
-
-  return (
-    <div className="max-w-2xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-2xl font-bold">{direction === 'rtl' ? 'الأجهزة المتصلة' : 'Connected Devices'}</h2>
-        {devices && devices.length > 1 && (
-          <button
-            onClick={handleRevokeAll}
-            disabled={revokeAll.isPending}
-            className="text-sm text-red-500 hover:text-red-600 font-medium transition-colors disabled:opacity-50"
-          >
-            {direction === 'rtl' ? 'تسجيل خروج الكل' : 'Log out all'}
-          </button>
-        )}
-      </div>
-      <p className="text-muted-foreground mb-6 text-sm">
-        {direction === 'rtl'
-          ? `الأجهزة النشطة على حسابك (${devices?.length || 0}/10)`
-          : `Active devices on your account (${devices?.length || 0}/10)`}
-      </p>
-
-      {currentDevice && (
-        <div className="mb-6">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            {direction === 'rtl' ? 'هذا الجهاز' : 'This Device'}
-          </p>
-          <DeviceCard
-            device={currentDevice}
-            direction={direction}
-            isCurrent={true}
-            onRemove={handleRemoveDevice}
-            onTrustToggle={handleTrustToggle}
-            removeIsPending={removeDevice.isPending}
-            trustIsPending={trustDevice.isPending}
-          />
-        </div>
-      )}
-
-      {otherDevices.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            {direction === 'rtl' ? 'أجهزة أخرى' : 'Other Devices'}
-          </p>
-          <div className="space-y-3">
-            {otherDevices.map((device: UserDevice) => (
-              <DeviceCard
-                key={device.id}
-                device={device}
-                direction={direction}
-                isCurrent={false}
-                onRemove={handleRemoveDevice}
-                onTrustToggle={handleTrustToggle}
-                removeIsPending={removeDevice.isPending}
-                trustIsPending={trustDevice.isPending}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(!devices || devices.length === 0) && (
-        <div className="text-center py-12 border border-border rounded-2xl bg-card/50">
-          <Smartphone className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-          <p className="text-muted-foreground">
-            {direction === 'rtl' ? 'لا توجد أجهزة متصلة' : 'No devices connected'}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DeviceCard({
-  device,
-  direction,
-  isCurrent,
-  onRemove,
-  onTrustToggle,
-  removeIsPending,
-  trustIsPending,
-}: {
-  device: UserDevice;
-  direction: string;
-  isCurrent: boolean;
-  onRemove: (id: string) => void;
-  onTrustToggle: (d: UserDevice) => void;
-  removeIsPending: boolean;
-  trustIsPending: boolean;
-}) {
-  const Icon = getDeviceIcon(device.device_type, device.os_name);
-  const lastActive = getTimeAgo(device.last_active_at, direction);
-  const firstLogin = device.first_login_at ? new Date(device.first_login_at).toLocaleDateString(direction === 'rtl' ? 'ar' : 'en') : '';
-
-  return (
-    <div className={cn(
-      "border rounded-2xl p-5 bg-card transition-all duration-200",
-      isCurrent ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20" : "border-border hover:border-primary/30",
-      device.is_trusted && "border-green-500/30"
-    )}>
-      <div className="flex items-start gap-4">
-        <div className={cn(
-          "p-3 rounded-xl flex-shrink-0",
-          isCurrent ? "bg-primary/15" : "bg-muted"
-        )}>
-          <Icon className={cn("w-6 h-6", isCurrent ? "text-primary" : "text-muted-foreground")} />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h3 className="font-semibold text-base truncate">{device.device_name}</h3>
-            {isCurrent && (
-              <span className="text-[10px] font-bold bg-primary text-primary-foreground px-2 py-0.5 rounded-full whitespace-nowrap">
-                {direction === 'rtl' ? 'هذا الجهاز' : 'THIS DEVICE'}
-              </span>
-            )}
-            {device.is_trusted && (
-              <span className="text-[10px] font-bold bg-green-500/15 text-green-600 px-2 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5">
-                <Shield className="w-3 h-3" />
-                {direction === 'rtl' ? 'موثوق' : 'TRUSTED'}
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-2">
-            <p className="flex items-center gap-1.5">
-              <Globe className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">{device.browser} {device.browser_version}</span>
-            </p>
-            <p className="flex items-center gap-1.5">
-              <Laptop className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">{device.os_name} {device.os_version}</span>
-            </p>
-            <p className="flex items-center gap-1.5">
-              <Activity className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">{device.city}, {device.country}</span>
-            </p>
-            <p className="flex items-center gap-1.5">
-              <Clock className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">{lastActive}</span>
-            </p>
-          </div>
-
-          {(device.login_count > 1 || device.screen_resolution || device.timezone) && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {device.login_count > 1 && (
-                <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
-                  {direction === 'rtl' ? `${device.login_count} تسجيل دخول` : `${device.login_count} logins`}
-                </span>
-              )}
-              {device.screen_resolution && (
-                <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
-                  {device.screen_resolution}
-                </span>
-              )}
-              {device.timezone && (
-                <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
-                  {device.timezone}
-                </span>
-              )}
-              {firstLogin && (
-                <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
-                  {direction === 'rtl' ? `أول دخول: ${firstLogin}` : `First: ${firstLogin}`}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1.5 flex-shrink-0">
-          <button
-            onClick={() => onTrustToggle(device)}
-            disabled={trustIsPending}
-            title={direction === 'rtl' ? (device.is_trusted ? 'إلغاء الثقة' : 'تعيين كموثوق') : (device.is_trusted ? 'Untrust' : 'Trust')}
-            className={cn(
-              "p-2 rounded-lg transition-colors disabled:opacity-50",
-              device.is_trusted
-                ? "bg-green-500/10 hover:bg-green-500/20 text-green-600"
-                : "bg-muted hover:bg-muted/80 text-muted-foreground"
-            )}
-          >
-            <Shield className="w-4 h-4" />
-          </button>
-          {!isCurrent && (
-            <button
-              onClick={() => onRemove(device.id)}
-              disabled={removeIsPending}
-              title={direction === 'rtl' ? 'إزالة الجهاز' : 'Remove device'}
-              className="bg-red-500/10 hover:bg-red-500/20 text-red-600 p-2 rounded-lg transition-colors disabled:opacity-50"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Statistics Component
 function TimeSpentStats() {
@@ -454,7 +172,6 @@ const settingsMenuStructure: MenuSection[] = [
   {
     sectionKey: "who_can_see",
     items: [
-      { id: "account_privacy", labelKey: "account_privacy", icon: Lock },
       { id: "close_friends", labelKey: "close_friends", icon: Star },
       { id: "blocked", labelKey: "blocked", icon: Shield },
       { id: "hide_story", labelKey: "hide_story", icon: EyeOff },
@@ -503,13 +220,6 @@ const settingsMenuStructure: MenuSection[] = [
       { id: "help", labelKey: "help", icon: HelpCircle },
       { id: "privacy_center", labelKey: "privacy_center", icon: Lock },
       { id: "about", labelKey: "about", icon: Info },
-    ]
-  },
-  {
-    sectionKey: "security",
-    items: [
-      { id: "password", labelKey: "password", icon: Lock },
-      { id: "connected_devices", labelKey: "connected_devices", icon: Smartphone },
     ]
   },
   {
@@ -963,8 +673,6 @@ export default function SettingsPage() {
     refetchLists,
   } = useSettings();
 
-  const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
-  const [changingPassword, setChangingPassword] = useState(false);
 
   const [newHiddenWord, setNewHiddenWord] = useState('');
 
@@ -1184,40 +892,6 @@ export default function SettingsPage() {
                       t.submit
                     )}
                 </Button>
-            </div>
-          </div>
-        );
-
-      case "account_privacy":
-        return (
-          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-            <h2 className="text-2xl font-bold mb-8">{t.account_privacy}</h2>
-            <div className="space-y-6">
-              <div className="border border-border rounded-2xl p-6 bg-card hover:border-primary/50 transition-colors">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg mb-2">{direction === 'rtl' ? 'حساب خاص' : 'Private Account'}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {direction === 'rtl' ? 'فقط المتابعون المقبولون يمكنهم رؤية محتواك' : 'Only approved followers can see your posts and followers.'}
-                    </p>
-                  </div>
-                  <ToggleSwitch checked={isPrivate} onCheckedChange={(checked) => { setIsPrivate(checked); }} />
-                </div>
-              </div>
-              <div className="border border-border rounded-2xl p-6 bg-card hover:border-primary/50 transition-colors">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg mb-2">{direction === 'rtl' ? 'إخفاء حالة الاتصال' : 'Hide Online Status'}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {direction === 'rtl' ? 'أخف حالة الاتصال من المستخدمين الآخرين' : 'Hide your online status from other users'}
-                    </p>
-                  </div>
-                  <ToggleSwitch checked={settings.hide_online_status} onCheckedChange={(checked) => { updateSettings({ hide_online_status: checked }); }} />
-                </div>
-              </div>
-              <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending} className="w-full bg-primary hover:bg-primary/90 text-white py-6 text-lg font-bold rounded-xl">
-                {updateProfileMutation.isPending ? <><Spinner className="w-5 h-5 mr-2" />{direction === 'rtl' ? 'جاري الحفظ...' : 'Saving...'}</> : (direction === 'rtl' ? 'حفظ التغييرات' : 'Save Changes')}
-              </Button>
             </div>
           </div>
         );
@@ -1657,42 +1331,6 @@ export default function SettingsPage() {
       case "verified":
         return <VerificationSection profile={profile} direction={direction} />;
 
-      case "password":
-        return (
-          <div className="max-w-xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-            <h2 className="text-2xl font-bold mb-8">{direction === 'rtl' ? 'تغيير كلمة المرور' : 'Change Password'}</h2>
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <h3 className="font-bold">{direction === 'rtl' ? 'كلمة المرور الجديدة' : 'New Password'}</h3>
-                <Input type="password" value={passwordData.newPassword} onChange={(e) => setPasswordData(p => ({...p, newPassword: e.target.value}))} placeholder={direction === 'rtl' ? 'أدخل كلمة مرور جديدة' : 'Enter new password'} className="bg-card border-border" />
-              </div>
-              <div className="space-y-2">
-                <h3 className="font-bold">{direction === 'rtl' ? 'تأكيد كلمة المرور' : 'Confirm Password'}</h3>
-                <Input type="password" value={passwordData.confirmPassword} onChange={(e) => setPasswordData(p => ({...p, confirmPassword: e.target.value}))} placeholder={direction === 'rtl' ? 'أعد إدخال كلمة المرور' : 'Re-enter password'} className="bg-card border-border" />
-              </div>
-              {passwordData.newPassword && passwordData.newPassword.length < 6 && (
-                <p className="text-xs text-red-500">{direction === 'rtl' ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : 'Password must be at least 6 characters'}</p>
-              )}
-              {passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
-                <p className="text-xs text-red-500">{direction === 'rtl' ? 'كلمتا المرور غير متطابقتين' : 'Passwords do not match'}</p>
-              )}
-              <Button onClick={async () => {
-                if (passwordData.newPassword.length < 6) { toast.error(direction === 'rtl' ? 'كلمة المرور قصيرة جداً' : 'Password too short'); return; }
-                if (passwordData.newPassword !== passwordData.confirmPassword) { toast.error(direction === 'rtl' ? 'كلمتا المرور غير متطابقتين' : 'Passwords do not match'); return; }
-                setChangingPassword(true);
-                try {
-                  await changePassword(passwordData.newPassword);
-                  toast.success(direction === 'rtl' ? 'تم تغيير كلمة المرور بنجاح!' : 'Password changed successfully!');
-                  setPasswordData({ newPassword: '', confirmPassword: '' });
-                } catch (err: any) { toast.error(err.message || (direction === 'rtl' ? 'فشل تغيير كلمة المرور' : 'Failed to change password')); }
-                setChangingPassword(false);
-              }} disabled={changingPassword || !passwordData.newPassword || !passwordData.confirmPassword || passwordData.newPassword !== passwordData.confirmPassword || passwordData.newPassword.length < 6}
-                className="w-full bg-primary hover:bg-primary/90 text-white py-6 text-lg font-bold rounded-xl">
-                {changingPassword ? <><Spinner className="w-5 h-5 mr-2" />{direction === 'rtl' ? 'جاري التغيير...' : 'Changing...'}</> : (direction === 'rtl' ? 'تغيير كلمة المرور' : 'Change Password')}
-              </Button>
-            </div>
-          </div>
-        );
       case "help":
         return (
           <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in fade-in zoom-in duration-300 pb-20">
@@ -1876,9 +1514,6 @@ export default function SettingsPage() {
           </div>
         );
       
-      case "connected_devices":
-        return <ConnectedDevicesSection direction={direction} user={user} />;
-
       case "logout":
         return (
           <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in fade-in zoom-in duration-300 pb-20">
