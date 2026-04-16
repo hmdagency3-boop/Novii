@@ -44,7 +44,7 @@ import {
   RotateCcw,
   X
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo, forwardRef, useImperativeHandle } from "react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
 import { getTranslation } from "@/lib/translations";
@@ -61,6 +61,89 @@ import { toast } from "sonner";
 import Cropper, { type Area } from "react-easy-crop";
 import { formatDistanceToNow } from "date-fns";
 import { ar } from "date-fns/locale";
+
+export type IsolatedChatInputHandle = {
+  getValue: () => string;
+  clear: () => void;
+  insert: (text: string) => void;
+  focus: () => void;
+};
+
+type IsolatedChatInputProps = {
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+  rtl?: boolean;
+  name?: string;
+  onSubmit?: (text: string) => void;
+  onTyping?: () => void;
+  onHasTextChange?: (hasText: boolean) => void;
+};
+
+/**
+ * IsolatedChatInput owns its own text state so typing does not re-render
+ * the giant Messages page. The parent reads the value via a ref handle on
+ * submit and tracks only a boolean (hasText) for the send button state.
+ */
+export const IsolatedChatInput = memo(forwardRef<IsolatedChatInputHandle, IsolatedChatInputProps>(
+  function IsolatedChatInput({ placeholder, disabled, className, rtl, name, onSubmit, onTyping, onHasTextChange }, ref) {
+    const [value, setValue] = useState("");
+    const valueRef = useRef("");
+    const inputRef = useRef<HTMLInputElement>(null);
+    const lastHasText = useRef(false);
+
+    const setBoth = (v: string) => {
+      valueRef.current = v;
+      setValue(v);
+      const has = v.trim().length > 0;
+      if (has !== lastHasText.current) {
+        lastHasText.current = has;
+        onHasTextChange?.(has);
+      }
+    };
+
+    useImperativeHandle(ref, () => ({
+      getValue: () => valueRef.current,
+      clear: () => setBoth(""),
+      insert: (text: string) => setBoth(valueRef.current + text),
+      focus: () => inputRef.current?.focus(),
+    }), []);
+
+    return (
+      <Input
+        ref={inputRef}
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        type="search"
+        inputMode="text"
+        enterKeyHint="send"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        name={name || "novii-message"}
+        data-form-type="other"
+        data-1p-ignore
+        data-lpignore="true"
+        onChange={(e) => {
+          if (disabled) return;
+          setBoth(e.target.value);
+          onTyping?.();
+        }}
+        onKeyDown={(e) => {
+          if (disabled) return;
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            const text = valueRef.current.trim();
+            if (text) onSubmit?.(text);
+          }
+        }}
+        className={cn(className, rtl && "text-right", "[&::-webkit-search-cancel-button]:hidden")}
+      />
+    );
+  }
+));
 
 function formatConvTime(dateStr: string | undefined | null, isRTL: boolean): string {
   if (!dateStr) return '';
@@ -105,6 +188,10 @@ export default function Messages() {
   const [selectedTab, setSelectedTab] = useState<'chats' | 'communities'>('chats');
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null);
   const [communityMessageInput, setCommunityMessageInput] = useState("");
+  const communityComposerRef = useRef<IsolatedChatInputHandle>(null);
+  const [hasCommunityText, setHasCommunityText] = useState(false);
+  const messageComposerRef = useRef<IsolatedChatInputHandle>(null);
+  const [hasMessageText, setHasMessageText] = useState(false);
   const [popoverTab, setPopoverTab] = useState<'chat' | 'community' | 'join'>('chat');
   const [newCommunityName, setNewCommunityName] = useState("");
   const [newCommunityDescription, setNewCommunityDescription] = useState("");
@@ -597,7 +684,8 @@ export default function Messages() {
         _optimistic: true,
       };
       queryClient.setQueryData(queryKey, [...previous, optimistic]);
-      setCommunityMessageInput("");
+      communityComposerRef.current?.clear();
+      setHasCommunityText(false);
       return { previous, queryKey };
     },
     onError: (err: any, _vars, ctx) => {
@@ -2300,12 +2388,12 @@ export default function Messages() {
                       {/* Desktop Input Box - Community Chat */}
                       <div className="hidden md:flex px-4 py-3 bg-background border-t border-border shrink-0 gap-2">
                         <div className="flex items-center gap-2 w-full">
-                          <Input
-                            value={communityMessageInput}
+                          <IsolatedChatInput
+                            ref={communityComposerRef}
                             disabled={userMuteStatus?.isMuted || userKickedStatus?.isKicked}
-                            onChange={(e) => {
-                              if (userMuteStatus?.isMuted || userKickedStatus?.isKicked) return;
-                              setCommunityMessageInput(e.target.value);
+                            rtl={isRTL}
+                            onHasTextChange={setHasCommunityText}
+                            onTyping={() => {
                               if (selectedCommunityId && currentUser) {
                                 api.updateCommunityTypingStatus(selectedCommunityId, true);
                                 if (communityTypingTimeoutRef.current) clearTimeout(communityTypingTimeoutRef.current);
@@ -2314,15 +2402,10 @@ export default function Messages() {
                                 }, 3000);
                               }
                             }}
-                            onKeyDown={(e) => {
-                              if (userMuteStatus?.isMuted || userKickedStatus?.isKicked) return;
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                if (communityMessageInput.trim() && selectedCommunityId) {
-                                  sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: communityMessageInput });
-                                  setCommunityMessageInput("");
-                                  api.updateCommunityTypingStatus(selectedCommunityId, false);
-                                }
+                            onSubmit={(text) => {
+                              if (selectedCommunityId) {
+                                sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: text });
+                                api.updateCommunityTypingStatus(selectedCommunityId, false);
                               }
                             }}
                             placeholder={
@@ -2334,18 +2417,17 @@ export default function Messages() {
                             }
                             className={cn(
                               "flex-1 rounded-full bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-10 text-sm px-4",
-                              isRTL && "text-right",
                               (userMuteStatus?.isMuted || userKickedStatus?.isKicked) && "opacity-50 cursor-not-allowed"
                             )}
                           />
                           <Button
                             onClick={() => {
-                              if (communityMessageInput.trim() && selectedCommunityId) {
-                                sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: communityMessageInput });
-                                setCommunityMessageInput("");
+                              const text = communityComposerRef.current?.getValue().trim() || "";
+                              if (text && selectedCommunityId) {
+                                sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: text });
                               }
                             }}
-                            disabled={!communityMessageInput.trim() || sendCommunityMessageMutation.isPending || userMuteStatus?.isMuted || userKickedStatus?.isKicked}
+                            disabled={!hasCommunityText || sendCommunityMessageMutation.isPending || userMuteStatus?.isMuted || userKickedStatus?.isKicked}
                             className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg transition-all h-10 w-10 p-0"
                             size="icon"
                           >
@@ -2558,12 +2640,12 @@ export default function Messages() {
                       {/* Community Input */}
                       {selectedCommunityId && (
                         <div className="flex items-end gap-1 w-full leading-none pb-1 m-0">
-                          <Input 
-                            value={communityMessageInput}
+                          <IsolatedChatInput
+                            ref={communityComposerRef}
                             disabled={userMuteStatus?.isMuted || userKickedStatus?.isKicked}
-                            onChange={(e) => {
-                              if (userMuteStatus?.isMuted || userKickedStatus?.isKicked) return;
-                              setCommunityMessageInput(e.target.value);
+                            rtl={isRTL}
+                            onHasTextChange={setHasCommunityText}
+                            onTyping={() => {
                               if (selectedCommunityId && currentUser) {
                                 api.updateCommunityTypingStatus(selectedCommunityId, true);
                                 if (communityTypingTimeoutRef.current) clearTimeout(communityTypingTimeoutRef.current);
@@ -2572,37 +2654,23 @@ export default function Messages() {
                                 }, 3000);
                               }
                             }}
-                            onKeyDown={(e) => {
-                              if (userMuteStatus?.isMuted || userKickedStatus?.isKicked) return;
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                if (communityMessageInput.trim() && selectedCommunityId) {
-                                  sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: communityMessageInput });
-                                  api.updateCommunityTypingStatus(selectedCommunityId, false);
-                                }
+                            onSubmit={(text) => {
+                              if (selectedCommunityId) {
+                                sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: text });
+                                api.updateCommunityTypingStatus(selectedCommunityId, false);
                               }
                             }}
                             placeholder={isRTL ? "اكتب رسالة..." : "Type a message..."}
-                            type="search"
-                            inputMode="text"
-                            enterKeyHint="send"
-                            autoComplete="off"
-                            autoCorrect="off"
-                            autoCapitalize="off"
-                            spellCheck={false}
-                            name="novii-message"
-                            data-form-type="other"
-                            data-1p-ignore
-                            data-lpignore="true"
-                            className="flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-9 text-sm px-3 py-0 m-0 [&::-webkit-search-cancel-button]:hidden"
+                            className="flex-1 rounded-lg bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-9 text-sm px-3 py-0 m-0"
                           />
                           <Button 
                             onClick={() => {
-                              if (communityMessageInput.trim() && selectedCommunityId) {
-                                sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: communityMessageInput });
+                              const text = communityComposerRef.current?.getValue().trim() || "";
+                              if (text && selectedCommunityId) {
+                                sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: text });
                               }
                             }}
-                            disabled={!communityMessageInput.trim() || sendCommunityMessageMutation.isPending || userMuteStatus?.isMuted || userKickedStatus?.isKicked}
+                            disabled={!hasCommunityText || sendCommunityMessageMutation.isPending || userMuteStatus?.isMuted || userKickedStatus?.isKicked}
                             className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg transition-all h-9 w-9 p-0 m-0"
                             size="icon" 
                           >
@@ -2743,59 +2811,40 @@ export default function Messages() {
             {/* Community Input */}
             {selectedCommunityId && (
             <div className="flex items-end gap-0 w-full leading-none pb-0 m-0 py-0">
-              <Input 
-                value={communityMessageInput}
+              <IsolatedChatInput
+                ref={communityComposerRef}
                 disabled={userMuteStatus?.isMuted || userKickedStatus?.isKicked}
-                onChange={(e) => {
-                  if (userMuteStatus?.isMuted || userKickedStatus?.isKicked) return;
-                  
-                  setCommunityMessageInput(e.target.value);
-                  
+                rtl={isRTL}
+                onHasTextChange={setHasCommunityText}
+                onTyping={() => {
                   if (selectedCommunityId && currentUser) {
                     api.updateCommunityTypingStatus(selectedCommunityId, true);
-                    if (communityTypingTimeoutRef.current) {
-                      clearTimeout(communityTypingTimeoutRef.current);
-                    }
+                    if (communityTypingTimeoutRef.current) clearTimeout(communityTypingTimeoutRef.current);
                     communityTypingTimeoutRef.current = setTimeout(() => {
                       api.updateCommunityTypingStatus(selectedCommunityId, false);
                     }, 3000);
                   }
                 }}
-                onKeyDown={(e) => {
-                  if (userMuteStatus?.isMuted || userKickedStatus?.isKicked) return;
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (communityMessageInput.trim() && selectedCommunityId) {
-                      sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: communityMessageInput });
-                      api.updateCommunityTypingStatus(selectedCommunityId, false);
-                    }
+                onSubmit={(text) => {
+                  if (selectedCommunityId) {
+                    sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: text });
+                    api.updateCommunityTypingStatus(selectedCommunityId, false);
                   }
                 }}
                 placeholder={userKickedStatus?.isKicked ? (isRTL ? "مطرود..." : "You are kicked...") : userMuteStatus?.isMuted ? (isRTL ? "معموله كتم..." : "You are muted...") : (isRTL ? "اكتب رسالة..." : "Type a message...")}
-                type="search"
-                inputMode="text"
-                enterKeyHint="send"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                name="novii-message"
-                data-form-type="other"
-                data-1p-ignore
-                data-lpignore="true"
                 className={cn(
-                  "flex-1 rounded-lg sm:rounded-2xl bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-8 sm:h-9 text-xs sm:text-sm px-3 py-0 m-0 [&::-webkit-search-cancel-button]:hidden",
-                  isRTL && "text-right",
+                  "flex-1 rounded-lg sm:rounded-2xl bg-secondary/60 border border-border/30 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all h-8 sm:h-9 text-xs sm:text-sm px-3 py-0 m-0",
                   (userMuteStatus?.isMuted || userKickedStatus?.isKicked) && "opacity-50 cursor-not-allowed bg-destructive/5"
                 )}
               />
               <Button 
                 onClick={() => {
-                  if (communityMessageInput.trim() && selectedCommunityId) {
-                    sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: communityMessageInput });
+                  const text = communityComposerRef.current?.getValue().trim() || "";
+                  if (text && selectedCommunityId) {
+                    sendCommunityMessageMutation.mutate({ communityId: selectedCommunityId, content: text });
                   }
                 }}
-                disabled={!communityMessageInput.trim() || sendCommunityMessageMutation.isPending || userMuteStatus?.isMuted || userKickedStatus?.isKicked}
+                disabled={!hasCommunityText || sendCommunityMessageMutation.isPending || userMuteStatus?.isMuted || userKickedStatus?.isKicked}
                 className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg transition-all h-8 w-8 sm:h-9 sm:w-9 p-0 m-0 ml-1"
                 size="icon" 
               >
