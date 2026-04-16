@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import ContactsSyncBanner from "@/components/contacts-sync-banner";
 
 const reasonIcons: Record<string, any> = {
   contact: Phone,
@@ -151,49 +152,6 @@ export default function SuggestionsSidebar() {
     );
   };
 
-  const ContactsSyncBanner = () => {
-    const [dismissed, setDismissed] = useState(() => localStorage.getItem('contacts_sync_dismissed') === '1');
-
-    if (dismissed || !currentProfile || currentProfile.contacts_synced_at) return null;
-
-    return (
-      <div className="mb-4 p-3 rounded-xl bg-primary/5 border border-primary/10">
-        <div className="flex items-start gap-2">
-          <Phone className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-xs font-semibold text-foreground mb-1">
-              {isRTL ? 'اكتشف أصدقائك على نوفي' : 'Find your friends on Novii'}
-            </p>
-            <p className="text-[11px] text-muted-foreground mb-2">
-              {isRTL 
-                ? 'مزامنة جهات الاتصال تساعدك تلاقي أصحابك اللي مسجلين على نوفي'
-                : 'Sync your contacts to find friends who are already on Novii'}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  toast.info(isRTL ? 'هذه الميزة تعمل على تطبيق الموبايل فقط' : 'This feature works on the mobile app only');
-                }}
-                className="px-3 py-1.5 text-[11px] font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                {isRTL ? 'مزامنة الآن' : 'Sync Now'}
-              </button>
-              <button
-                onClick={() => {
-                  setDismissed(true);
-                  localStorage.setItem('contacts_sync_dismissed', '1');
-                }}
-                className="px-3 py-1.5 text-[11px] font-medium rounded-lg text-muted-foreground hover:bg-muted transition-colors"
-              >
-                {isRTL ? 'لاحقاً' : 'Later'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const AllSuggestionsDialog = () => {
     return (
       <Dialog open={isViewAllOpen} onOpenChange={setIsViewAllOpen}>
@@ -225,7 +183,7 @@ export default function SuggestionsSidebar() {
   return (
     <>
       <aside className={`hidden xl:flex flex-col w-80 h-screen sticky top-0 p-6 pt-10 z-40 overflow-y-auto ${isRTL ? 'border-l' : 'border-r'} border-border/40`}>
-        <ContactsSyncBanner />
+        <ContactsSyncBanner variant="sidebar" />
 
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
