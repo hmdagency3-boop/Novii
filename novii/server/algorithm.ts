@@ -403,7 +403,6 @@ export async function getPersonalizedFeed(
     .select(POST_SELECT)
     .eq("is_archived", false)
     .eq("is_deleted", false)
-    .in("user_id", [...followingIds])
     .order("created_at", { ascending: false })
     .range(0, batchSize - 1);
 
@@ -411,6 +410,9 @@ export async function getPersonalizedFeed(
 
   const scored: ScoredPost[] = posts.map((post: any) => {
     const reasons: string[] = [];
+
+    const isFromFollowing = followingIds.has(post.user_id);
+    if (isFromFollowing && post.user_id !== userId) reasons.push("following");
 
     const authorScore = calculateAuthorAffinityScore(profile, post.user_id);
     if (authorScore > 0.5) reasons.push("author_affinity");
@@ -449,12 +451,15 @@ export async function getPersonalizedFeed(
     }
     boostScore = Math.min(boostScore, 1);
 
+    const followingBonus = isFromFollowing ? 0.35 : 0;
+
     const finalScore = Math.max(0,
       authorScore * config.feed_weight_author +
       interestScore * config.feed_weight_interest +
       engagementScore * config.feed_weight_engagement +
       recencyScore * config.feed_weight_recency +
       boostScore * config.feed_weight_boost +
+      followingBonus +
       discoveryBoost -
       negPenalty
     );
