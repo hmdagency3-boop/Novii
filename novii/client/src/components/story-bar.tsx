@@ -61,7 +61,7 @@ export default function StoryBar({ stories, followingUsers = [], currentUserAvat
             }}
           >
             <div className={cn(
-                "w-16 h-16 md:w-20 md:h-20 rounded-full p-[2px] transition-all duration-300 relative",
+                "w-20 h-20 md:w-24 md:h-24 rounded-full p-[2px] transition-all duration-300 relative",
                 !currentUserStory!.is_viewed 
                     ? "bg-gradient-to-tr from-yellow-400 via-orange-500 to-primary" 
                     : "bg-border"
@@ -85,7 +85,7 @@ export default function StoryBar({ stories, followingUsers = [], currentUserAvat
               onAddStoryClick?.();
             }}
           >
-            <div className="relative w-16 h-16 md:w-20 md:h-20">
+            <div className="relative w-20 h-20 md:w-24 md:h-24">
               <div className="w-full h-full rounded-full p-[2px] border border-border/50">
                    <img 
                       src={currentUserAvatar} 
@@ -119,7 +119,7 @@ export default function StoryBar({ stories, followingUsers = [], currentUserAvat
               }}
             >
                 <div className={cn(
-                    "w-16 h-16 md:w-20 md:h-20 rounded-full p-[2px] transition-all duration-300 relative",
+                    "w-20 h-20 md:w-24 md:h-24 rounded-full p-[2px] transition-all duration-300 relative",
                     isUnviewed 
                         ? isCloseFriend
                           ? "bg-gradient-to-tr from-green-400 via-emerald-500 to-green-600"
