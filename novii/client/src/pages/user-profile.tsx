@@ -704,7 +704,7 @@ export default function UserProfile() {
                             <ProfilePostCard
                               key={`post-${item.id}`}
                               post={item}
-                              onClick={() => { setSelectedPost(item); setPostViewerOpen(true); }}
+                              onClick={() => setLocation(`/user-posts/${userId}?start=${item.id}`)}
                             />
                           )
                         )}
