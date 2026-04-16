@@ -19,6 +19,16 @@ export default function Home() {
   const [feedSeed, setFeedSeed] = useState<number>(() => Date.now());
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
 
+  useEffect(() => {
+    const handleVisChange = () => {
+      if (document.visibilityState === 'visible') {
+        queryClient.invalidateQueries({ queryKey: ['feed-infinite'] });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisChange);
+    return () => document.removeEventListener('visibilitychange', handleVisChange);
+  }, [queryClient]);
+
   const {
     data: infiniteData,
     isLoading: postsLoading,

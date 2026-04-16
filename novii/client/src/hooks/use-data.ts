@@ -75,7 +75,8 @@ export function useInfiniteFeed(seed: number = 0) {
       if (lastPage.length < FEED_PAGE_SIZE) return undefined;
       return allPages.length;
     },
-    staleTime: 1000 * 60 * 2,
+    staleTime: 0,
+    gcTime: 1000 * 30,
   });
 }
 
@@ -83,6 +84,9 @@ export function useExplorePosts(limit = 30) {
   return useQuery({
     queryKey: ['explore', limit],
     queryFn: () => api.getPersonalizedExplore(limit),
+    staleTime: 0,
+    gcTime: 1000 * 30,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -90,6 +94,9 @@ export function useExploreReels(limit = 20) {
   return useQuery({
     queryKey: ['explore-reels', limit],
     queryFn: () => api.getPersonalizedExploreReels(limit),
+    staleTime: 0,
+    gcTime: 1000 * 30,
+    refetchOnWindowFocus: true,
   });
 }
 
