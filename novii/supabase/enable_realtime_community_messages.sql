@@ -60,6 +60,21 @@ BEGIN
   END IF;
 END$$;
 
+-- 6) Direct messages (DMs) — required for instant delivery in private chats.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'messages'
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.messages';
+  END IF;
+END$$;
+
+ALTER TABLE public.messages REPLICA IDENTITY FULL;
+
 -- Verify which tables are now in the publication:
 SELECT schemaname, tablename
 FROM pg_publication_tables
