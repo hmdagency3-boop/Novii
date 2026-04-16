@@ -243,6 +243,45 @@ export default function Messages() {
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Pin conversation (persisted in localStorage)
+  const pinnedConvsKey = `novii_pinned_${currentUser?.id}`;
+  const [pinnedConvIds, setPinnedConvIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(`novii_pinned_${currentUser?.id || ''}`);
+      return new Set(stored ? JSON.parse(stored) : []);
+    } catch { return new Set(); }
+  });
+  const togglePinConv = (userId: string) => {
+    setPinnedConvIds(prev => {
+      const next = new Set(prev);
+      const wasPinned = next.has(userId);
+      if (wasPinned) next.delete(userId); else next.add(userId);
+      try { localStorage.setItem(pinnedConvsKey, JSON.stringify(Array.from(next))); } catch {}
+      toast.success(wasPinned ? (isRTL ? "تم إلغاء التثبيت" : "Unpinned") : (isRTL ? "تم تثبيت المحادثة" : "Pinned"));
+      return next;
+    });
+  };
+
+  // Long-press context menu for conversation list
+  const [chatMenu, setChatMenu] = useState<{ userId: string; username: string; x: number; y: number } | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressTriggeredRef = useRef(false);
+  const startLongPress = (e: React.TouchEvent | React.MouseEvent, userId: string, username: string) => {
+    longPressTriggeredRef.current = false;
+    const point = "touches" in e ? e.touches[0] : e;
+    const x = point.clientX;
+    const y = point.clientY;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      try { (navigator as any).vibrate?.(20); } catch {}
+      setChatMenu({ userId, username, x, y });
+    }, 450);
+  };
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+  };
+
   // Mute conversation (persisted in localStorage)
   const mutedConvsKey = `novii_muted_${currentUser?.id}`;
   const [mutedConvIds, setMutedConvIds] = useState<Set<string>>(() => {
@@ -1943,25 +1982,43 @@ export default function Messages() {
               </div>
             ) : (
               <div className="flex flex-col">
-                {filteredConversations.map((conv: any) => {
+                {[...filteredConversations].sort((a: any, b: any) => {
+                  const ap = pinnedConvIds.has(a.user?.id) ? 1 : 0;
+                  const bp = pinnedConvIds.has(b.user?.id) ? 1 : 0;
+                  return bp - ap;
+                }).map((conv: any) => {
                   const hasUnread = conv.unreadCount > 0 && selectedUserId !== conv.user?.id;
                   const isVerified = conv.user?.is_verified;
                   const isOfficial = conv.user?.is_official;
                   const isSelected = selectedUserId === conv.user?.id;
                   const isOnline = conv.user?.is_online === true;
-                  
+                  const isPinned = pinnedConvIds.has(conv.user?.id);
+                  const userId = conv.user?.id;
+                  const username = conv.user?.full_name || conv.user?.username || "";
+
                   return (
                     <button
                       key={conv.user?.id}
-                      onClick={() => {
+                      onClick={(e) => {
+                        if (longPressTriggeredRef.current) {
+                          e.preventDefault();
+                          longPressTriggeredRef.current = false;
+                          return;
+                        }
                         setSelectedCommunityId(null);
                         setSelectedUserId(conv.user?.id);
                       }}
+                      onTouchStart={(e) => startLongPress(e, userId, username)}
+                      onTouchEnd={cancelLongPress}
+                      onTouchMove={cancelLongPress}
+                      onTouchCancel={cancelLongPress}
+                      onContextMenu={(e) => { e.preventDefault(); setChatMenu({ userId, username, x: e.clientX, y: e.clientY }); }}
                       className={cn(
-                        "flex items-center gap-3 px-4 py-3.5 cursor-pointer relative w-full",
+                        "flex items-center gap-3 px-4 py-3.5 cursor-pointer relative w-full select-none",
                         "transition-colors duration-150",
                         "border-b border-border/20 last:border-0",
                         isRTL ? "text-right flex-row-reverse" : "text-left",
+                        isPinned && !isSelected && "bg-primary/[0.03]",
                         isSelected
                           ? "bg-primary/8"
                           : "hover:bg-accent/40 active:bg-accent/60"
@@ -2497,15 +2554,6 @@ export default function Messages() {
                             </div>
                         </div>
                         <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={cn("hover:bg-accent/50 transition-colors h-9 w-9", isMutedConv ? "text-orange-500" : "text-muted-foreground hover:text-foreground")}
-                              onClick={toggleMuteConv}
-                              title={isMutedConv ? (isRTL ? "إلغاء الكتم" : "Unmute") : (isRTL ? "كتم الإشعارات" : "Mute notifications")}
-                            >
-                              {isMutedConv ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                            </Button>
                             <Button variant="ghost" size="icon" className="hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground h-9 w-9">
                               <Phone className="w-4 h-4" />
                             </Button>
@@ -3544,6 +3592,68 @@ export default function Messages() {
           currentUserId={currentUser?.id}
         />
       )}
+      {/* Long-press chat context menu (frosted glass) */}
+      {chatMenu && (() => {
+        const isPinned = pinnedConvIds.has(chatMenu.userId);
+        const isMuted = mutedConvIds.has(chatMenu.userId);
+        const menuWidth = 240;
+        const menuHeight = 130;
+        const padding = 12;
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 360;
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 640;
+        const left = Math.min(Math.max(padding, chatMenu.x - menuWidth / 2), vw - menuWidth - padding);
+        const top = Math.min(Math.max(padding, chatMenu.y - menuHeight - 8), vh - menuHeight - padding);
+        return (
+          <div
+            className="fixed inset-0 z-[100] animate-in fade-in duration-150"
+            onClick={() => setChatMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setChatMenu(null); }}
+          >
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+            <div
+              role="menu"
+              onClick={(e) => e.stopPropagation()}
+              className="absolute rounded-2xl overflow-hidden border border-white/15 shadow-2xl ring-1 ring-black/10 animate-in zoom-in-95 duration-150"
+              style={{
+                left,
+                top,
+                width: menuWidth,
+                background: 'rgba(20,20,28,0.55)',
+                backdropFilter: 'saturate(180%) blur(24px)',
+                WebkitBackdropFilter: 'saturate(180%) blur(24px)',
+              }}
+            >
+              <div className="px-3 pt-3 pb-2 text-[11px] uppercase tracking-wider text-white/60 truncate">
+                {chatMenu.username}
+              </div>
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white hover:bg-white/10 active:bg-white/15 transition-colors"
+                onClick={() => { togglePinConv(chatMenu.userId); setChatMenu(null); }}
+              >
+                <span className="text-base leading-none">{isPinned ? '📍' : '📌'}</span>
+                <span>{isPinned ? (isRTL ? 'إلغاء التثبيت' : 'Unpin chat') : (isRTL ? 'تثبيت المحادثة' : 'Pin chat')}</span>
+              </button>
+              <div className="h-px bg-white/10 mx-2" />
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white hover:bg-white/10 active:bg-white/15 transition-colors"
+                onClick={() => {
+                  setMutedConvIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has(chatMenu.userId)) next.delete(chatMenu.userId); else next.add(chatMenu.userId);
+                    try { localStorage.setItem(mutedConvsKey, JSON.stringify(Array.from(next))); } catch {}
+                    toast.success(isMuted ? (isRTL ? 'تم إلغاء الكتم' : 'Unmuted') : (isRTL ? 'تم كتم المحادثة' : 'Muted'));
+                    return next;
+                  });
+                  setChatMenu(null);
+                }}
+              >
+                {isMuted ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                <span>{isMuted ? (isRTL ? 'إلغاء الكتم' : 'Unmute') : (isRTL ? 'كتم الإشعارات' : 'Mute notifications')}</span>
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </Layout>
   );
 }
