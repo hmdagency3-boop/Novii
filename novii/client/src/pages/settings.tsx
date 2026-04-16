@@ -68,7 +68,7 @@ function formatTimeSpent(seconds: number): string {
 function TimeSpentStats() {
   const { data: stats, isLoading } = useUserStatistics();
   const { direction } = useLanguage();
-  const t = getTranslation(direction === 'rtl' ? 'ar' : 'en').settings;
+  const isRtl = direction === 'rtl';
 
   if (isLoading) {
     return (
@@ -78,73 +78,105 @@ function TimeSpentStats() {
     );
   }
 
-  const totalEngagement = stats ? stats.likes_given + stats.comments_created : 0;
-  const totalPosts = stats ? stats.posts_created + stats.posts_saved : 0;
-  const totalActivity = stats ? stats.likes_given + stats.comments_created + stats.posts_created : 0;
-  
-  const engagementRatio = totalPosts > 0 ? (totalEngagement / totalPosts).toFixed(1) : '0';
-  
-  const isHyperActive = stats && stats.time_spent_seconds > 3600;
-  const isVeryActive = stats && stats.time_spent_seconds > 1800;
-  const isActive = stats && stats.time_spent_seconds > 600;
-  
+  const seconds = stats?.time_spent_seconds ?? 0;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  const dailyAvgMin = Math.round((seconds / 7) / 60);
+
+  let activityLabel = isRtl ? 'منخفض' : 'Low';
+  let activityTone = 'text-emerald-500';
+  let activityDot = 'bg-emerald-500';
+  if (seconds > 3600) { activityLabel = isRtl ? 'مرتفع جدًا' : 'Very High'; activityTone = 'text-rose-500'; activityDot = 'bg-rose-500'; }
+  else if (seconds > 1800) { activityLabel = isRtl ? 'مرتفع' : 'High'; activityTone = 'text-amber-500'; activityDot = 'bg-amber-500'; }
+  else if (seconds > 600) { activityLabel = isRtl ? 'متوسط' : 'Moderate'; activityTone = 'text-sky-500'; activityDot = 'bg-sky-500'; }
+
   const statItems = stats ? [
-    { icon: Heart, label: direction === 'rtl' ? 'إعجابات' : 'Likes', value: stats.likes_given, color: 'from-red-500 to-red-600', bgColor: 'from-red-500/10 to-red-500/5', icon_color: 'text-red-500', accent: 'bg-red-500/20' },
-    { icon: MessageCircle, label: direction === 'rtl' ? 'تعليقات' : 'Comments', value: stats.comments_created, color: 'from-blue-500 to-blue-600', bgColor: 'from-blue-500/10 to-blue-500/5', icon_color: 'text-blue-500', accent: 'bg-blue-500/20' },
-    { icon: TrendingUp, label: direction === 'rtl' ? 'منشورات' : 'Posts', value: stats.posts_created, color: 'from-purple-500 to-purple-600', bgColor: 'from-purple-500/10 to-purple-500/5', icon_color: 'text-purple-500', accent: 'bg-purple-500/20' },
-    { icon: Bookmark, label: direction === 'rtl' ? 'محفوظ' : 'Saved', value: stats.posts_saved, color: 'from-amber-500 to-amber-600', bgColor: 'from-amber-500/10 to-amber-500/5', icon_color: 'text-amber-500', accent: 'bg-amber-500/20' },
+    { icon: Heart, label: isRtl ? 'إعجابات' : 'Likes', value: stats.likes_given },
+    { icon: MessageCircle, label: isRtl ? 'تعليقات' : 'Comments', value: stats.comments_created },
+    { icon: TrendingUp, label: isRtl ? 'منشورات' : 'Posts', value: stats.posts_created },
+    { icon: Bookmark, label: isRtl ? 'محفوظ' : 'Saved', value: stats.posts_saved },
   ] : [];
 
   return (
-    <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      <div className="relative mb-12 overflow-hidden rounded-3xl">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-primary via-purple-500 to-transparent opacity-30 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-br from-pink-500 via-red-500 to-transparent opacity-20 rounded-full blur-3xl" />
-        </div>
-        
-        <div className="relative p-8 md:p-16 text-center backdrop-blur-sm">
-          <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-bold text-primary uppercase tracking-widest">{direction === 'rtl' ? 'لوحة التحليلات' : 'Analytics Dashboard'}</span>
+    <div className="max-w-3xl mx-auto w-full animate-in fade-in slide-in-from-bottom-2 duration-500 pb-20" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold tracking-tight">{isRtl ? 'الوقت المستغرق' : 'Time Spent'}</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {isRtl ? 'نظرة عامة على نشاطك خلال آخر 7 أيام' : 'Overview of your activity over the last 7 days'}
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-8 md:p-10 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <Clock className="w-3.5 h-3.5" />
+            {isRtl ? 'إجمالي الوقت' : 'Total time'}
           </div>
-          
-          <h1 className="text-5xl md:text-7xl font-black bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent mb-4 leading-tight">
-            {direction === 'rtl' ? 'إحصائياتك الشاملة' : 'Your Analytics'}
-          </h1>
+          <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-muted/50">
+            <span className={cn("w-1.5 h-1.5 rounded-full", activityDot)} />
+            <span className={cn("text-xs font-semibold", activityTone)}>{activityLabel}</span>
+          </div>
+        </div>
+
+        <div className="flex items-baseline gap-2 mb-2">
+          {hours > 0 && (
+            <>
+              <span className="text-6xl md:text-7xl font-bold tabular-nums tracking-tight">{hours}</span>
+              <span className="text-2xl text-muted-foreground font-medium">h</span>
+            </>
+          )}
+          <span className="text-6xl md:text-7xl font-bold tabular-nums tracking-tight">{String(minutes).padStart(hours > 0 ? 2 : 1, '0')}</span>
+          <span className="text-2xl text-muted-foreground font-medium">m</span>
+          {hours === 0 && (
+            <>
+              <span className="text-6xl md:text-7xl font-bold tabular-nums tracking-tight text-muted-foreground/60">{String(secs).padStart(2, '0')}</span>
+              <span className="text-2xl text-muted-foreground font-medium">s</span>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-4 mt-6 pt-6 border-t border-border/60">
+          <div className="flex-1">
+            <p className="text-xs text-muted-foreground mb-1">{isRtl ? 'المتوسط اليومي' : 'Daily average'}</p>
+            <p className="text-base font-semibold tabular-nums">{dailyAvgMin} <span className="text-sm font-normal text-muted-foreground">{isRtl ? 'دقيقة' : 'min'}</span></p>
+          </div>
+          <div className="w-px h-10 bg-border" />
+          <div className="flex-1">
+            <p className="text-xs text-muted-foreground mb-1">{isRtl ? 'الجلسات' : 'Sessions'}</p>
+            <p className="text-base font-semibold tabular-nums">{Math.max(1, Math.round(seconds / 300))}</p>
+          </div>
+          <div className="w-px h-10 bg-border" />
+          <div className="flex-1">
+            <p className="text-xs text-muted-foreground mb-1">{isRtl ? 'إجمالي الأنشطة' : 'Activities'}</p>
+            <p className="text-base font-semibold tabular-nums">{stats ? (stats.likes_given + stats.comments_created + stats.posts_created + stats.posts_saved).toLocaleString() : 0}</p>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{isRtl ? 'تفاصيل النشاط' : 'Activity breakdown'}</h3>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {statItems.map((item, idx) => {
           const Icon = item.icon;
-          const percentage = idx === 0 ? (stats!.likes_given / Math.max(totalEngagement, 1)) * 100 : 
-                            idx === 1 ? (stats!.comments_created / Math.max(totalEngagement, 1)) * 100 :
-                            idx === 2 ? (stats!.posts_created / Math.max(totalPosts, 1)) * 100 :
-                            (stats!.posts_saved / Math.max(totalPosts, 1)) * 100;
-
           return (
             <div
               key={idx}
-              className="group relative overflow-hidden rounded-3xl border border-border/50 backdrop-blur-xl hover:border-primary/60 transition-all duration-500 hover:shadow-2xl hover:-translate-y-2"
+              className="rounded-xl border border-border bg-card p-5 hover:border-foreground/20 transition-colors"
             >
-              <div className={cn("absolute inset-0 bg-gradient-to-br", item.bgColor)} />
-              
-              <div className="relative p-7 md:p-9">
-                <div className="flex items-start justify-between mb-8">
-                  <div className={cn("p-4 rounded-2xl bg-background/40 backdrop-blur-lg border border-border/50 group-hover:scale-125 group-hover:shadow-lg transition-all duration-500 shadow-lg")}>
-                    <Icon className={cn("w-7 h-7", item.icon_color)} />
-                  </div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 rounded-lg bg-muted/60">
+                  <Icon className="w-4 h-4 text-foreground/70" />
                 </div>
-                
-                <p className={cn("text-5xl md:text-6xl font-black mb-3 bg-gradient-to-r", item.color, "bg-clip-text text-transparent leading-tight")}>
-                  {item.value.toLocaleString()}
-                </p>
-                
-                <p className="text-sm md:text-base font-bold text-muted-foreground group-hover:text-foreground transition-colors">
-                  {item.label}
-                </p>
               </div>
+              <p className="text-2xl font-bold tabular-nums tracking-tight mb-0.5">
+                {item.value.toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground font-medium">
+                {item.label}
+              </p>
             </div>
           );
         })}
