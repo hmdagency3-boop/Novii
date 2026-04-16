@@ -16,7 +16,7 @@ import {
   Trash2, UserPlus, UserX, Settings, AlertCircle, CheckCircle,
   Camera, Upload as UploadIcon, ImageIcon, ArrowRight, ArrowLeft, FileCheck, ScanFace
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useLocation } from "wouter";
