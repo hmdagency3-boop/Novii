@@ -3880,6 +3880,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           UNIQUE(reel_id, hashtag_id)
         );
         CREATE INDEX IF NOT EXISTS idx_hashtags_posts_count ON hashtags(posts_count DESC);
+        NOTIFY pgrst, 'reload schema';
       `});
       console.log('✅ hashtags system ready');
     } catch {
