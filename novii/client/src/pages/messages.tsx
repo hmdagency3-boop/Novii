@@ -239,10 +239,15 @@ export default function Messages() {
     selectedCommunityIdRef.current = selectedCommunityId;
   }, [selectedCommunityId]);
 
-  // Hide bottom nav in mobile when chat/community is selected
+  // Hide bottom nav in mobile when chat/community is selected.
+  // Always reset to 'false' on unmount so navigating away re-shows the nav.
   useEffect(() => {
     localStorage.setItem('chatActive', selectedUserId || selectedCommunityId ? 'true' : 'false');
     window.dispatchEvent(new Event('chatActiveChange'));
+    return () => {
+      localStorage.setItem('chatActive', 'false');
+      window.dispatchEvent(new Event('chatActiveChange'));
+    };
   }, [selectedUserId, selectedCommunityId]);
 
   // Fetch communities
