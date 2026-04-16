@@ -2931,6 +2931,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (sectionErrors.length) console.warn('User detail partial errors:', sectionErrors);
 
+      // Compute live statistics (fallback when user_statistics row is missing or zeroed)
+      let statistics: any = safeSingle(statsRes, 'statistics');
+      try {
+        const [likesCnt, commentsCnt, viewsCnt] = await Promise.all([
+          adminDb!.from('likes').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          adminDb!.from('comments').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('is_deleted', false),
+          adminDb!.from('post_views').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+        ]);
+        const live = {
+          total_likes_given: likesCnt.count ?? 0,
+          total_comments_created: commentsCnt.count ?? 0,
+          total_posts_viewed: viewsCnt.error ? (statistics?.total_posts_viewed ?? 0) : (viewsCnt.count ?? 0),
+          total_time_spent_seconds: statistics?.total_time_spent_seconds ?? 0,
+          last_active_at: statistics?.last_active_at ?? null,
+        };
+        statistics = { ...(statistics || {}), ...live };
+      } catch (e) {
+        console.warn('Failed to compute live statistics:', e);
+      }
+
       res.json({
         profile,
         devices: safeData(devicesRes, 'devices'),
@@ -2943,7 +2963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         appeals: safeData(appealsRes, 'appeals'),
         verification_requests: safeData(verificationRes, 'verification'),
         admin_logs: safeData(logsRes, 'admin_logs'),
-        statistics: safeSingle(statsRes, 'statistics'),
+        statistics,
         followers_sample: safeData(followersRes, 'followers'),
         following_sample: safeData(followingRes, 'following'),
         communities: safeData(communitiesRes, 'communities'),
