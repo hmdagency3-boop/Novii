@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Link } from "wouter";
 import { Spinner } from "@/components/ui/spinner";
-import { UserPlus, AlertCircle, Sparkles, X, Phone, Users, BadgeCheck, TrendingUp, Heart } from "lucide-react";
+import { UserPlus, AlertCircle, X, Users, BadgeCheck } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { useState } from "react";
 import {
@@ -14,15 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import ContactsSyncBanner from "@/components/contacts-sync-banner";
-
-const reasonIcons: Record<string, any> = {
-  contact: Phone,
-  mutual: Users,
-  interest: Heart,
-  verified: BadgeCheck,
-  popular: TrendingUp,
-  suggested: Sparkles,
-};
 
 export default function SuggestionsSidebar() {
   const queryClient = useQueryClient();
@@ -87,8 +78,6 @@ export default function SuggestionsSidebar() {
   const SuggestionItem = ({ user, compact = false }: { user: any; compact?: boolean }) => {
     const isFollowing = followingIds.has(user.id);
     const reason = user.suggestion_reason || (isRTL ? 'مقترح لك' : 'Suggested for you');
-    const reasonType = user.suggestion_reason_type || 'suggested';
-    const ReasonIcon = reasonIcons[reasonType] || Sparkles;
 
     return (
       <div className="relative group">
@@ -105,7 +94,6 @@ export default function SuggestionsSidebar() {
                   {user.is_verified && <BadgeCheck className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
                 </div>
                 <div className="flex items-center gap-1 min-w-0">
-                  <ReasonIcon className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                   <span className="text-[11px] text-muted-foreground truncate">
                     {reason}
                   </span>
@@ -158,7 +146,6 @@ export default function SuggestionsSidebar() {
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
               {isRTL ? 'جميع التوصيات' : 'All Suggestions'}
             </DialogTitle>
           </DialogHeader>
@@ -185,7 +172,6 @@ export default function SuggestionsSidebar() {
       <aside className={`hidden xl:flex flex-col w-80 h-screen sticky top-0 p-6 pt-10 z-40 overflow-y-auto ${isRTL ? 'border-l' : 'border-r'} border-border/40`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" />
             <span className="font-bold text-sm text-foreground">
               {isRTL ? 'توصيات لك' : 'Suggestions for you'}
             </span>
@@ -213,7 +199,7 @@ export default function SuggestionsSidebar() {
           </div>
         ) : displaySuggestions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 space-y-3">
-            <Sparkles className="w-8 h-8 text-muted-foreground/40" />
+            <Users className="w-8 h-8 text-muted-foreground/40" />
             <div className="text-center">
               <p className="font-semibold text-sm mb-1">
                 {isRTL ? 'لا توجد توصيات متاحة' : 'No suggestions available'}
