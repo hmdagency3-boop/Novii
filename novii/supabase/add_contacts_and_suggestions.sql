@@ -33,6 +33,8 @@ CREATE INDEX IF NOT EXISTS idx_profiles_phone_hash
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS contacts_synced_at TIMESTAMPTZ;
 
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone_number TEXT;
+
 ALTER TABLE user_contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE suggestion_dismissals ENABLE ROW LEVEL SECURITY;
 

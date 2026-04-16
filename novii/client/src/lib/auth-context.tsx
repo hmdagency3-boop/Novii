@@ -19,8 +19,6 @@ interface AuthContextType {
   banInfo: BanInfo | null;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signInWithPhone: (phone: string) => Promise<void>;
-  verifyPhoneOtp: (phone: string, token: string) => Promise<void>;
   signOut: () => Promise<void>;
   recheckBan: () => Promise<void>;
 }
@@ -142,21 +140,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signInWithPhone = async (phone: string) => {
-    const { error } = await supabase.auth.signInWithOtp({ phone });
-    if (error) throw new Error(error.message);
-  };
-
-  const verifyPhoneOtp = async (phone: string, token: string) => {
-    const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
-    if (error) throw new Error(error.message);
-    if (data.user) setUser(data.user);
-    if (data.session) {
-      setSession(data.session);
-      await checkBanStatus(data.session.access_token);
-    }
-  };
-
   const signOut = async () => {
     try {
       localStorage.clear();
@@ -187,7 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [checkBanStatus]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isBanned, banInfo, signUp, signIn, signInWithPhone, verifyPhoneOtp, signOut, recheckBan }}>
+    <AuthContext.Provider value={{ user, session, loading, isBanned, banInfo, signUp, signIn, signOut, recheckBan }}>
       {children}
     </AuthContext.Provider>
   );

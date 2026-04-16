@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, Loader2, Languages, Sparkles, ArrowRight, Heart, X, Phone, ChevronDown } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Loader2, Languages, ArrowRight, Heart, X, Phone, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -45,7 +45,6 @@ const countryCodes = [
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
-  const [authMethod, setAuthMethod] = useState<"email" | "phone">("email");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [countryCode, setCountryCode] = useState("+966");
@@ -65,13 +64,9 @@ export default function AuthPage() {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [isSendingReset, setIsSendingReset] = useState(false);
 
-  const [otpStep, setOtpStep] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-  const [otpCountdown, setOtpCountdown] = useState(0);
-
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { signIn, signUp, signInWithPhone, verifyPhoneOtp } = useAuth();
+  const { signIn, signUp } = useAuth();
   const { language, setLanguage, direction } = useLanguage();
   const t = getTranslation(language.code);
   const isRTL = direction === "rtl";
@@ -90,13 +85,6 @@ export default function AuthPage() {
       setLocation('/auth');
     }
   }, [isBanned, banMessage, toast, language.code, setLocation]);
-
-  useEffect(() => {
-    if (otpCountdown > 0) {
-      const timer = setTimeout(() => setOtpCountdown(otpCountdown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [otpCountdown]);
 
   const months = language.code === 'ar' 
     ? ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
@@ -122,36 +110,11 @@ export default function AuthPage() {
     return { score, label: t.auth.very_strong, color: "bg-green-500" };
   };
 
-  const passwordStrength = !isLogin && authMethod === "email" ? getPasswordStrength(password) : null;
+  const passwordStrength = !isLogin ? getPasswordStrength(password) : null;
 
-  const getFullPhone = () => `${countryCode}${phoneNumber.replace(/^0+/, '')}`;
-
-  const validatePhoneNumber = (phone: string): boolean => {
-    const cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
-    return cleaned.length >= 7 && cleaned.length <= 15 && /^\d+$/.test(cleaned);
-  };
+  const getFullPhone = () => phoneNumber.trim() ? `${countryCode}${phoneNumber.replace(/^0+/, '').replace(/\s/g, '')}` : "";
 
   const validateForm = (): boolean => {
-    if (authMethod === "phone") {
-      if (!phoneNumber || !validatePhoneNumber(phoneNumber)) {
-        toast({
-          variant: "destructive",
-          title: t.auth.invalid_phone,
-          description: t.auth.invalid_phone_desc,
-        });
-        return false;
-      }
-      if (!isLogin && (!fullName || !username || !birthMonth || !birthDay || !birthYear || !gender)) {
-        toast({
-          variant: "destructive",
-          title: t.auth.validation_error,
-          description: t.auth.fill_all_fields,
-        });
-        return false;
-      }
-      return true;
-    }
-
     if (!email || !password) {
       toast({
         variant: "destructive",
@@ -189,101 +152,21 @@ export default function AuthPage() {
         });
         return false;
       }
+
+      if (phoneNumber.trim()) {
+        const cleaned = phoneNumber.replace(/[\s\-\(\)\.]/g, '');
+        if (cleaned.length < 7 || cleaned.length > 15 || !/^\d+$/.test(cleaned)) {
+          toast({
+            variant: "destructive",
+            title: t.auth.invalid_phone,
+            description: t.auth.invalid_phone_desc,
+          });
+          return false;
+        }
+      }
     }
 
     return true;
-  };
-
-  const handleSendOtp = async () => {
-    if (!validateForm()) return;
-    
-    setIsLoading(true);
-    try {
-      const fullPhone = getFullPhone();
-      await signInWithPhone(fullPhone);
-      setOtpStep(true);
-      setOtpCountdown(60);
-      toast({
-        title: t.auth.otp_sent,
-        description: t.auth.otp_sent_desc,
-      });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: t.auth.error,
-        description: error.message || t.auth.generic_error,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!otpCode || otpCode.length !== 6) {
-      toast({
-        variant: "destructive",
-        title: t.auth.invalid_otp,
-        description: t.auth.invalid_otp_desc,
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const fullPhone = getFullPhone();
-      await verifyPhoneOtp(fullPhone, otpCode);
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
-
-      if (user?.id && !isLogin) {
-        try {
-          await api.createProfile(user.id, username, gender);
-        } catch (profileError) {
-          console.error('Profile creation failed:', profileError);
-        }
-      }
-
-      if (user?.id) {
-        try {
-          await api.trackDevice(user.id);
-        } catch (deviceError) {
-          console.error('Device tracking failed:', deviceError);
-        }
-      }
-
-      setLocation("/");
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: t.auth.otp_error,
-        description: error.message || t.auth.otp_error_desc,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    if (otpCountdown > 0) return;
-    setIsLoading(true);
-    try {
-      const fullPhone = getFullPhone();
-      await signInWithPhone(fullPhone);
-      setOtpCountdown(60);
-      toast({
-        title: t.auth.otp_sent,
-        description: t.auth.otp_sent_desc,
-      });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: t.auth.error,
-        description: error.message || t.auth.generic_error,
-      });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -336,15 +219,6 @@ export default function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (authMethod === "phone") {
-      if (otpStep) {
-        await handleVerifyOtp();
-      } else {
-        await handleSendOtp();
-      }
-      return;
-    }
-
     if (!validateForm()) return;
     
     setIsLoading(true);
@@ -371,7 +245,7 @@ export default function AuthPage() {
           const { data: { session } } = await supabase.auth.getSession();
           const user = session?.user;
           if (user?.id) {
-            await api.createProfile(user.id, username, gender);
+            await api.createProfile(user.id, username, gender, fullName, getFullPhone());
           }
         } catch (profileError) {
           console.error('Profile creation failed:', profileError);
@@ -419,13 +293,17 @@ export default function AuthPage() {
     setBirthYear("");
     setGender("");
     setPhoneNumber("");
-    setOtpStep(false);
-    setOtpCode("");
-    setOtpCountdown(0);
   };
 
   const phoneInputJSX = (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+        <Phone className="w-3 h-3" />
+        {t.auth.phone_number} 
+        <span className="text-muted-foreground/60 text-[10px]">
+          ({isRTL ? 'اختياري' : 'optional'})
+        </span>
+      </label>
       <div className="flex gap-2">
         <div className="relative">
           <button
@@ -462,115 +340,13 @@ export default function AuthPage() {
         </div>
         <Input
           type="tel"
-          placeholder={isRTL ? "5XX XXX XXX" : "5XX XXX XXX"}
+          placeholder="5XX XXX XXX"
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d\s]/g, ''))}
           className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm flex-1"
           dir="ltr"
         />
       </div>
-    </div>
-  );
-
-  const otpVerificationJSX = (
-    <div className="space-y-4">
-      <div className="text-center space-y-2">
-        <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-3">
-          <Phone className="w-7 h-7 text-primary" />
-        </div>
-        <h3 className="font-bold text-lg">{t.auth.verify_otp}</h3>
-        <p className="text-sm text-muted-foreground">
-          {t.auth.otp_sent_desc}
-        </p>
-        <p className="text-xs text-primary font-mono" dir="ltr">{getFullPhone()}</p>
-      </div>
-
-      <div className="flex justify-center" dir="ltr">
-        <Input
-          type="text"
-          inputMode="numeric"
-          maxLength={6}
-          placeholder="000000"
-          value={otpCode}
-          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          className="bg-background/50 border-border/80 text-foreground text-center text-2xl tracking-[0.5em] font-mono h-14 w-64 focus:border-primary focus:ring-primary/20 transition-all duration-200"
-        />
-      </div>
-
-      <Button
-        type="submit"
-        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-10 sm:h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300"
-        disabled={isLoading || otpCode.length !== 6}
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            {t.auth.loading}
-          </>
-        ) : (
-          <>
-            {t.auth.verify_otp}
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </>
-        )}
-      </Button>
-
-      <div className="flex items-center justify-center gap-2">
-        <button
-          type="button"
-          onClick={handleResendOtp}
-          disabled={otpCountdown > 0 || isLoading}
-          className={`text-sm font-medium transition-colors ${
-            otpCountdown > 0 ? 'text-muted-foreground cursor-not-allowed' : 'text-primary hover:text-primary/80 cursor-pointer'
-          }`}
-        >
-          {otpCountdown > 0 
-            ? `${t.auth.resend_in} ${otpCountdown}${t.auth.seconds}` 
-            : t.auth.resend_otp}
-        </button>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          setOtpStep(false);
-          setOtpCode("");
-        }}
-        className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {isRTL ? "← تغيير رقم الهاتف" : "← Change phone number"}
-      </button>
-    </div>
-  );
-
-  const authMethodToggleJSX = (
-    <div className="flex rounded-xl bg-background/50 border border-border/60 p-1 gap-1">
-      <button
-        type="button"
-        onClick={() => { setAuthMethod("email"); setOtpStep(false); setOtpCode(""); }}
-        className={cn(
-          "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all duration-200",
-          authMethod === "email" 
-            ? "bg-primary text-primary-foreground shadow-sm" 
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        )}
-      >
-        <Mail className="w-3.5 h-3.5" />
-        {t.auth.use_email}
-      </button>
-      <button
-        type="button"
-        onClick={() => { setAuthMethod("phone"); }}
-        className={cn(
-          "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all duration-200",
-          authMethod === "phone" 
-            ? "bg-primary text-primary-foreground shadow-sm" 
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        )}
-      >
-        <Phone className="w-3.5 h-3.5" />
-        {t.auth.use_phone}
-      </button>
     </div>
   );
 
@@ -738,270 +514,224 @@ export default function AuthPage() {
                   <div className="h-1 w-16 bg-gradient-to-r from-pink-500 to-cyan-500 rounded-full animate-in fade-in duration-700 delay-200"></div>
                 </div>
                 <p className="text-sm text-muted-foreground animate-in fade-in duration-700 delay-300">
-                  {authMethod === "phone" && isLogin
-                    ? t.auth.phone_login_subtitle
-                    : isLogin ? t.auth.login_subtitle : t.auth.signup_subtitle}
+                  {isLogin ? t.auth.login_subtitle : t.auth.signup_subtitle}
                 </p>
               </div>
 
-              {authMethodToggleJSX}
-
               {!isLogin ? (
                 <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-3.5 overflow-visible">
-                  {authMethod === "email" ? (
+                  <Input
+                    type="email"
+                    placeholder={t.auth.email}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
+                    dir="ltr"
+                  />
+
+                  {phoneInputJSX}
+
+                  <Input
+                    type="text"
+                    placeholder={t.auth.full_name}
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
+                  />
+
+                  <Input
+                    type="text"
+                    placeholder={t.auth.username}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                    className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
+                    dir="ltr"
+                  />
+
+                  <div className="relative">
                     <Input
-                      type="email"
-                      placeholder={t.auth.mobile_or_email}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      type={showPassword ? "text" : "password"}
+                      placeholder={t.auth.password}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                       className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
                       dir="ltr"
                     />
-                  ) : otpStep ? (
-                    otpVerificationJSX
-                  ) : (
-                    phoneInputJSX
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
 
-                  {!(authMethod === "phone" && otpStep) && (
-                    <>
-                      <Input
-                        type="text"
-                        placeholder={t.auth.full_name}
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        required
-                        className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
-                      />
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">{language.code === 'ar' ? 'الجنس' : 'Gender'}</label>
+                    <Select value={gender} onValueChange={setGender}>
+                      <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-9 sm:h-11 text-sm hover:border-primary/50 transition-colors">
+                        <SelectValue placeholder={language.code === 'ar' ? 'اختر الجنس' : 'Select gender'} />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border" side="bottom" align="start" sideOffset={8}>
+                        <SelectItem value="male" className="text-foreground hover:bg-primary/10">
+                          {language.code === 'ar' ? 'ذكر' : 'Male'}
+                        </SelectItem>
+                        <SelectItem value="female" className="text-foreground hover:bg-primary/10">
+                          {language.code === 'ar' ? 'أنثى' : 'Female'}
+                        </SelectItem>
+                        <SelectItem value="other" className="text-foreground hover:bg-primary/10">
+                          {language.code === 'ar' ? 'آخر' : 'Other'}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                      <Input
-                        type="text"
-                        placeholder={t.auth.username}
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        required
-                        className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
-                        dir="ltr"
-                      />
-
-                      {authMethod === "email" && (
-                        <div className="relative">
-                          <Input
-                            type={showPassword ? "text" : "password"}
-                            placeholder={t.auth.password}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground h-9 sm:h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200 text-sm"
-                            dir="ltr"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      )}
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">{language.code === 'ar' ? 'الجنس' : 'Gender'}</label>
-                        <Select value={gender} onValueChange={setGender}>
-                          <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-9 sm:h-11 text-sm hover:border-primary/50 transition-colors">
-                            <SelectValue placeholder={language.code === 'ar' ? 'اختر الجنس' : 'Select gender'} />
-                          </SelectTrigger>
-                          <SelectContent className="bg-card border-border" side="bottom" align="start" sideOffset={8}>
-                            <SelectItem value="male" className="text-foreground hover:bg-primary/10">
-                              {language.code === 'ar' ? 'ذكر' : 'Male'}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">{t.auth.date_of_birth}</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Select value={birthMonth} onValueChange={setBirthMonth}>
+                        <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
+                          <SelectValue placeholder={t.auth.month} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-border" side="bottom" align="start" sideOffset={4}>
+                          {months.map((month, index) => (
+                            <SelectItem key={index} value={String(index + 1)} className="text-foreground hover:bg-primary/10">
+                              {month}
                             </SelectItem>
-                            <SelectItem value="female" className="text-foreground hover:bg-primary/10">
-                              {language.code === 'ar' ? 'أنثى' : 'Female'}
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={birthDay} onValueChange={setBirthDay}>
+                        <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
+                          <SelectValue placeholder={t.auth.day} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-border max-h-60" side="bottom" align="start" sideOffset={4}>
+                          {days.map((day) => (
+                            <SelectItem key={day} value={String(day)} className="text-foreground hover:bg-primary/10">
+                              {day}
                             </SelectItem>
-                            <SelectItem value="other" className="text-foreground hover:bg-primary/10">
-                              {language.code === 'ar' ? 'آخر' : 'Other'}
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={birthYear} onValueChange={setBirthYear}>
+                        <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
+                          <SelectValue placeholder={t.auth.year} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-border max-h-60" side="bottom" align="start" sideOffset={4}>
+                          {years.map((year) => (
+                            <SelectItem key={year} value={String(year)} className="text-foreground hover:bg-primary/10">
+                              {year}
                             </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">{t.auth.date_of_birth}</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          <Select value={birthMonth} onValueChange={setBirthMonth}>
-                            <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
-                              <SelectValue placeholder={t.auth.month} />
-                            </SelectTrigger>
-                            <SelectContent className="bg-card border-border" side="bottom" align="start" sideOffset={4}>
-                              {months.map((month, index) => (
-                                <SelectItem key={index} value={String(index + 1)} className="text-foreground hover:bg-primary/10">
-                                  {month}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {t.auth.dob_info2}
+                  </p>
 
-                          <Select value={birthDay} onValueChange={setBirthDay}>
-                            <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
-                              <SelectValue placeholder={t.auth.day} />
-                            </SelectTrigger>
-                            <SelectContent className="bg-card border-border max-h-60" side="bottom" align="start" sideOffset={4}>
-                              {days.map((day) => (
-                                <SelectItem key={day} value={String(day)} className="text-foreground hover:bg-primary/10">
-                                  {day}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-
-                          <Select value={birthYear} onValueChange={setBirthYear}>
-                            <SelectTrigger className="bg-background/50 border-border/80 text-foreground h-10 text-xs hover:border-primary/50 transition-colors">
-                              <SelectValue placeholder={t.auth.year} />
-                            </SelectTrigger>
-                            <SelectContent className="bg-card border-border max-h-60" side="bottom" align="start" sideOffset={4}>
-                              {years.map((year) => (
-                                <SelectItem key={year} value={String(year)} className="text-foreground hover:bg-primary/10">
-                                  {year}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        {t.auth.dob_info2}
-                      </p>
-
-                      <Button
-                        type="submit"
-                        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-10 sm:h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            {t.auth.loading}
-                          </>
-                        ) : (
-                          <>
-                            {authMethod === "phone" ? t.auth.send_otp : t.auth.signup_button}
-                            <ArrowRight className="w-4 h-4 ml-2" />
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  )}
+                  <Button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-10 sm:h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t.auth.loading}
+                      </>
+                    ) : (
+                      <>
+                        {t.auth.signup_button}
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
                 </form>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">
-                  {authMethod === "phone" ? (
-                    otpStep ? (
-                      otpVerificationJSX
+                  <div className="space-y-2.5">
+                    <label className="text-sm font-medium text-foreground">{t.auth.email}</label>
+                    <div className="relative">
+                      <Mail className="absolute right-3 top-3.5 w-5 h-5 text-muted-foreground pointer-events-none" />
+                      <Input
+                        type="email"
+                        placeholder="example@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground pr-10 h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <label className="text-sm font-medium text-foreground">{t.auth.password}</label>
+                    <div className="relative">
+                      <Lock className="absolute right-3 top-3.5 w-5 h-5 text-muted-foreground pointer-events-none" />
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground pr-10 pl-10 h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200"
+                        dir="ltr"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute left-3 top-3.5 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <label className="flex items-center gap-2.5 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-primary/20 transition-all"
+                      />
+                      <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">{t.auth.remember_me}</span>
+                    </label>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowForgotPassword(true)}
+                      className="text-sm text-primary hover:text-primary/80 font-medium transition-colors">
+                      {t.auth.forgot_password}
+                    </button>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300 mt-6"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t.auth.loading}
+                      </>
                     ) : (
                       <>
-                        <div className="space-y-2.5">
-                          <label className="text-sm font-medium text-foreground">{t.auth.phone_number}</label>
-                          {phoneInputJSX}
-                        </div>
-                        <Button
-                          type="submit"
-                          className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300 mt-6"
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              {t.auth.loading}
-                            </>
-                          ) : (
-                            <>
-                              {t.auth.send_otp}
-                              <ArrowRight className="w-4 h-4 ml-2" />
-                            </>
-                          )}
-                        </Button>
+                        {t.auth.login_button}
+                        <ArrowRight className="w-4 h-4 ml-2" />
                       </>
-                    )
-                  ) : (
-                    <>
-                      <div className="space-y-2.5">
-                        <label className="text-sm font-medium text-foreground">{t.auth.email}</label>
-                        <div className="relative">
-                          <Mail className="absolute right-3 top-3.5 w-5 h-5 text-muted-foreground pointer-events-none" />
-                          <Input
-                            type="email"
-                            placeholder="example@email.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground pr-10 h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200"
-                            dir="ltr"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2.5">
-                        <label className="text-sm font-medium text-foreground">{t.auth.password}</label>
-                        <div className="relative">
-                          <Lock className="absolute right-3 top-3.5 w-5 h-5 text-muted-foreground pointer-events-none" />
-                          <Input
-                            type={showPassword ? "text" : "password"}
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            className="bg-background/50 border-border/80 text-foreground placeholder:text-muted-foreground pr-10 pl-10 h-11 focus:border-primary focus:ring-primary/20 transition-all duration-200"
-                            dir="ltr"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute left-3 top-3.5 text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2">
-                        <label className="flex items-center gap-2.5 cursor-pointer group">
-                          <input
-                            type="checkbox"
-                            checked={rememberMe}
-                            onChange={(e) => setRememberMe(e.target.checked)}
-                            className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-primary/20 transition-all"
-                          />
-                          <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">{t.auth.remember_me}</span>
-                        </label>
-                        <button 
-                          type="button" 
-                          onClick={() => setShowForgotPassword(true)}
-                          className="text-sm text-primary hover:text-primary/80 font-medium transition-colors">
-                          {t.auth.forgot_password}
-                        </button>
-                      </div>
-
-                      <Button
-                        type="submit"
-                        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white h-11 font-semibold shadow-lg shadow-primary/25 transition-all duration-300 mt-6"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            {t.auth.loading}
-                          </>
-                        ) : (
-                          <>
-                            {t.auth.login_button}
-                            <ArrowRight className="w-4 h-4 ml-2" />
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  )}
+                    )}
+                  </Button>
                 </form>
               )}
             </div>

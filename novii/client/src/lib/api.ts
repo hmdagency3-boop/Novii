@@ -428,7 +428,7 @@ export const api = {
     }
   },
 
-  async createProfile(userId: string, username: string, gender?: string): Promise<Profile> {
+  async createProfile(userId: string, username: string, gender?: string, fullName?: string, phone?: string): Promise<Profile> {
     // Set default avatar based on gender
     let defaultAvatarUrl = '/assets/default_avatar_male.png'; // Default to male
     if (gender === 'female') {
@@ -439,17 +439,23 @@ export const api = {
       defaultAvatarUrl = '/assets/default_avatar_male.png'; // Use male for other as fallback
     }
 
+    const updateData: any = {
+      username: username,
+      full_name: fullName || username,
+      gender: gender || null,
+      avatar_url: defaultAvatarUrl,
+      is_online: false,
+      last_seen: new Date().toISOString(),
+    };
+
+    if (phone && phone.trim()) {
+      updateData.phone_number = phone.trim();
+    }
+
     // Update the profile that was automatically created by the trigger
     const { data, error } = await supabase
       .from('profiles')
-      .update({
-        username: username,
-        full_name: username,
-        gender: gender || null,
-        avatar_url: defaultAvatarUrl,
-        is_online: false,
-        last_seen: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', userId)
       .select()
       .single();
