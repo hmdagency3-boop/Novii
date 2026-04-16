@@ -19,7 +19,7 @@ import {
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -642,6 +642,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const { user, signOut } = useAuth();
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   
   // Fetch current user profile
@@ -1577,7 +1578,7 @@ export default function SettingsPage() {
             </div>
             
             <ScrollArea className="flex-1 px-4">
-                <div onClick={() => { window.location.href = '/accounts-center'; }} className="bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/30 rounded-xl p-4 mb-6 mt-2 shadow-sm cursor-pointer hover:bg-primary/20 transition-all duration-300 group">
+                <div onClick={() => { navigate('/accounts-center'); }} className="bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/30 rounded-xl p-4 mb-6 mt-2 shadow-sm cursor-pointer hover:bg-primary/20 transition-all duration-300 group">
                     <div className="flex items-center gap-2 mb-3 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
                         <Monitor className="w-5 h-5 text-primary" />
                         <span className="font-bold text-sm">Novii</span>
