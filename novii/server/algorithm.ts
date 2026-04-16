@@ -394,11 +394,11 @@ export async function getPersonalizedFeed(
       .in("user_id", [...followingIds])
       .order("created_at", { ascending: false })
       .range(page * limit, page * limit + limit - 1);
-    return chronoPosts || [];
+    return (chronoPosts || []).filter((p: any) => !p.profile?.is_deactivated);
   }
 
   const batchSize = config.feed_batch_size;
-  const { data: posts, error } = await db
+  const { data: rawPosts, error } = await db
     .from("posts")
     .select(POST_SELECT)
     .eq("is_archived", false)
@@ -407,7 +407,9 @@ export async function getPersonalizedFeed(
     .order("created_at", { ascending: false })
     .range(0, batchSize - 1);
 
-  if (error || !posts) return [];
+  if (error || !rawPosts) return [];
+
+  const posts = rawPosts.filter((p: any) => !p.profile?.is_deactivated);
 
   const scored: ScoredPost[] = posts.map((post: any) => {
     const reasons: string[] = [];

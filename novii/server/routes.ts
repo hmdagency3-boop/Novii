@@ -1424,13 +1424,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     if (upErr) throw new Error(upErr.message);
 
-    // 3) Hide all the user's content using the existing is_deleted flags
-    await Promise.all([
-      adminDb.from('posts').update({ is_deleted: true }).eq('user_id', userId),
-      adminDb.from('reels').update({ is_deleted: true }).eq('user_id', userId),
-      adminDb.from('comments').update({ is_deleted: true }).eq('user_id', userId),
-      adminDb.from('stories').delete().eq('user_id', userId),
-    ].map(p => p.then(() => null).catch(() => null)));
+    // 3) Stories are real-time so we delete them; posts/reels/comments are NOT
+    //    soft-deleted at the row level — instead, every feed/comment query
+    //    filters them out via the joined profile.is_deactivated flag.
+    //    This avoids permanently mutating content rows and keeps reactivation
+    //    instant for both the owner and everyone who follows them.
+    try { await adminDb.from('stories').delete().eq('user_id', userId); } catch {}
   }
 
   async function restoreProfileInDb(adminDb: any, userId: string, extraFields: Record<string, any> = {}) {
@@ -4787,6 +4786,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         console.log('✅ Redaction backfill complete');
+
+        // ONE-TIME RECOVERY: previous versions of redactProfileInDb
+        // bulk-marked posts/reels/comments of deactivated users as
+        // is_deleted=true. We now rely solely on the joined
+        // profile.is_deactivated filter. Un-mark those rows once per
+        // affected profile, then set a marker inside deletion_backup so
+        // we never run it again (which would otherwise revive
+        // legitimately deleted/moderated rows).
+        if (hasBackupColumn) {
+          const needsRecovery = toRedact.filter((p: any) => !p?.deletion_backup?.recovery_v1_done);
+          if (needsRecovery.length > 0) {
+            const ids = needsRecovery.map((p: any) => p.id).filter(Boolean);
+            try {
+              const [pr, rr, cr] = await Promise.all([
+                adminDb.from('posts').update({ is_deleted: false }).in('user_id', ids).eq('is_deleted', true).select('id'),
+                adminDb.from('reels').update({ is_deleted: false }).in('user_id', ids).eq('is_deleted', true).select('id'),
+                adminDb.from('comments').update({ is_deleted: false }).in('user_id', ids).eq('is_deleted', true).select('id'),
+              ]);
+              console.log(`🔄 One-time recovery for ${ids.length} profile(s): posts=${pr.data?.length || 0} reels=${rr.data?.length || 0} comments=${cr.data?.length || 0}`);
+              for (const p of needsRecovery) {
+                const merged = { ...(p.deletion_backup || {}), recovery_v1_done: true };
+                await adminDb.from('profiles').update({ deletion_backup: merged }).eq('id', p.id);
+              }
+            } catch (e: any) {
+              console.warn('⚠️ Content visibility recovery skipped:', e?.message);
+            }
+          }
+        }
       }
       if (!hasBackupColumn) {
         console.log('ℹ️  Run this SQL in Supabase to enable restore-on-cancel: ALTER TABLE profiles ADD COLUMN IF NOT EXISTS deletion_backup JSONB;');
