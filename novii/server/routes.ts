@@ -2414,8 +2414,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (membersErr) throw membersErr;
 
-      console.log(`✅ Fetched ${members?.length || 0} members for community ${communityId}`);
-      res.json(members || []);
+      // Flatten nested profile fields so the client can read them directly
+      const flatMembers = (members || []).map((m: any) => ({
+        ...m,
+        username: m.profiles?.username,
+        full_name: m.profiles?.full_name,
+        avatar_url: m.profiles?.avatar_url,
+        is_verified: m.profiles?.is_verified,
+        is_official: m.profiles?.is_official,
+      }));
+
+      console.log(`✅ Fetched ${flatMembers.length} members for community ${communityId}`);
+      res.json(flatMembers);
     } catch (error) {
       console.error("Get members error:", error);
       res.status(500).json({ error: 'Failed to fetch members' });
