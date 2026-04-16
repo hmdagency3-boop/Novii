@@ -2961,3 +2961,70 @@ export const api = {
     return data.request;
   },
 };
+
+export const accountApi = {
+  async changePassword(currentPassword: string, newPassword: string) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch('/api/account/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-token': token },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to change password');
+    return data;
+  },
+  async changeEmail(newEmail: string, currentPassword: string) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch('/api/account/change-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-token': token },
+      body: JSON.stringify({ newEmail, currentPassword }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to change email');
+    return data;
+  },
+  async deactivate() {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch('/api/account/deactivate', {
+      method: 'POST',
+      headers: { 'x-user-token': token },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to deactivate');
+    return data;
+  },
+  async deleteAccount(password: string, confirmation: string) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch('/api/account/delete', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'x-user-token': token },
+      body: JSON.stringify({ password, confirmation }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to delete account');
+    return data;
+  },
+  async exportData(): Promise<Blob> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch('/api/account/export-data', {
+      headers: { 'x-user-token': token },
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Failed to export');
+    }
+    return await res.blob();
+  },
+};

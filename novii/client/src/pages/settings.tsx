@@ -1942,7 +1942,7 @@ export default function SettingsPage() {
             </div>
             
             <ScrollArea className="flex-1 px-4">
-                <div className="bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/30 rounded-xl p-4 mb-6 mt-2 shadow-sm cursor-pointer hover:bg-primary/20 transition-all duration-300 group">
+                <div onClick={() => { window.location.href = '/accounts-center'; }} className="bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/30 rounded-xl p-4 mb-6 mt-2 shadow-sm cursor-pointer hover:bg-primary/20 transition-all duration-300 group">
                     <div className="flex items-center gap-2 mb-3 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
                         <Monitor className="w-5 h-5 text-primary" />
                         <span className="font-bold text-sm">Novii</span>

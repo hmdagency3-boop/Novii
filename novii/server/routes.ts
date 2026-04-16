@@ -1226,7 +1226,204 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Setup endpoint - Check Supabase & RLS status
+  // ====== ACCOUNTS CENTER ENDPOINTS ======
+
+  // Change password (requires current password verification)
+  app.post("/api/account/change-password", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const { currentPassword, newPassword } = req.body || {};
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Current and new password required' });
+      }
+      if (typeof newPassword !== 'string' || newPassword.length < 8) {
+        return res.status(400).json({ error: 'New password must be at least 8 characters' });
+      }
+      if (currentPassword === newPassword) {
+        return res.status(400).json({ error: 'New password must be different from current password' });
+      }
+
+      if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
+
+      // Get user email
+      const { data: userData, error: userErr } = await adminDb.auth.admin.getUserById(userId);
+      if (userErr || !userData?.user?.email) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      const email = userData.user.email;
+
+      // Verify current password by attempting sign in
+      const supabaseUrl = process.env.SUPABASE_URL!;
+      const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+      const verifier = createClient(supabaseUrl, supabaseAnonKey);
+      const { error: signInErr } = await verifier.auth.signInWithPassword({ email, password: currentPassword });
+      if (signInErr) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+
+      // Update password
+      const { error: updateErr } = await adminDb.auth.admin.updateUserById(userId, { password: newPassword });
+      if (updateErr) {
+        return res.status(500).json({ error: updateErr.message });
+      }
+
+      // Revoke all other sessions for security
+      try {
+        await adminDb.from('user_devices').delete().eq('user_id', userId);
+      } catch {}
+
+      return res.json({ success: true });
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || 'Failed to change password' });
+    }
+  });
+
+  // Change email (sends verification to new email)
+  app.post("/api/account/change-email", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const { newEmail, currentPassword } = req.body || {};
+
+      if (!newEmail || !currentPassword) {
+        return res.status(400).json({ error: 'New email and current password required' });
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newEmail)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+      }
+
+      if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
+
+      const { data: userData, error: userErr } = await adminDb.auth.admin.getUserById(userId);
+      if (userErr || !userData?.user?.email) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Verify current password
+      const supabaseUrl = process.env.SUPABASE_URL!;
+      const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+      const verifier = createClient(supabaseUrl, supabaseAnonKey);
+      const { error: signInErr } = await verifier.auth.signInWithPassword({ email: userData.user.email, password: currentPassword });
+      if (signInErr) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+
+      // Update email (Supabase will send verification automatically if email confirmation is enabled)
+      const { error: updateErr } = await adminDb.auth.admin.updateUserById(userId, { email: newEmail });
+      if (updateErr) {
+        return res.status(500).json({ error: updateErr.message });
+      }
+
+      return res.json({ success: true, message: 'Email updated. Check your inbox for verification.' });
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || 'Failed to change email' });
+    }
+  });
+
+  // Deactivate account (temporary - reversible)
+  app.post("/api/account/deactivate", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
+
+      const { error } = await adminDb
+        .from('profiles')
+        .update({
+          is_deactivated: true,
+          deactivated_at: new Date().toISOString(),
+          is_online: false,
+        })
+        .eq('id', userId);
+
+      if (error) return res.status(500).json({ error: error.message });
+
+      // Sign out all devices
+      try { await adminDb.from('user_devices').delete().eq('user_id', userId); } catch {}
+
+      return res.json({ success: true });
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || 'Failed to deactivate' });
+    }
+  });
+
+  // Permanently delete account
+  app.delete("/api/account/delete", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const { password, confirmation } = req.body || {};
+
+      if (confirmation !== 'DELETE') {
+        return res.status(400).json({ error: 'Type DELETE to confirm' });
+      }
+      if (!password) {
+        return res.status(400).json({ error: 'Password required' });
+      }
+
+      if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
+
+      // Verify password
+      const { data: userData } = await adminDb.auth.admin.getUserById(userId);
+      if (!userData?.user?.email) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      const supabaseUrl = process.env.SUPABASE_URL!;
+      const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+      const verifier = createClient(supabaseUrl, supabaseAnonKey);
+      const { error: signInErr } = await verifier.auth.signInWithPassword({ email: userData.user.email, password });
+      if (signInErr) {
+        return res.status(401).json({ error: 'Password is incorrect' });
+      }
+
+      // Delete auth user — cascade should remove profile via FK
+      const { error: delErr } = await adminDb.auth.admin.deleteUser(userId);
+      if (delErr) return res.status(500).json({ error: delErr.message });
+
+      // Best-effort cleanup
+      try { await adminDb.from('profiles').delete().eq('id', userId); } catch {}
+      try { await adminDb.from('user_devices').delete().eq('user_id', userId); } catch {}
+
+      return res.json({ success: true });
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || 'Failed to delete account' });
+    }
+  });
+
+  // Export user data (GDPR)
+  app.get("/api/account/export-data", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
+
+      const [profile, posts, comments, likes, savedPosts, followers, following] = await Promise.all([
+        adminDb.from('profiles').select('*').eq('id', userId).single(),
+        adminDb.from('posts').select('*').eq('user_id', userId),
+        adminDb.from('comments').select('*').eq('user_id', userId),
+        adminDb.from('post_likes').select('*').eq('user_id', userId),
+        adminDb.from('saved_posts').select('*').eq('user_id', userId),
+        adminDb.from('followers').select('follower_id, created_at').eq('following_id', userId),
+        adminDb.from('followers').select('following_id, created_at').eq('follower_id', userId),
+      ]);
+
+      const exportData = {
+        exported_at: new Date().toISOString(),
+        profile: profile.data || null,
+        posts: posts.data || [],
+        comments: comments.data || [],
+        likes: likes.data || [],
+        saved_posts: savedPosts.data || [],
+        followers: followers.data || [],
+        following: following.data || [],
+      };
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="novii-data-${userId}-${Date.now()}.json"`);
+      return res.send(JSON.stringify(exportData, null, 2));
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || 'Failed to export data' });
+    }
+  });
+
   app.get("/api/setup/status", async (req: Request, res: Response) => {
     try {
       // Test Supabase connectivity

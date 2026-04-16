@@ -28,6 +28,7 @@ import Explore from "@/pages/explore";
 import Search from "@/pages/search";
 import Reels from "@/pages/reels";
 import Settings from "@/pages/settings";
+import AccountsCenter from "@/pages/accounts-center";
 import Messages from "@/pages/messages";
 import Notifications from "@/pages/notifications";
 import AuthPage from "@/pages/auth";
@@ -181,6 +182,11 @@ function Router() {
       <Route path="/settings">
         <ProtectedLayout>
           <Settings />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/accounts-center">
+        <ProtectedLayout>
+          <AccountsCenter />
         </ProtectedLayout>
       </Route>
       <Route path="/messages">
