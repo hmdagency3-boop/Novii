@@ -932,14 +932,11 @@ export default function Messages() {
             const member = members.find((m: any) => m.user_id === newMessage.sender_id);
             const enriched = {
               ...newMessage,
-              sender: member ? {
-                id: member.user_id,
-                username: member.username,
-                full_name: member.full_name,
-                avatar_url: member.avatar_url,
-                is_verified: member.is_verified,
-                is_official: member.is_official,
-              } : newMessage.sender,
+              username: member?.username ?? newMessage.username,
+              full_name: member?.full_name ?? newMessage.full_name,
+              avatar_url: member?.avatar_url ?? newMessage.avatar_url,
+              is_verified: member?.is_verified ?? newMessage.is_verified,
+              is_official: member?.is_official ?? newMessage.is_official,
             };
 
             // Replace any pending optimistic message from same sender with same content
