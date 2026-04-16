@@ -2805,7 +2805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/admin/users — list all users
+  // GET /api/admin/users — list all users (enriched with auth email/phone)
   app.get("/api/admin/users", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
     try {
       const { data: users, error } = await adminDb
@@ -2814,11 +2814,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      const mapped = (users || []).map((u: any) => ({
-        ...u,
-        display_name: u.full_name || u.display_name || u.username || null,
-        ban_reason: u.banned_reason || u.ban_reason || null,
-      }));
+
+      // Fetch auth users (email/phone) — paginate to cover up to 5000 users
+      const authByUserId = new Map<string, { email: string | null; phone: string | null }>();
+      try {
+        const perPage = 1000;
+        for (let page = 1; page <= 5; page++) {
+          const { data: authData, error: authErr } = await adminDb!.auth.admin.listUsers({ page, perPage });
+          if (authErr) { console.warn('listUsers error:', authErr); break; }
+          const list = authData?.users || [];
+          for (const u of list) {
+            authByUserId.set(u.id, { email: u.email || null, phone: (u as any).phone || null });
+          }
+          if (list.length < perPage) break;
+        }
+      } catch (e) {
+        console.warn('Failed to enrich auth users:', e);
+      }
+
+      const mapped = (users || []).map((u: any) => {
+        const auth = authByUserId.get(u.id);
+        return {
+          ...u,
+          display_name: u.full_name || u.display_name || u.username || null,
+          ban_reason: u.banned_reason || u.ban_reason || null,
+          email: auth?.email || u.email || null,
+          phone: auth?.phone || u.phone || null,
+        };
+      });
       res.json(mapped);
     } catch (error) {
       console.error('Admin users error:', error);

@@ -82,13 +82,20 @@ export default function UsersPage() {
   const filtered = useMemo(() => {
     let result = users;
     if (search) {
-      const s = search.toLowerCase();
-      result = result.filter(
-        (u) =>
+      const s = search.toLowerCase().trim();
+      const digits = s.replace(/\D/g, "");
+      result = result.filter((u) => {
+        const phoneDigits = (u.phone || "").replace(/\D/g, "");
+        return (
           u.username?.toLowerCase().includes(s) ||
           u.display_name?.toLowerCase().includes(s) ||
-          u.id.includes(s)
-      );
+          (u as any).full_name?.toLowerCase?.().includes(s) ||
+          (u as any).bio?.toLowerCase?.().includes(s) ||
+          u.email?.toLowerCase().includes(s) ||
+          (digits.length > 0 && phoneDigits.includes(digits)) ||
+          u.id.toLowerCase().includes(s)
+        );
+      });
     }
     if (filter === "verified") result = result.filter((u) => u.is_verified);
     if (filter === "featured") result = result.filter((u) => u.is_featured);
@@ -132,7 +139,7 @@ export default function UsersPage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="بحث..."
+            placeholder="بحث بالاسم، اليوزر، الإيميل، رقم الهاتف، أو المعرّف..."
             className="w-full pr-10 pl-4 py-2 bg-[#efefef] border-none rounded-lg text-[14px] text-[#262626] placeholder-[#8e8e8e] focus:outline-none focus:bg-[#dbdbdb]/60 transition-colors"
             dir="rtl"
           />

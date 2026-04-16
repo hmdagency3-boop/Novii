@@ -318,6 +318,8 @@ export interface UserProfile {
   followers_count: number;
   following_count: number;
   posts_count: number;
+  email?: string | null;
+  phone?: string | null;
 }
 
 export interface AdminRecord {
