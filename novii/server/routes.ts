@@ -1379,7 +1379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Permanently delete account
+  // Soft-delete account: mark for deletion in 30 days, can be cancelled
   app.delete("/api/account/delete", requireAuth as any, async (req: Request, res: Response) => {
     try {
       const userId = req.userId!;
@@ -1407,17 +1407,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Password is incorrect' });
       }
 
-      // Delete auth user — cascade should remove profile via FK
-      const { error: delErr } = await adminDb.auth.admin.deleteUser(userId);
-      if (delErr) return res.status(500).json({ error: delErr.message });
+      // SOFT DELETE: schedule deletion in 30 days, deactivate immediately
+      const now = new Date();
+      const scheduled = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-      // Best-effort cleanup
-      try { await adminDb.from('profiles').delete().eq('id', userId); } catch {}
+      const { error: upErr } = await adminDb
+        .from('profiles')
+        .update({
+          is_deactivated: true,
+          deactivated_at: now.toISOString(),
+          deletion_requested_at: now.toISOString(),
+          scheduled_deletion_at: scheduled.toISOString(),
+          is_online: false,
+        })
+        .eq('id', userId);
+
+      if (upErr) return res.status(500).json({ error: upErr.message });
+
+      // Sign out all other devices
       try { await adminDb.from('user_devices').delete().eq('user_id', userId); } catch {}
+
+      return res.json({
+        success: true,
+        scheduled_deletion_at: scheduled.toISOString(),
+        days_remaining: 30,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || 'Failed to delete account' });
+    }
+  });
+
+  // Cancel a pending account deletion (within 30-day grace period)
+  app.post("/api/account/cancel-deletion", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
+
+      const { data: profile } = await adminDb
+        .from('profiles')
+        .select('scheduled_deletion_at, deletion_requested_at, is_deactivated')
+        .eq('id', userId)
+        .single();
+
+      if (!profile?.scheduled_deletion_at) {
+        return res.status(400).json({ error: 'No pending deletion to cancel' });
+      }
+
+      // Grace period guard: cannot cancel after the scheduled time
+      if (new Date(profile.scheduled_deletion_at).getTime() <= Date.now()) {
+        return res.status(410).json({ error: 'Grace period has expired' });
+      }
+
+      const { error } = await adminDb
+        .from('profiles')
+        .update({
+          is_deactivated: false,
+          deactivated_at: null,
+          deletion_requested_at: null,
+          scheduled_deletion_at: null,
+        })
+        .eq('id', userId);
+
+      if (error) return res.status(500).json({ error: error.message });
 
       return res.json({ success: true });
     } catch (e: any) {
-      return res.status(500).json({ error: e?.message || 'Failed to delete account' });
+      return res.status(500).json({ error: e?.message || 'Failed to cancel deletion' });
+    }
+  });
+
+  // Account lifecycle status
+  app.get("/api/account/status", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
+
+      const { data: profile, error } = await adminDb
+        .from('profiles')
+        .select('is_deactivated, deactivated_at, deletion_requested_at, scheduled_deletion_at')
+        .eq('id', userId)
+        .single();
+
+      if (error) return res.status(500).json({ error: error.message });
+
+      const scheduled = profile?.scheduled_deletion_at ? new Date(profile.scheduled_deletion_at) : null;
+      const daysRemaining = scheduled ? Math.max(0, Math.ceil((scheduled.getTime() - Date.now()) / (24 * 60 * 60 * 1000))) : 0;
+
+      return res.json({
+        is_deactivated: !!profile?.is_deactivated,
+        deactivated_at: profile?.deactivated_at || null,
+        deletion_requested_at: profile?.deletion_requested_at || null,
+        scheduled_deletion_at: profile?.scheduled_deletion_at || null,
+        days_remaining: daysRemaining,
+        pending_deletion: !!scheduled && scheduled.getTime() > Date.now(),
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || 'Failed to get status' });
+    }
+  });
+
+  // Reactivate (clears is_deactivated even when no pending deletion)
+  app.post("/api/account/reactivate", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      if (!adminDb) return res.status(500).json({ error: 'Server not configured' });
+
+      const { error } = await adminDb
+        .from('profiles')
+        .update({
+          is_deactivated: false,
+          deactivated_at: null,
+          deletion_requested_at: null,
+          scheduled_deletion_at: null,
+        })
+        .eq('id', userId);
+
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ success: true });
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || 'Failed to reactivate' });
     }
   });
 

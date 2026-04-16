@@ -865,8 +865,18 @@ function OwnershipSection({ user, isRTL, signOut }: { user: any; isRTL: boolean;
   const [showDelete, setShowDelete] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [deletePw, setDeletePw] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
+
+  const { data: status, refetch: refetchStatus } = useQuery({
+    queryKey: ["account-status", user?.id],
+    queryFn: async () => await accountApi.getStatus(),
+    enabled: !!user?.id,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  });
 
   const handleDeactivate = async () => {
     setDeactivating(true);
@@ -891,12 +901,30 @@ function OwnershipSection({ user, isRTL, signOut }: { user: any; isRTL: boolean;
     }
     setDeleting(true);
     try {
-      await accountApi.deleteAccount(deletePw, deleteConfirm);
-      toast({ title: isRTL ? "✅ تم حذف الحساب" : "✅ Account Deleted" });
-      setTimeout(() => signOut(), 1500);
+      const result = await accountApi.deleteAccount(deletePw, deleteConfirm);
+      toast({
+        title: isRTL ? "🕒 تم جدولة الحذف" : "🕒 Deletion Scheduled",
+        description: isRTL
+          ? `سيتم حذف الحساب نهائياً بعد ${result.days_remaining} يوم. يمكنك التراجع بتسجيل الدخول مرة أخرى خلال هذه الفترة.`
+          : `Your account will be permanently deleted in ${result.days_remaining} days. You can cancel by signing in again before then.`,
+      });
+      setTimeout(() => signOut(), 2500);
     } catch (e: any) {
       toast({ variant: "destructive", title: isRTL ? "❌ خطأ" : "❌ Error", description: e.message });
       setDeleting(false);
+    }
+  };
+
+  const handleCancelDeletion = async () => {
+    setCancelling(true);
+    try {
+      await accountApi.cancelDeletion();
+      toast({ title: isRTL ? "✅ تم إلغاء الحذف" : "✅ Deletion Cancelled", description: isRTL ? "حسابك آمن الآن" : "Your account is safe now" });
+      await refetchStatus();
+    } catch (e: any) {
+      toast({ variant: "destructive", title: isRTL ? "❌ خطأ" : "❌ Error", description: e.message });
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -908,6 +936,42 @@ function OwnershipSection({ user, isRTL, signOut }: { user: any; isRTL: boolean;
       </p>
 
       <div className="space-y-4">
+        {/* Pending Deletion Banner */}
+        {status?.pending_deletion && (
+          <div className="border-2 border-red-500/50 rounded-2xl p-6 bg-red-500/10 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-red-500/30 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-lg mb-1 text-red-700 dark:text-red-400">
+                  {isRTL ? "حسابك مجدول للحذف" : "Your account is scheduled for deletion"}
+                </h3>
+                <p className="text-sm text-foreground/80 mb-1">
+                  {isRTL
+                    ? `سيتم الحذف النهائي خلال ${status.days_remaining} ${status.days_remaining === 1 ? 'يوم' : 'يوم'}`
+                    : `Permanent deletion in ${status.days_remaining} day${status.days_remaining === 1 ? '' : 's'}`}
+                </p>
+                {status.scheduled_deletion_at && (
+                  <p className="text-xs text-muted-foreground mb-4">
+                    {isRTL ? "تاريخ الحذف:" : "Deletion date:"}{" "}
+                    {new Date(status.scheduled_deletion_at).toLocaleDateString(isRTL ? 'ar' : 'en', { dateStyle: 'long' })}
+                  </p>
+                )}
+                <Button
+                  onClick={handleCancelDeletion}
+                  disabled={cancelling}
+                  className="bg-red-500 hover:bg-red-600 text-white"
+                >
+                  {cancelling
+                    ? <><Spinner className="w-4 h-4 mr-2" />{isRTL ? "جاري الإلغاء..." : "Cancelling..."}</>
+                    : (isRTL ? "إلغاء الحذف واستعادة الحساب" : "Cancel deletion & restore account")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Deactivate */}
         <div className="border border-yellow-500/30 rounded-2xl p-6 bg-yellow-500/5">
           <div className="flex items-start gap-4">
@@ -963,12 +1027,17 @@ function OwnershipSection({ user, isRTL, signOut }: { user: any; isRTL: boolean;
               <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-lg mb-1 text-red-700 dark:text-red-400">{isRTL ? "حذف الحساب نهائياً" : "Delete Account Permanently"}</h3>
-              <p className="text-sm text-muted-foreground mb-4">
+              <h3 className="font-bold text-lg mb-1 text-red-700 dark:text-red-400">{isRTL ? "حذف الحساب" : "Delete Account"}</h3>
+              <p className="text-sm text-muted-foreground mb-2">
                 {isRTL
-                  ? "⚠️ سيتم حذف ملفك الشخصي ومنشوراتك وتعليقاتك ومتابعينك بشكل نهائي. لا يمكن استرجاع الحساب بعد الحذف"
-                  : "⚠️ Your profile, posts, comments, and followers will be permanently deleted. This cannot be undone."}
+                  ? "⏳ هتكون عندك مهلة 30 يوم تقدر فيها تتراجع وترجع لحسابك. خلال المهلة دي:"
+                  : "⏳ You'll have a 30-day grace period to change your mind. During this period:"}
               </p>
+              <ul className="text-sm text-muted-foreground mb-4 space-y-1 list-disc ms-5">
+                <li>{isRTL ? "حسابك هيختفي من الناس فوراً" : "Your account is hidden from everyone immediately"}</li>
+                <li>{isRTL ? "تقدر ترجعه بأي وقت بتسجيل الدخول وإلغاء الحذف" : "You can restore it anytime by signing back in and cancelling"}</li>
+                <li>{isRTL ? "بعد 30 يوم بيتم حذف كل بياناتك (المنشورات، التعليقات، المتابعين) نهائياً ولا يمكن استرجاعها" : "After 30 days, all your data (posts, comments, followers) is permanently deleted and cannot be recovered"}</li>
+              </ul>
 
               {!showDelete ? (
                 <Button variant="outline" onClick={() => setShowDelete(true)} className="border-red-500/50 text-red-700 dark:text-red-400 hover:bg-red-500/10">

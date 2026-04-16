@@ -352,6 +352,12 @@ export const api = {
       .single();
 
     if (error) throw error;
+    if (!data) return null;
+    // Hide deactivated/pending-deletion accounts from anyone but the owner
+    if ((data as any).is_deactivated) {
+      const me = await getCurrentUser();
+      if (!me || me.id !== (data as any).id) return null;
+    }
     return data;
   },
 
@@ -2300,6 +2306,10 @@ export const api = {
     if (!profile) return null;
 
     const currentUser = await getCurrentUser();
+    // Hide deactivated/pending-deletion accounts from anyone but the owner
+    if ((profile as any).is_deactivated && (!currentUser || currentUser.id !== profile.id)) {
+      return null;
+    }
 
     // Calculate correct counts from follows table
     const { count: followersCount } = await supabase
@@ -3217,6 +3227,46 @@ export const accountApi = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to delete account');
+    return data as { success: boolean; scheduled_deletion_at: string; days_remaining: number };
+  },
+  async getStatus() {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch('/api/account/status', { headers: { 'x-user-token': token } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch status');
+    return data as {
+      is_deactivated: boolean;
+      deactivated_at: string | null;
+      deletion_requested_at: string | null;
+      scheduled_deletion_at: string | null;
+      days_remaining: number;
+      pending_deletion: boolean;
+    };
+  },
+  async cancelDeletion() {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch('/api/account/cancel-deletion', {
+      method: 'POST',
+      headers: { 'x-user-token': token },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to cancel deletion');
+    return data;
+  },
+  async reactivate() {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch('/api/account/reactivate', {
+      method: 'POST',
+      headers: { 'x-user-token': token },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to reactivate');
     return data;
   },
   async exportData(): Promise<Blob> {
