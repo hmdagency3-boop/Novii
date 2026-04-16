@@ -71,7 +71,7 @@ export default function SuggestionsSidebar() {
 
   const followingIds = getUserFollowingIds();
 
-  const visibleSuggestions = suggestions.filter((u: any) => !dismissedLocally.has(u.id));
+  const visibleSuggestions = suggestions.filter((u: any) => !dismissedLocally.has(u.id) && !followingIds.has(u.id));
   const displaySuggestions = visibleSuggestions.slice(0, 5);
   const allSuggestions = visibleSuggestions;
 

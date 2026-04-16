@@ -1116,7 +1116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const results = scored.slice(0, maxResults).map(s => ({
+      const results = scored.filter(s => !followingIds.has(s.profile.id)).slice(0, maxResults).map(s => ({
         id: s.profile.id,
         username: s.profile.username,
         full_name: s.profile.full_name,
