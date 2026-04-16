@@ -212,7 +212,6 @@ const settingsMenuStructure: MenuSection[] = [
       { id: "edit_profile", labelKey: "edit_profile", icon: User },
       { id: "notifications", labelKey: "notifications", icon: Bell },
       { id: "time_spent", labelKey: "time_spent", icon: History },
-      { id: "mentions", labelKey: "mentions", icon: AtSign, isLink: true, href: "/mentions" },
     ]
   },
   {
