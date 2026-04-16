@@ -869,18 +869,46 @@ export default function Messages() {
     enabled: !!selectedUserId && !!currentUser,
   });
 
-  // Send message mutation
+  // Send message mutation (with optimistic update so the sender's bubble shows instantly)
   const sendMessageMutation = useMutation({
     mutationFn: async ({ receiverId, content, imageUrl, replyToId, audioUrl }: { receiverId: string; content: string; imageUrl?: string; replyToId?: string; audioUrl?: string }) =>
       api.sendMessage(receiverId, content, imageUrl, replyToId, audioUrl),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['messages', selectedUserId] });
-      queryClient.invalidateQueries({ queryKey: ['conversations', currentUser?.id] });
+    onMutate: async ({ receiverId, content, imageUrl, replyToId, audioUrl }) => {
+      const queryKey = ['messages', receiverId];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<any[]>(queryKey) || [];
+      const meta: any = (currentUser as any)?.user_metadata || {};
+      const optimistic: any = {
+        id: `temp-${Date.now()}`,
+        sender_id: currentUser?.id,
+        receiver_id: receiverId,
+        content,
+        image_url: imageUrl || null,
+        audio_url: audioUrl || null,
+        reply_to_id: replyToId || null,
+        created_at: new Date().toISOString(),
+        is_read: false,
+        is_deleted: false,
+        username: meta.username || meta.user_name || 'You',
+        full_name: meta.full_name || null,
+        avatar_url: meta.avatar_url || null,
+        _optimistic: true,
+      };
+      queryClient.setQueryData(queryKey, [...previous, optimistic]);
       setMessageInput("");
       setSelectedImage(null);
       setPreviewUrl(null);
       setReplyingTo(null);
       setShowEmojiPicker(false);
+      return { previous, queryKey };
+    },
+    onError: (err: any, _vars, ctx) => {
+      if (ctx?.queryKey) queryClient.setQueryData(ctx.queryKey, ctx.previous);
+      toast.error(err?.message || (isRTL ? 'فشل إرسال الرسالة' : 'Failed to send message'));
+    },
+    onSettled: (_data, _err, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['messages', vars.receiverId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', currentUser?.id] });
     },
   });
 
