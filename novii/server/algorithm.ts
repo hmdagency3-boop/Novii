@@ -107,6 +107,17 @@ export function clearConfigCache() {
   cacheTime = 0;
 }
 
+function createRequestJitter(magnitude: number = 0.06): (postId: string) => number {
+  const requestSeed = Date.now() ^ (Math.random() * 0xFFFFFFFF >>> 0);
+  return (postId: string) => {
+    const idSum = postId.split("").reduce((a: number, c: string) => a + c.charCodeAt(0), 0);
+    const hash = (requestSeed * 31 + idSum * 2654435761) >>> 0;
+    const x = Math.sin(hash) * 10000;
+    const norm = x - Math.floor(x);
+    return (norm * 2 - 1) * magnitude;
+  };
+}
+
 const POST_SELECT = `
   id, user_id, caption, image_url, location,
   likes_count, comments_count, views_count,
@@ -301,6 +312,8 @@ export async function getPersonalizedFeed(
 
   if (error || !posts) return [];
 
+  const getJitter = createRequestJitter(0.04);
+
   const scored: ScoredPost[] = posts.map((post: any) => {
     const reasons: string[] = [];
 
@@ -335,12 +348,7 @@ export async function getPersonalizedFeed(
     }
     boostScore = Math.min(boostScore, 1);
 
-    const idSum = post.id
-      .split("")
-      .reduce((a: number, c: string) => a + c.charCodeAt(0), 0);
-    const sessionSeed = Math.floor(Date.now() / 3600000);
-    const jitter =
-      (((sessionSeed * 31 + idSum * 17) % 100) / 100) * 0.05;
+    const jitter = getJitter(post.id);
 
     const finalScore =
       authorScore * config.feed_weight_author +
@@ -426,6 +434,8 @@ export async function getPersonalizedExplore(
 
   console.log(`🔍 Explore: fetched ${posts.length} posts, showing ${ownPosts.length} (excluded own)`);
 
+  const getExploreJitter = createRequestJitter(0.06);
+
   const scored: ScoredPost[] = ownPosts.map((post: any) => {
     const reasons: string[] = [];
 
@@ -453,10 +463,7 @@ export async function getPersonalizedExplore(
     }
     qualityScore = Math.min(qualityScore, 1);
 
-    const idSum = post.id
-      .split("")
-      .reduce((a: number, c: string) => a + c.charCodeAt(0), 0);
-    const jitter = ((idSum * 13) % 100) / 100 * 0.08;
+    const jitter = getExploreJitter(post.id);
 
     const finalScore =
       interestScore * config.explore_weight_interest +
@@ -539,6 +546,8 @@ export async function getPersonalizedExploreReels(
 
   const allReels = reels.filter((r: any) => r.user_id !== userId);
 
+  const getReelsJitter = createRequestJitter(0.06);
+
   const scored = allReels.map((reel: any) => {
     const interestScore = calculateInterestScore(profile, reel.caption);
     const engagementScore = calculateEngagementScore(reel);
@@ -550,11 +559,14 @@ export async function getPersonalizedExploreReels(
     if (reel.profile?.is_featured) boostScore += 0.2;
     boostScore = Math.min(boostScore, 1);
 
+    const jitter = getReelsJitter(reel.id);
+
     const finalScore =
       interestScore * config.reels_weight_interest +
       engagementScore * config.reels_weight_engagement +
       recencyScore * config.reels_weight_recency +
-      boostScore * 0.15;
+      boostScore * 0.15 +
+      jitter;
 
     return { ...reel, _score: finalScore };
   });
