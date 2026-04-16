@@ -55,11 +55,21 @@ export default function AccountsCenter() {
   const [, setLocation] = useLocation();
   const [activeSection, setActiveSection] = useState<SectionId>(null);
 
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const { data: profile, isLoading: profileLoading, refetch: refetchProfile } = useQuery({
     queryKey: ["my-profile-center", user?.id],
     queryFn: async () => (user?.id ? await api.getProfileById(user.id) : null),
     enabled: !!user?.id,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
+
+  // Refetch profile whenever user opens any section (so new external edits show up)
+  useEffect(() => {
+    if (activeSection) {
+      refetchProfile();
+    }
+  }, [activeSection, refetchProfile]);
 
   const sections = [
     {
