@@ -208,8 +208,7 @@ export default function Home() {
                 .sort((a, b) => {
                   const aFav = favoriteIds.has(a.user_id) ? 1 : 0;
                   const bFav = favoriteIds.has(b.user_id) ? 1 : 0;
-                  if (aFav !== bFav) return bFav - aFav;
-                  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                  return bFav - aFav;
                 })
                 .map(post => (
                   <PostCard key={post.id} post={post} />
