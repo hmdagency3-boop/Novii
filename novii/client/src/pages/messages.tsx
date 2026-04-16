@@ -42,7 +42,11 @@ import {
   Clock,
   Trash2,
   RotateCcw,
-  X
+  X,
+  Pin,
+  PinOff,
+  BellOff,
+  Bell
 } from "lucide-react";
 import { useState, useRef, useEffect, memo, forwardRef, useImperativeHandle } from "react";
 import { cn } from "@/lib/utils";
@@ -3596,15 +3600,15 @@ export default function Messages() {
       {chatMenu && (() => {
         const isPinned = pinnedConvIds.has(chatMenu.userId);
         const isMuted = mutedConvIds.has(chatMenu.userId);
-        const menuWidth = 280;
-        const menuHeight = 120;
-        const padding = 12;
+        const menuWidth = 300;
+        const menuHeight = 132;
+        const padding = 16;
         const vw = typeof window !== 'undefined' ? window.innerWidth : 360;
         const vh = typeof window !== 'undefined' ? window.innerHeight : 640;
         let left = chatMenu.x - menuWidth / 2;
         left = Math.min(Math.max(padding, left), vw - menuWidth - padding);
-        let top = chatMenu.y + 12;
-        if (top + menuHeight + padding > vh) top = chatMenu.y - menuHeight - 12;
+        let top = chatMenu.y + 14;
+        if (top + menuHeight + padding > vh) top = chatMenu.y - menuHeight - 14;
         top = Math.max(padding, top);
         return (
           <div
@@ -3615,34 +3619,38 @@ export default function Messages() {
             <div
               role="menu"
               onClick={(e) => e.stopPropagation()}
-              className="absolute rounded-2xl overflow-hidden border border-white/10 shadow-2xl animate-in zoom-in-95 fade-in duration-150"
+              className="absolute rounded-[26px] overflow-hidden animate-in zoom-in-95 fade-in duration-150"
               style={{
                 left,
                 top,
                 width: menuWidth,
-                background: 'rgba(40,40,48,0.75)',
-                backdropFilter: 'saturate(180%) blur(30px)',
-                WebkitBackdropFilter: 'saturate(180%) blur(30px)',
+                background: 'rgba(50,50,55,0.45)',
+                backdropFilter: 'saturate(180%) blur(50px)',
+                WebkitBackdropFilter: 'saturate(180%) blur(50px)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.45), inset 0 0 0 0.5px rgba(255,255,255,0.18)',
               }}
             >
               {/* Pin */}
               <button
                 className={cn(
-                  "w-full flex items-center gap-3 px-5 py-4 text-[16px] text-white hover:bg-white/5 active:bg-white/10 transition-colors",
+                  "w-full flex items-center gap-4 px-5 py-[14px] text-[17px] text-white active:bg-white/10 transition-colors",
                   isRTL && "flex-row-reverse text-right"
                 )}
                 onClick={() => { togglePinConv(chatMenu.userId); setChatMenu(null); }}
               >
-                <span className="text-[20px] leading-none w-6 text-center">{isPinned ? '📍' : '📌'}</span>
-                <span className="flex-1 font-medium">{isPinned ? (isRTL ? 'إلغاء التثبيت' : 'Unpin chat') : (isRTL ? 'تثبيت المحادثة' : 'Pin chat')}</span>
+                {isPinned
+                  ? <PinOff className="w-[22px] h-[22px] text-white shrink-0" strokeWidth={2} />
+                  : <Pin className="w-[22px] h-[22px] text-white shrink-0" strokeWidth={2} />}
+                <span className="flex-1 font-normal">{isPinned ? (isRTL ? 'إلغاء التثبيت' : 'Unpin chat') : (isRTL ? 'تثبيت المحادثة' : 'Pin chat')}</span>
               </button>
 
-              <div className="h-px bg-white/10 mx-3" />
+              <div className="h-[0.5px] bg-white/15" />
 
               {/* Mute */}
               <button
                 className={cn(
-                  "w-full flex items-center gap-3 px-5 py-4 text-[16px] text-white hover:bg-white/5 active:bg-white/10 transition-colors",
+                  "w-full flex items-center gap-4 px-5 py-[14px] text-[17px] active:bg-white/10 transition-colors",
+                  isMuted ? "text-white" : "text-[#ff5f5f]",
                   isRTL && "flex-row-reverse text-right"
                 )}
                 onClick={() => {
@@ -3657,9 +3665,9 @@ export default function Messages() {
                 }}
               >
                 {isMuted
-                  ? <Volume2 className="w-5 h-5 text-white" />
-                  : <VolumeX className="w-5 h-5 text-white" />}
-                <span className="flex-1 font-medium">{isMuted ? (isRTL ? 'إلغاء الكتم' : 'Unmute') : (isRTL ? 'كتم الإشعارات' : 'Mute notifications')}</span>
+                  ? <Bell className="w-[22px] h-[22px] shrink-0" strokeWidth={2} />
+                  : <BellOff className="w-[22px] h-[22px] shrink-0" strokeWidth={2} />}
+                <span className="flex-1 font-normal">{isMuted ? (isRTL ? 'إلغاء الكتم' : 'Unmute') : (isRTL ? 'كتم الإشعارات' : 'Mute notifications')}</span>
               </button>
             </div>
           </div>
