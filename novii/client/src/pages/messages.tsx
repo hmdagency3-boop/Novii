@@ -2070,12 +2070,17 @@ export default function Messages() {
                             {isVerified && <VerifiedBadge size="sm" />}
                             {isOfficial && <OfficialBadge size="sm" />}
                           </div>
-                          <span className={cn(
-                            "text-[11px] flex-shrink-0",
-                            hasUnread ? "text-primary font-medium" : "text-muted-foreground"
-                          )}>
-                            {formatConvTime(conv.lastMessage?.created_at, isRTL)}
-                          </span>
+                          <div className={cn("flex items-center gap-1.5 flex-shrink-0", isRTL && "flex-row-reverse")}>
+                            {isPinned && (
+                              <Pin className="w-3.5 h-3.5 text-muted-foreground rotate-45" strokeWidth={2.5} fill="currentColor" />
+                            )}
+                            <span className={cn(
+                              "text-[11px]",
+                              hasUnread ? "text-primary font-medium" : "text-muted-foreground"
+                            )}>
+                              {formatConvTime(conv.lastMessage?.created_at, isRTL)}
+                            </span>
+                          </div>
                         </div>
                         
                         {/* Message preview + unread badge row */}
