@@ -227,7 +227,6 @@ const settingsMenuStructure: MenuSection[] = [
     sectionKey: "how_others_interact",
     items: [
       { id: "messages", labelKey: "messages_replies", icon: MessageCircle },
-      { id: "tags", labelKey: "tags", icon: AtSign },
       { id: "comments", labelKey: "comments", icon: MessageCircle },
       { id: "sharing", labelKey: "sharing", icon: Share2 },
       { id: "restricted", labelKey: "restricted", icon: ShieldAlert },
