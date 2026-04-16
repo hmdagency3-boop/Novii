@@ -10,8 +10,11 @@ import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
-import { api, accountApi } from "@/lib/api";
+import { api, accountApi, type UserDevice } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
+import { useUserDevices, useRemoveDevice, useTrustDevice, useRevokeAllDevices } from "@/hooks/use-data";
+import { useSettings } from "@/lib/settings-context";
+import { Switch as ToggleSwitch } from "@/components/ui/switch";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import {
@@ -34,6 +37,11 @@ import {
   Smartphone,
   ChevronRight,
   Monitor,
+  Laptop,
+  Globe,
+  Clock,
+  Activity,
+  X,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -523,20 +531,189 @@ function SecuritySection({ user, isRTL }: { user: any; isRTL: boolean }) {
         </div>
       )}
 
-      {tab === "devices" && (
-        <div className="text-center py-12">
-          <Smartphone className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-          <h3 className="font-bold text-lg mb-2">{isRTL ? "إدارة الأجهزة المتصلة" : "Manage Connected Devices"}</h3>
-          <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-            {isRTL ? "اعرض وسجّل خروج من الأجهزة المختلفة المسجل عليها حسابك" : "View and sign out of devices where your account is logged in"}
+      {tab === "devices" && <DevicesPanel user={user} isRTL={isRTL} />}
+    </div>
+  );
+}
+
+// ============ DEVICES PANEL ============
+function DevicesPanel({ user, isRTL }: { user: any; isRTL: boolean }) {
+  const { toast } = useToast();
+  const { data: devices, isLoading } = useUserDevices(user?.id);
+  const removeDevice = useRemoveDevice();
+  const trustDevice = useTrustDevice();
+  const revokeAll = useRevokeAllDevices();
+
+  const currentSessionToken = (() => {
+    try { return sessionStorage.getItem('novii_device_session'); } catch { return null; }
+  })();
+  const isCurrentDevice = (d: UserDevice) =>
+    !!currentSessionToken && d.session_token === currentSessionToken;
+
+  const handleRemove = async (id: string) => {
+    try {
+      await removeDevice.mutateAsync(id);
+      toast({ title: isRTL ? "✅ تم الإزالة" : "✅ Removed", description: isRTL ? "تم إزالة الجهاز" : "Device removed" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: isRTL ? "❌ خطأ" : "❌ Error", description: e?.message });
+    }
+  };
+
+  const handleTrust = async (d: UserDevice) => {
+    try {
+      await trustDevice.mutateAsync({ deviceId: d.id, trusted: !d.is_trusted });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: isRTL ? "❌ خطأ" : "❌ Error", description: e?.message });
+    }
+  };
+
+  const handleRevokeAll = async () => {
+    if (!user?.id) return;
+    const current = devices?.find(d => isCurrentDevice(d));
+    try {
+      await revokeAll.mutateAsync({ userId: user.id, exceptDeviceId: current?.id });
+      toast({ title: isRTL ? "✅ تم تسجيل الخروج" : "✅ Signed out", description: isRTL ? "من جميع الأجهزة الأخرى" : "From all other devices" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: isRTL ? "❌ خطأ" : "❌ Error", description: e?.message });
+    }
+  };
+
+  if (isLoading) {
+    return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;
+  }
+
+  const current = devices?.find(d => isCurrentDevice(d));
+  const others = devices?.filter(d => !isCurrentDevice(d)) || [];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {isRTL ? `الأجهزة النشطة (${devices?.length || 0}/10)` : `Active devices (${devices?.length || 0}/10)`}
+        </p>
+        {others.length > 0 && (
+          <button
+            onClick={handleRevokeAll}
+            disabled={revokeAll.isPending}
+            className="text-xs font-bold text-red-500 hover:text-red-600 disabled:opacity-50"
+          >
+            {isRTL ? "تسجيل خروج الكل" : "Log out all"}
+          </button>
+        )}
+      </div>
+
+      {current && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            {isRTL ? "هذا الجهاز" : "This Device"}
           </p>
-          <Link href="/settings">
-            <Button className="bg-primary hover:bg-primary/90 text-white">
-              {isRTL ? "فتح الأجهزة المتصلة" : "Open Connected Devices"}
-            </Button>
-          </Link>
+          <DeviceRow device={current} isCurrent isRTL={isRTL} onRemove={handleRemove} onTrust={handleTrust} busy={removeDevice.isPending || trustDevice.isPending} />
         </div>
       )}
+
+      {others.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            {isRTL ? "أجهزة أخرى" : "Other Devices"}
+          </p>
+          <div className="space-y-3">
+            {others.map(d => (
+              <DeviceRow key={d.id} device={d} isCurrent={false} isRTL={isRTL} onRemove={handleRemove} onTrust={handleTrust} busy={removeDevice.isPending || trustDevice.isPending} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(!devices || devices.length === 0) && (
+        <div className="text-center py-12 border border-border rounded-2xl bg-card/50">
+          <Smartphone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+          <p className="text-sm text-muted-foreground">{isRTL ? "لا توجد أجهزة متصلة" : "No devices connected"}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeviceRow({ device, isCurrent, isRTL, onRemove, onTrust, busy }: {
+  device: UserDevice; isCurrent: boolean; isRTL: boolean;
+  onRemove: (id: string) => void; onTrust: (d: UserDevice) => void; busy: boolean;
+}) {
+  const Icon = device.device_type === 'mobile' || device.device_type === 'tablet' ? Smartphone : Monitor;
+  const last = (() => {
+    const diff = Math.floor((Date.now() - new Date(device.last_active_at).getTime()) / 60000);
+    if (isRTL) {
+      if (diff < 1) return "الآن";
+      if (diff < 60) return `منذ ${diff} د`;
+      if (diff < 1440) return `منذ ${Math.floor(diff / 60)} س`;
+      return `منذ ${Math.floor(diff / 1440)} يوم`;
+    }
+    if (diff < 1) return "Just now";
+    if (diff < 60) return `${diff}m ago`;
+    if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+    return `${Math.floor(diff / 1440)}d ago`;
+  })();
+
+  return (
+    <div className={cn(
+      "border rounded-xl p-4 bg-card transition-colors",
+      isCurrent ? "border-primary/40 bg-primary/5" : "border-border",
+      device.is_trusted && !isCurrent && "border-green-500/30"
+    )}>
+      <div className="flex items-start gap-3">
+        <div className={cn("p-2.5 rounded-lg shrink-0", isCurrent ? "bg-primary/15" : "bg-muted")}>
+          <Icon className={cn("w-5 h-5", isCurrent ? "text-primary" : "text-muted-foreground")} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <h4 className="font-bold text-sm truncate">{device.device_name}</h4>
+            {isCurrent && (
+              <span className="text-[9px] font-bold bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
+                {isRTL ? "هذا الجهاز" : "THIS DEVICE"}
+              </span>
+            )}
+            {device.is_trusted && (
+              <span className="text-[9px] font-bold bg-green-500/15 text-green-600 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                <Shield className="w-2.5 h-2.5" />
+                {isRTL ? "موثوق" : "TRUSTED"}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1 truncate"><Globe className="w-3 h-3 shrink-0" />{device.browser}</span>
+            <span className="flex items-center gap-1 truncate"><Laptop className="w-3 h-3 shrink-0" />{device.os_name}</span>
+            <span className="flex items-center gap-1 truncate"><Activity className="w-3 h-3 shrink-0" />{device.city || '—'}, {device.country || '—'}</span>
+            <span className="flex items-center gap-1 truncate"><Clock className="w-3 h-3 shrink-0" />{last}</span>
+          </div>
+          {device.login_count > 1 && (
+            <span className="inline-block mt-2 text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+              {isRTL ? `${device.login_count} تسجيل دخول` : `${device.login_count} logins`}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-col gap-1.5 shrink-0">
+          <button
+            onClick={() => onTrust(device)}
+            disabled={busy}
+            title={isRTL ? (device.is_trusted ? "إلغاء الثقة" : "موثوق") : (device.is_trusted ? "Untrust" : "Trust")}
+            className={cn(
+              "p-1.5 rounded-md transition-colors disabled:opacity-50",
+              device.is_trusted ? "bg-green-500/10 text-green-600 hover:bg-green-500/20" : "bg-muted text-muted-foreground hover:bg-muted/70"
+            )}
+          >
+            <Shield className="w-3.5 h-3.5" />
+          </button>
+          {!isCurrent && (
+            <button
+              onClick={() => onRemove(device.id)}
+              disabled={busy}
+              title={isRTL ? "إزالة" : "Remove"}
+              className="bg-red-500/10 text-red-600 hover:bg-red-500/20 p-1.5 rounded-md transition-colors disabled:opacity-50"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -544,7 +721,39 @@ function SecuritySection({ user, isRTL }: { user: any; isRTL: boolean }) {
 // ============ DATA & PERMISSIONS ============
 function DataSection({ isRTL }: { isRTL: boolean }) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [downloading, setDownloading] = useState(false);
+  const { settings, updateSettings } = useSettings();
+
+  const { data: privacyProfile } = useQuery({
+    queryKey: ["my-profile-privacy", user?.id],
+    queryFn: async () => (user?.id ? await api.getProfile(user.id) : null),
+    enabled: !!user?.id,
+  });
+
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+
+  useEffect(() => {
+    if (privacyProfile) setIsPrivate(!!privacyProfile.is_private);
+  }, [privacyProfile]);
+
+  const togglePrivate = async (checked: boolean) => {
+    setIsPrivate(checked);
+    setSavingPrivacy(true);
+    try {
+      const { error } = await supabase.from("profiles").update({ is_private: checked }).eq("id", user!.id);
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["my-profile-privacy"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-profile-center"] });
+      toast({ title: isRTL ? "✅ تم الحفظ" : "✅ Saved" });
+    } catch (e: any) {
+      setIsPrivate(!checked);
+      toast({ variant: "destructive", title: isRTL ? "❌ خطأ" : "❌ Error", description: e.message });
+    }
+    setSavingPrivacy(false);
+  };
 
   const handleDownload = async () => {
     setDownloading(true);
@@ -594,22 +803,46 @@ function DataSection({ isRTL }: { isRTL: boolean }) {
           </div>
         </div>
 
-        <Link href="/settings">
-          <div className="border border-border rounded-2xl p-6 bg-card hover:border-primary/50 transition-colors cursor-pointer">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
-                <Lock className="w-6 h-6 text-violet-500" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-lg mb-1">{isRTL ? "خصوصية الحساب" : "Account Privacy"}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {isRTL ? "إدارة من يقدر يشوف محتواك ومن يقدر يتفاعل معاك" : "Manage who can see your content and interact with you"}
-                </p>
-              </div>
-              <ChevronRight className={cn("w-5 h-5 text-muted-foreground/50 self-center", isRTL && "rotate-180")} />
+        <div className="border border-border rounded-2xl p-6 bg-card">
+          <div className="flex items-start gap-4 mb-5">
+            <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
+              <Lock className="w-6 h-6 text-violet-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-lg mb-1">{isRTL ? "خصوصية الحساب" : "Account Privacy"}</h3>
+              <p className="text-sm text-muted-foreground">
+                {isRTL ? "إدارة من يقدر يشوف محتواك ومن يقدر يتفاعل معاك" : "Manage who can see your content and interact with you"}
+              </p>
             </div>
           </div>
-        </Link>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-border bg-background/50">
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-sm mb-0.5">{isRTL ? "حساب خاص" : "Private Account"}</h4>
+                <p className="text-xs text-muted-foreground">
+                  {isRTL ? "فقط المتابعون المقبولون يقدروا يشوفوا منشوراتك" : "Only approved followers can see your posts"}
+                </p>
+              </div>
+              <ToggleSwitch checked={isPrivate} onCheckedChange={togglePrivate} disabled={savingPrivacy} />
+            </div>
+
+            {settings && updateSettings && (
+              <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-border bg-background/50">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-sm mb-0.5">{isRTL ? "إخفاء حالة الاتصال" : "Hide Online Status"}</h4>
+                  <p className="text-xs text-muted-foreground">
+                    {isRTL ? "أخفِ متى آخر مرة كنت متصل" : "Hide when you were last online"}
+                  </p>
+                </div>
+                <ToggleSwitch
+                  checked={!!settings.hide_online_status}
+                  onCheckedChange={(v) => updateSettings({ hide_online_status: v })}
+                />
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
