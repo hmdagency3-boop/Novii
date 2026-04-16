@@ -77,6 +77,37 @@ export async function updateUser(
   });
 }
 
+export async function resetUserPassword(
+  userId: string,
+  newPassword: string
+): Promise<unknown> {
+  return adminFetch(`/users/${userId}/reset-password`, {
+    method: "POST",
+    body: JSON.stringify({ new_password: newPassword }),
+  });
+}
+
+export async function uploadUserAvatar(
+  userId: string,
+  file: File
+): Promise<{ success: boolean; avatar_url: string }> {
+  const headers = await getAuthHeaders();
+  delete (headers as any)["Content-Type"];
+  const formData = new FormData();
+  formData.append("avatar", file);
+  const res = await fetch(
+    `${NOVII_API_BASE}/admin/users/${userId}/avatar`,
+    { method: "POST", headers, body: formData }
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    let msg = `HTTP ${res.status}`;
+    try { const json = JSON.parse(text); msg = json.error || msg; } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 export async function fetchAdmins(): Promise<AdminRecord[]> {
   return adminFetch("/admins");
 }

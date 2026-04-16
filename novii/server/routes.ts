@@ -2646,13 +2646,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/users/:userId", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;
-      const { full_name, bio, website, location, is_verified, is_official, is_creator, is_premium, is_popular, is_active, is_gold_early_member, is_silver_early_member, is_bronze_early_member, is_beta_tester, is_bug_hunter } = req.body;
+      const { full_name, display_name, username, bio, website, location, avatar_url, is_verified, is_official, is_creator, is_premium, is_popular, is_active, is_gold_early_member, is_silver_early_member, is_bronze_early_member, is_beta_tester, is_bug_hunter } = req.body;
 
       const updatePayload: Record<string, any> = {
         updated_at: new Date().toISOString(),
       };
-      if (full_name !== undefined) updatePayload.full_name = full_name || null;
-      if (bio !== undefined) updatePayload.bio = bio || null;
+      if (display_name !== undefined) {
+        if (display_name && display_name.length > 50) return res.status(400).json({ error: 'الاسم الظاهر يجب أن يكون أقل من 50 حرف' });
+        updatePayload.full_name = display_name || null;
+      } else if (full_name !== undefined) {
+        if (full_name && full_name.length > 50) return res.status(400).json({ error: 'الاسم يجب أن يكون أقل من 50 حرف' });
+        updatePayload.full_name = full_name || null;
+      }
+      if (username !== undefined) {
+        const cleanUsername = (username || '').trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+        if (!cleanUsername || cleanUsername.length < 3) {
+          return res.status(400).json({ error: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل (أحرف إنجليزية وأرقام فقط)' });
+        }
+        const { data: existing } = await adminDb.from('profiles').select('id').eq('username', cleanUsername).neq('id', userId).single();
+        if (existing) {
+          return res.status(400).json({ error: `اسم المستخدم @${cleanUsername} مستخدم بالفعل` });
+        }
+        updatePayload.username = cleanUsername;
+      }
+      if (avatar_url !== undefined) updatePayload.avatar_url = avatar_url || null;
+      if (bio !== undefined) {
+        if (bio && bio.length > 300) return res.status(400).json({ error: 'النبذة يجب أن تكون أقل من 300 حرف' });
+        updatePayload.bio = bio || null;
+      }
       if (website !== undefined) updatePayload.website = website || null;
       if (location !== undefined) updatePayload.location = location || null;
       if (is_verified !== undefined) updatePayload.is_verified = is_verified === true;
@@ -2787,6 +2808,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Admin edit user error:', error);
       res.status(500).json({ error: 'Failed to edit user' });
+    }
+  });
+
+  // POST /api/admin/users/:userId/reset-password — admin reset user password
+  app.post("/api/admin/users/:userId/reset-password", requireAuth, requireAdmin, checkPermission('can_manage_users'), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { new_password } = req.body;
+
+      if (!new_password || new_password.length < 6) {
+        return res.status(400).json({ error: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' });
+      }
+
+      const { data: profile } = await adminDb.from('profiles').select('username').eq('id', userId).single();
+      if (!profile) {
+        return res.status(404).json({ error: 'المستخدم غير موجود' });
+      }
+
+      const { error } = await adminDb.auth.admin.updateUserById(userId, {
+        password: new_password,
+      });
+
+      if (error) {
+        console.error('Admin reset password error:', error);
+        return res.status(500).json({ error: 'فشل في تغيير كلمة المرور: ' + error.message });
+      }
+
+      const { error: deviceErr } = await adminDb
+        .from('user_devices')
+        .update({ is_revoked: true, revoked_at: new Date().toISOString() })
+        .eq('user_id', userId);
+      if (deviceErr) console.error('⚠️ Failed to revoke devices after password reset:', deviceErr);
+
+      await logAdminAction(req, 'reset_password', 'user', userId, `Reset password for @${profile.username}`);
+      res.json({ success: true, sessions_terminated: true });
+    } catch (error) {
+      console.error('Admin reset password error:', error);
+      res.status(500).json({ error: 'فشل في تغيير كلمة المرور' });
+    }
+  });
+
+  // POST /api/admin/users/:userId/avatar — admin upload/change user avatar
+  app.post("/api/admin/users/:userId/avatar", requireAuth, requireAdmin, checkPermission('can_manage_users'), upload.single('avatar') as any, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const file = (req as any).file;
+
+      if (!file) {
+        return res.status(400).json({ error: 'لم يتم تحميل صورة' });
+      }
+
+      const { data: profile } = await adminDb.from('profiles').select('id').eq('id', userId).single();
+      if (!profile) {
+        return res.status(404).json({ error: 'المستخدم غير موجود' });
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      if (!allowedTypes.includes(file.mimetype)) {
+        return res.status(400).json({ error: 'نوع الملف غير مدعوم. يرجى تحميل صورة (JPEG, PNG, WebP, GIF)' });
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        return res.status(400).json({ error: 'حجم الصورة يجب أن يكون أقل من 10 ميغابايت' });
+      }
+
+      const avatarUrl = await uploadToCloudinary(file.buffer, 'avatars', 'image');
+
+      const { error } = await adminDb
+        .from('profiles')
+        .update({ avatar_url: avatarUrl, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      await logAdminAction(req, 'change_avatar', 'user', userId, 'Admin changed user avatar');
+      res.json({ success: true, avatar_url: avatarUrl });
+    } catch (error) {
+      console.error('Admin avatar upload error:', error);
+      res.status(500).json({ error: 'فشل في تحديث الصورة' });
     }
   });
 

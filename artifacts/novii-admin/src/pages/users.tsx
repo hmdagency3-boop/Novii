@@ -6,6 +6,8 @@ import {
   updateUser,
   forceLogoutUser,
   featureUser,
+  resetUserPassword,
+  uploadUserAvatar,
   type UserProfile,
 } from "@/lib/admin-api";
 import {
@@ -34,6 +36,14 @@ import {
   ChevronRight,
   Star,
   TrendingUp,
+  Camera,
+  Key,
+  User,
+  AtSign,
+  AlertCircle,
+  Check,
+  Loader2,
+  Upload,
 } from "lucide-react";
 
 import UserDetailPage from "./user-detail";
@@ -723,6 +733,15 @@ function DeleteModal({ user, onClose, onDone }: { user: UserProfile; onClose: ()
 }
 
 function EditModal({ user, onClose, onDone }: { user: UserProfile; onClose: () => void; onDone: () => void }) {
+  const [activeTab, setActiveTab] = useState<"profile" | "badges" | "password">("profile");
+  const [displayName, setDisplayName] = useState(user.display_name || user.full_name || "");
+  const [username, setUsername] = useState(user.username || "");
+  const [bio, setBio] = useState(user.bio || "");
+  const [avatarPreview, setAvatarPreview] = useState(user.avatar_url || "");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [badges, setBadges] = useState({
     is_verified: user.is_verified,
     is_official: user.is_official,
@@ -736,17 +755,73 @@ function EditModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =
     is_beta_tester: user.is_beta_tester,
     is_bug_hunter: user.is_bug_hunter,
   });
-  const [bio, setBio] = useState(user.bio || "");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const handleSave = async () => {
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError("حجم الصورة يجب أن يكون أقل من 10 ميغابايت");
+      return;
+    }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setError("");
+  };
+
+  const handleRemoveAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview("");
+  };
+
+  const handleSaveProfile = async () => {
     setBusy(true);
+    setError("");
+    setSuccess("");
     try {
-      await updateUser(user.id, { ...badges, bio });
-      onDone();
-      onClose();
-    } catch (e) {
-      console.error(e);
+      if (avatarFile) {
+        const result = await uploadUserAvatar(user.id, avatarFile);
+        setAvatarPreview(result.avatar_url);
+        setAvatarFile(null);
+      } else if (!avatarPreview && user.avatar_url) {
+        await updateUser(user.id, { avatar_url: null });
+      }
+
+      const payload: Record<string, any> = { ...badges, bio };
+      if (displayName !== (user.display_name || user.full_name || "")) {
+        payload.display_name = displayName;
+      }
+      if (username !== user.username) {
+        payload.username = username;
+      }
+
+      await updateUser(user.id, payload);
+      setSuccess("تم حفظ التغييرات بنجاح");
+      setTimeout(() => { onDone(); onClose(); }, 800);
+    } catch (e: any) {
+      setError(e?.message || "حدث خطأ أثناء الحفظ");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!newPassword) { setError("أدخل كلمة المرور الجديدة"); return; }
+    if (newPassword.length < 6) { setError("كلمة المرور يجب أن تكون 6 أحرف على الأقل"); return; }
+    if (newPassword !== confirmPassword) { setError("كلمة المرور وتأكيدها غير متطابقتين"); return; }
+
+    setBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      await resetUserPassword(user.id, newPassword);
+      setSuccess("تم تغيير كلمة المرور بنجاح");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (e: any) {
+      setError(e?.message || "فشل في تغيير كلمة المرور");
     } finally {
       setBusy(false);
     }
@@ -766,45 +841,213 @@ function EditModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =
     ["is_bug_hunter", "باك هانتر 🐛"],
   ];
 
+  const tabs = [
+    { id: "profile" as const, label: "الملف الشخصي", icon: User },
+    { id: "badges" as const, label: "الشارات", icon: Award },
+    { id: "password" as const, label: "كلمة المرور", icon: Key },
+  ];
+
   return (
     <ModalWrapper onClose={onClose} title={`تعديل @${user.username}`}>
-      <div className="space-y-5" dir="rtl">
-        <div>
-          <label className="block text-[14px] font-semibold text-[#262626] mb-1.5">النبذة</label>
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            className="w-full px-3 py-2.5 border border-[#dbdbdb] rounded-lg text-[14px] text-[#262626] focus:outline-none focus:border-[#8e8e8e] resize-none placeholder-[#8e8e8e] transition-colors"
-            rows={2}
-          />
+      <div className="space-y-4" dir="rtl">
+        <div className="flex gap-1 bg-[#fafafa] rounded-lg p-1">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => { setActiveTab(t.id); setError(""); setSuccess(""); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-[12px] font-medium transition-all ${
+                activeTab === t.id ? "bg-white text-[#262626] shadow-sm" : "text-[#8e8e8e] hover:text-[#262626]"
+              }`}
+            >
+              <t.icon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          ))}
         </div>
-        <div>
-          <label className="block text-[14px] font-semibold text-[#262626] mb-2">الشارات</label>
-          <div className="space-y-0.5 max-h-[300px] overflow-y-auto scrollbar-thin">
-            {badgeList.map(([key, label]) => (
-              <label key={key} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-[#fafafa] cursor-pointer transition-colors">
-                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${badges[key as keyof typeof badges] ? "bg-[#0095f6] border-[#0095f6]" : "border-[#dbdbdb]"}`}>
-                  {badges[key as keyof typeof badges] && (
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                  )}
-                </div>
-                <input
-                  type="checkbox"
-                  checked={badges[key as keyof typeof badges]}
-                  onChange={(e) => setBadges({ ...badges, [key]: e.target.checked })}
-                  className="sr-only"
-                />
-                <span className="text-[14px] text-[#262626]">{label}</span>
-              </label>
-            ))}
+
+        {error && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#ed4956]/10 text-[#ed4956]">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <p className="text-[12px] font-medium">{error}</p>
           </div>
-        </div>
-        <div className="flex gap-2 justify-end pt-1">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-[14px] font-medium text-[#262626] hover:bg-[#fafafa] transition-colors">إلغاء</button>
-          <button onClick={handleSave} disabled={busy} className="px-5 py-2 rounded-lg text-[14px] font-semibold text-white bg-[#0095f6] hover:bg-[#1877f2] transition-colors disabled:opacity-50">
-            {busy ? "جاري الحفظ..." : "حفظ التغييرات"}
-          </button>
-        </div>
+        )}
+        {success && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#00c853]/10 text-[#00c853]">
+            <Check className="w-4 h-4 shrink-0" />
+            <p className="text-[12px] font-medium">{success}</p>
+          </div>
+        )}
+
+        {activeTab === "profile" && (
+          <div className="space-y-4">
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative group">
+                {avatarPreview ? (
+                  <img src={avatarPreview} className="w-20 h-20 rounded-full object-cover border-2 border-[#dbdbdb]" alt="" />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-[#efefef] flex items-center justify-center border-2 border-[#dbdbdb]">
+                    <User className="w-8 h-8 text-[#8e8e8e]" />
+                  </div>
+                )}
+                <label className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                  <Camera className="w-5 h-5 text-white" />
+                  <input type="file" accept="image/*" onChange={handleAvatarChange} className="sr-only" />
+                </label>
+              </div>
+              <div className="flex gap-2">
+                <label className="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-[#0095f6]/10 text-[#0095f6] hover:bg-[#0095f6]/20 cursor-pointer transition-colors">
+                  <Upload className="w-3 h-3 inline ml-1" />
+                  تغيير الصورة
+                  <input type="file" accept="image/*" onChange={handleAvatarChange} className="sr-only" />
+                </label>
+                {avatarPreview && (
+                  <button onClick={handleRemoveAvatar} className="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-[#ed4956]/10 text-[#ed4956] hover:bg-[#ed4956]/20 transition-colors">
+                    إزالة الصورة
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-[13px] font-semibold text-[#262626] mb-1.5">
+                <User className="w-3.5 h-3.5 text-[#8e8e8e]" />
+                الاسم الظاهر
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="الاسم الظاهر"
+                className="w-full px-3 py-2.5 border border-[#dbdbdb] rounded-lg text-[14px] text-[#262626] focus:outline-none focus:border-[#0095f6] placeholder-[#8e8e8e] transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-[13px] font-semibold text-[#262626] mb-1.5">
+                <AtSign className="w-3.5 h-3.5 text-[#8e8e8e]" />
+                اسم المستخدم
+              </label>
+              <div className="relative">
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[14px] text-[#8e8e8e]">@</span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ''))}
+                  placeholder="username"
+                  dir="ltr"
+                  className="w-full px-3 pr-8 py-2.5 border border-[#dbdbdb] rounded-lg text-[14px] text-[#262626] focus:outline-none focus:border-[#0095f6] placeholder-[#8e8e8e] transition-colors text-left"
+                />
+              </div>
+              {username !== user.username && username.length > 0 && username.length < 3 && (
+                <p className="text-[11px] text-[#ed4956] mt-1">اسم المستخدم يجب أن يكون 3 أحرف على الأقل</p>
+              )}
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-[13px] font-semibold text-[#262626] mb-1.5">النبذة</label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                className="w-full px-3 py-2.5 border border-[#dbdbdb] rounded-lg text-[14px] text-[#262626] focus:outline-none focus:border-[#0095f6] resize-none placeholder-[#8e8e8e] transition-colors"
+                rows={2}
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end pt-1">
+              <button onClick={onClose} className="px-4 py-2 rounded-lg text-[13px] font-medium text-[#262626] hover:bg-[#fafafa] transition-colors">إلغاء</button>
+              <button onClick={handleSaveProfile} disabled={busy || (username.length > 0 && username.length < 3)} className="px-5 py-2 rounded-lg text-[13px] font-semibold text-white bg-[#0095f6] hover:bg-[#1877f2] transition-colors disabled:opacity-50 flex items-center gap-2">
+                {busy ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />جاري الحفظ...</> : "حفظ التغييرات"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "badges" && (
+          <div className="space-y-4">
+            <div className="space-y-0.5 max-h-[350px] overflow-y-auto scrollbar-thin">
+              {badgeList.map(([key, label]) => (
+                <label key={key} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-[#fafafa] cursor-pointer transition-colors">
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${badges[key as keyof typeof badges] ? "bg-[#0095f6] border-[#0095f6]" : "border-[#dbdbdb]"}`}>
+                    {badges[key as keyof typeof badges] && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    )}
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={badges[key as keyof typeof badges]}
+                    onChange={(e) => setBadges({ ...badges, [key]: e.target.checked })}
+                    className="sr-only"
+                  />
+                  <span className="text-[14px] text-[#262626]">{label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end pt-1">
+              <button onClick={onClose} className="px-4 py-2 rounded-lg text-[13px] font-medium text-[#262626] hover:bg-[#fafafa] transition-colors">إلغاء</button>
+              <button onClick={handleSaveProfile} disabled={busy} className="px-5 py-2 rounded-lg text-[13px] font-semibold text-white bg-[#0095f6] hover:bg-[#1877f2] transition-colors disabled:opacity-50 flex items-center gap-2">
+                {busy ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />جاري الحفظ...</> : "حفظ الشارات"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "password" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#ff9500]/10">
+              <AlertCircle className="w-4 h-4 text-[#ff9500] shrink-0" />
+              <p className="text-[12px] text-[#ff9500] font-medium">سيتم تسجيل خروج المستخدم من جميع الأجهزة بعد تغيير كلمة المرور</p>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-[13px] font-semibold text-[#262626] mb-1.5">
+                <Key className="w-3.5 h-3.5 text-[#8e8e8e]" />
+                كلمة المرور الجديدة
+              </label>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="أدخل كلمة المرور الجديدة (6 أحرف على الأقل)"
+                className="w-full px-3 py-2.5 border border-[#dbdbdb] rounded-lg text-[14px] text-[#262626] focus:outline-none focus:border-[#0095f6] placeholder-[#8e8e8e] transition-colors"
+                dir="ltr"
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-[13px] font-semibold text-[#262626] mb-1.5">
+                <Key className="w-3.5 h-3.5 text-[#8e8e8e]" />
+                تأكيد كلمة المرور
+              </label>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="أعد كتابة كلمة المرور"
+                className="w-full px-3 py-2.5 border border-[#dbdbdb] rounded-lg text-[14px] text-[#262626] focus:outline-none focus:border-[#0095f6] placeholder-[#8e8e8e] transition-colors"
+                dir="ltr"
+              />
+              {confirmPassword && newPassword !== confirmPassword && (
+                <p className="text-[11px] text-[#ed4956] mt-1">كلمة المرور وتأكيدها غير متطابقتين</p>
+              )}
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} className="w-4 h-4 rounded border-[#dbdbdb] accent-[#0095f6]" />
+              <span className="text-[13px] text-[#262626]">إظهار كلمة المرور</span>
+            </label>
+
+            <div className="flex gap-2 justify-end pt-1">
+              <button onClick={onClose} className="px-4 py-2 rounded-lg text-[13px] font-medium text-[#262626] hover:bg-[#fafafa] transition-colors">إلغاء</button>
+              <button
+                onClick={handleResetPassword}
+                disabled={busy || !newPassword || newPassword.length < 6 || newPassword !== confirmPassword}
+                className="px-5 py-2 rounded-lg text-[13px] font-semibold text-white bg-[#ed4956] hover:bg-[#d63950] transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {busy ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />جاري التغيير...</> : "تغيير كلمة المرور"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </ModalWrapper>
   );
@@ -813,7 +1056,7 @@ function EditModal({ user, onClose, onDone }: { user: UserProfile; onClose: () =
 function ModalWrapper({ children, onClose, title }: { children: React.ReactNode; onClose: () => void; title: string }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[400px] max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[460px] max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#efefef]">
           <h2 className="text-[16px] font-semibold text-[#262626] flex-1 text-center">{title}</h2>
           <button onClick={onClose} className="absolute left-4 p-0.5 hover:opacity-60 transition-opacity">
