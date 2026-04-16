@@ -41,7 +41,12 @@ export default function UserPostsFeed() {
   }, [orderedPosts, startPostId]);
 
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
-  const username = (posts[0] as any)?.username || (posts[0] as any)?.profiles?.username || "";
+  const firstPost = posts[0] as any;
+  const username =
+    firstPost?.profile?.username ||
+    firstPost?.profiles?.username ||
+    firstPost?.username ||
+    "";
 
   const goBack = () => {
     if (window.history.length > 1) window.history.back();
