@@ -1478,7 +1478,7 @@ export default function Messages() {
 
   return (
     <Layout>
-      <div className="flex h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] md:h-screen w-full bg-background text-foreground overflow-hidden border-t border-border md:border-0">
+      <div className="flex h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)] md:h-screen w-full bg-background text-foreground overflow-hidden border-t border-border md:border-0">
         
         {/* Conversations Sidebar */}
         <div className={cn(
