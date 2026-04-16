@@ -353,10 +353,28 @@ export const api = {
 
     if (error) throw error;
     if (!data) return null;
-    // Hide deactivated/pending-deletion accounts from anyone but the owner
+    // Redact deactivated/pending-deletion accounts for anyone but the owner
     if ((data as any).is_deactivated) {
       const me = await getCurrentUser();
-      if (!me || me.id !== (data as any).id) return null;
+      if (!me || me.id !== (data as any).id) {
+        return {
+          ...(data as any),
+          full_name: 'User Deleted',
+          username: 'deleted_user',
+          avatar_url: null,
+          cover_url: null,
+          bio: '',
+          website: '',
+          location: '',
+          phone_number: null,
+          is_verified: false,
+          is_official: false,
+          is_private: true,
+          followers_count: 0,
+          following_count: 0,
+          posts_count: 0,
+        } as any;
+      }
     }
     return data;
   },
@@ -2306,9 +2324,25 @@ export const api = {
     if (!profile) return null;
 
     const currentUser = await getCurrentUser();
-    // Hide deactivated/pending-deletion accounts from anyone but the owner
+    // Redact deactivated/pending-deletion accounts for anyone but the owner
     if ((profile as any).is_deactivated && (!currentUser || currentUser.id !== profile.id)) {
-      return null;
+      return {
+        ...(profile as any),
+        full_name: 'User Deleted',
+        username: 'deleted_user',
+        avatar_url: null,
+        cover_url: null,
+        bio: '',
+        website: '',
+        location: '',
+        phone_number: null,
+        is_verified: false,
+        is_official: false,
+        is_private: true,
+        followers_count: 0,
+        following_count: 0,
+        posts_count: 0,
+      } as any;
     }
 
     // Calculate correct counts from follows table
