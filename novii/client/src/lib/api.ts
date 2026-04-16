@@ -531,7 +531,47 @@ export const api = {
     return posts as unknown as Post[];
   },
 
-  // Algorithmic feed: fetch a large batch, score by engagement + recency + seeded randomness
+  async getPersonalizedFeed(page: number = 0, limit: number = 20): Promise<Post[]> {
+    const user = await getCurrentUser();
+    if (!user) return this.getFeed(limit, page * limit);
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || "";
+    try {
+      const res = await fetch(`/api/feed/personalized?page=${page}&limit=${limit}`, {
+        headers: { "x-user-token": token, "x-user-id": user.id },
+      });
+      if (!res.ok) return this.getFeed(limit, page * limit);
+      return res.json();
+    } catch {
+      return this.getFeed(limit, page * limit);
+    }
+  },
+
+  async getPersonalizedExplore(limit: number = 30): Promise<Post[]> {
+    const user = await getCurrentUser();
+    if (!user) return this.getExplorePosts(limit);
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || "";
+    const res = await fetch(`/api/explore/personalized?limit=${limit}`, {
+      headers: { "x-user-token": token, "x-user-id": user.id },
+    });
+    if (!res.ok) return this.getExplorePosts(limit);
+    return res.json();
+  },
+
+  async getPersonalizedExploreReels(limit: number = 20): Promise<Reel[]> {
+    const user = await getCurrentUser();
+    if (!user) return this.getExploreReels(limit);
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || "";
+    const res = await fetch(`/api/explore/personalized/reels?limit=${limit}`, {
+      headers: { "x-user-token": token, "x-user-id": user.id },
+    });
+    if (!res.ok) return this.getExploreReels(limit);
+    return res.json();
+  },
+
+  // Legacy: Algorithmic feed (client-side scoring, fallback)
   async getFeedAlgorithmic(seed: number, limit = 10): Promise<Post[]> {
     const BATCH = 60;
     const { data, error } = await supabase

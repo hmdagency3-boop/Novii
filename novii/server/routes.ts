@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage, db, getUserDb, adminDb } from "./storage";
+import { getPersonalizedFeed, getPersonalizedExplore, getPersonalizedExploreReels } from "./algorithm";
 
 function getDb(req: Request) {
   const token = req.headers['x-user-token'] as string;
@@ -832,6 +833,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Music search error:", error);
       res.json([]);
+    }
+  });
+
+  // ========================================
+  // PERSONALIZED FEED ALGORITHM
+  // ========================================
+
+  app.get("/api/feed/personalized", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const page = parseInt(req.query.page as string) || 0;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+      const feedDb = getDb(req);
+      const posts = await getPersonalizedFeed(feedDb, userId, page, limit);
+      res.json(posts);
+    } catch (error) {
+      console.error("Personalized feed error:", error);
+      res.status(500).json({ error: "Failed to load feed" });
+    }
+  });
+
+  app.get("/api/explore/personalized", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const limit = Math.min(parseInt(req.query.limit as string) || 30, 60);
+      const feedDb = getDb(req);
+      const posts = await getPersonalizedExplore(feedDb, userId, limit);
+      res.json(posts);
+    } catch (error) {
+      console.error("Personalized explore error:", error);
+      res.status(500).json({ error: "Failed to load explore" });
+    }
+  });
+
+  app.get("/api/explore/personalized/reels", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 40);
+      const feedDb = getDb(req);
+      const reels = await getPersonalizedExploreReels(feedDb, userId, limit);
+      res.json(reels);
+    } catch (error) {
+      console.error("Personalized explore reels error:", error);
+      res.status(500).json({ error: "Failed to load reels" });
     }
   });
 

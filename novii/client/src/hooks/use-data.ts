@@ -68,15 +68,12 @@ export function useInfiniteFeed(seed: number = 0) {
   return useInfiniteQuery({
     queryKey: ['feed-infinite', seed],
     queryFn: ({ pageParam }: { pageParam: number }) => {
-      // First page: algorithmic scoring from a big batch
-      if (pageParam === 0) return api.getFeedAlgorithmic(seed, FEED_PAGE_SIZE);
-      // Subsequent pages: regular chronological (offset beyond the algo batch)
-      return api.getFeed(FEED_PAGE_SIZE, 60 + (pageParam - 1) * FEED_PAGE_SIZE);
+      return api.getPersonalizedFeed(pageParam, FEED_PAGE_SIZE);
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage: any[], allPages: any[][]) => {
       if (lastPage.length < FEED_PAGE_SIZE) return undefined;
-      return allPages.length; // page index
+      return allPages.length;
     },
     staleTime: 1000 * 60 * 2,
   });
@@ -85,14 +82,14 @@ export function useInfiniteFeed(seed: number = 0) {
 export function useExplorePosts(limit = 30) {
   return useQuery({
     queryKey: ['explore', limit],
-    queryFn: () => api.getExplorePosts(limit),
+    queryFn: () => api.getPersonalizedExplore(limit),
   });
 }
 
 export function useExploreReels(limit = 20) {
   return useQuery({
     queryKey: ['explore-reels', limit],
-    queryFn: () => api.getExploreReels(limit),
+    queryFn: () => api.getPersonalizedExploreReels(limit),
   });
 }
 

@@ -76,6 +76,15 @@ Arabic social media platform (React + Vite frontend, Express backend) using Supa
 - **ErrorBoundary**: `novii/client/src/components/error-boundary.tsx` wraps entire app in `App.tsx`
 - Prevents white screen on crashes, shows error UI with retry button
 
+### Personalized Recommendation Algorithm
+- **Backend**: `novii/server/algorithm.ts` — comprehensive server-side recommendation engine
+- **Scoring factors**: Author affinity (interaction history), interest matching (hashtag/topic overlap), engagement quality (likes/comments/saves weighted), recency decay, content diversity
+- **API endpoints**: `GET /api/feed/personalized` (paginated), `GET /api/explore/personalized`, `GET /api/explore/personalized/reels` — all require auth
+- **Client integration**: `api.ts` methods (`getPersonalizedFeed`, `getPersonalizedExplore`, `getPersonalizedExploreReels`) call server endpoints with auth headers, fallback to legacy Supabase-direct queries if unauthenticated or server error
+- **Hooks**: `useInfiniteFeed`, `useExplorePosts`, `useExploreReels` in `use-data.ts` now use personalized endpoints
+- **Security**: Uses user's authenticated DB connection (RLS enforced), not adminDb
+- **Legacy fallback**: `getFeedAlgorithmic()` (client-side scoring) preserved as fallback
+
 ### Hashtag System
 - **Database tables**: `hashtags` (name, posts_count, is_banned, is_pinned), `post_hashtags` (post_id, hashtag_id), `reel_hashtags` (reel_id, hashtag_id)
 - **Auto-extraction**: `saveHashtags()` in `api.ts` parses `#tags` from caption on post/reel creation, upserts hashtag rows, links via junction tables
