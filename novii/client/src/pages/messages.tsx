@@ -2631,8 +2631,6 @@ export default function Messages() {
                             )}
                             
                             <div ref={messagesEndRef} />
-                            {/* Mobile spacer so the last message clears the fixed composer above the keyboard */}
-                            <div className="h-1 md:hidden" aria-hidden />
                           </div>
                         )}
                     </ScrollArea>
