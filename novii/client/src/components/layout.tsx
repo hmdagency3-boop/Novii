@@ -146,19 +146,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  // Listen for chat selection changes to hide bottom nav in mobile
+  // Listen for chat selection changes to hide bottom nav in mobile.
+  // Always force-disable chatActive when not on the messages route so the
+  // bottom nav can never get stuck hidden across the rest of the app.
   useEffect(() => {
     const handleStorageChange = () => {
-      setChatActive(localStorage.getItem('chatActive') === 'true');
+      const flag = localStorage.getItem('chatActive') === 'true';
+      setChatActive(flag && location.startsWith('/messages'));
     };
-    handleStorageChange(); // Check on mount
+    handleStorageChange();
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('chatActiveChange', handleStorageChange);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('chatActiveChange', handleStorageChange);
     };
-  }, []);
+  }, [location]);
 
   // Listen for global create modal events (works from any page)
   useEffect(() => {
