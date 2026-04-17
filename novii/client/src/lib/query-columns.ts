@@ -43,6 +43,7 @@ export const PROFILE_COLUMNS = `
 export const PROFILE_MINIMAL = `
   id,
   username,
+  full_name,
   avatar_url,
   is_verified,
   is_official,
