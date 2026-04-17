@@ -40,8 +40,14 @@ function ExploreContent() {
   const isLoading = postsLoading || reelsLoading;
 
   const items: ExploreItem[] = useMemo(() => {
-    const posts = (explorePosts || []).map(p => ({ kind: 'post' as const, data: p }));
-    const reels = (exploreReels || []).map(r => ({ kind: 'reel' as const, data: r }));
+    // Explore is a visual grid — drop anything that has no media to render,
+    // otherwise it shows up as an empty `bg-muted` (brown/dark) tile.
+    const posts = (explorePosts || [])
+      .filter(p => !!p.image_url)
+      .map(p => ({ kind: 'post' as const, data: p }));
+    const reels = (exploreReels || [])
+      .filter(r => !!r.thumbnail_url || !!r.video_url)
+      .map(r => ({ kind: 'reel' as const, data: r }));
 
     if (reels.length === 0) return posts;
     if (posts.length === 0) return reels;
