@@ -28,6 +28,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
+import { useQuery } from "@tanstack/react-query";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
+import { VerifiedUsername } from "@/components/ui/verified-username";
+import { OfficialBadge } from "@/components/ui/official-badge";
+import { CreatorBadge } from "@/components/ui/creator-badge";
+import { PremiumBadge } from "@/components/ui/premium-badge";
+import { PopularBadge } from "@/components/ui/popular-badge";
+import { ActiveBadge } from "@/components/ui/active-badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { CreateStoryModal } from "@/components/create-story-modal";
 import { LocationPicker } from "@/components/location-picker";
@@ -320,6 +328,13 @@ export default function CreatePage() {
   const createPostMutation = useCreatePost();
   const isRTL = direction === "rtl";
 
+  const { data: myProfile } = useQuery({
+    queryKey: ["my-profile", user?.id],
+    queryFn: () => (user?.id ? api.getProfileById(user.id) : null),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const [tab, setTab] = useState<Tab>('story');
   const [capturedMedia, setCapturedMedia] = useState<MediaItem | null>(null);
   const [caption, setCaption] = useState("");
@@ -533,13 +548,27 @@ export default function CreatePage() {
           </div>
           <div className="flex gap-3 p-4 border-b border-border/30">
             <Avatar className="w-9 h-9 flex-shrink-0">
-              <AvatarImage src={user?.user_metadata?.avatar_url} />
+              <AvatarImage src={myProfile?.avatar_url || user?.user_metadata?.avatar_url} />
               <AvatarFallback className="text-xs bg-primary text-white">
-                {user?.user_metadata?.full_name?.[0] || user?.email?.[0]?.toUpperCase()}
+                {(myProfile?.full_name || myProfile?.username || user?.user_metadata?.full_name || user?.email || "?")[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <p className="text-sm font-semibold mb-1">{user?.user_metadata?.full_name || user?.email}</p>
+              <div className="flex items-center gap-1 flex-wrap mb-1">
+                <VerifiedUsername
+                  username={myProfile?.full_name || myProfile?.username || user?.user_metadata?.full_name || user?.email || ""}
+                  isVerified={myProfile?.is_verified}
+                  className="text-sm font-semibold"
+                />
+                <div className="flex items-center gap-0.5 flex-wrap">
+                  {myProfile?.is_verified && <VerifiedBadge size="sm" verifiedAt={myProfile?.verified_at} />}
+                  {myProfile?.is_official && <OfficialBadge size="sm" showText={false} />}
+                  {myProfile?.is_creator && <CreatorBadge size="sm" />}
+                  {myProfile?.is_premium && <PremiumBadge size="sm" />}
+                  {myProfile?.is_popular && <PopularBadge size="sm" />}
+                  {myProfile?.is_active && <ActiveBadge size="sm" />}
+                </div>
+              </div>
               <Textarea
                 placeholder={isRTL ? "اكتب تعليقاً..." : "Write a caption..."}
                 value={caption}
