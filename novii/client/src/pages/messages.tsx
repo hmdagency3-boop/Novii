@@ -114,12 +114,12 @@ export const IsolatedChatInput = memo(forwardRef<IsolatedChatInputHandle, Isolat
     }), []);
 
     return (
-      <Input
-        ref={inputRef}
+      <textarea
+        ref={inputRef as any}
         value={value}
         disabled={disabled}
         placeholder={placeholder}
-        type="search"
+        rows={1}
         inputMode="text"
         enterKeyHint="send"
         autoComplete="off"
@@ -143,7 +143,12 @@ export const IsolatedChatInput = memo(forwardRef<IsolatedChatInputHandle, Isolat
             if (text) onSubmit?.(text);
           }
         }}
-        className={cn(className, rtl && "text-right", "[&::-webkit-search-cancel-button]:hidden")}
+        style={{ maxHeight: "120px", minHeight: "40px" }}
+        className={cn(
+          "flex w-full bg-transparent py-2 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 resize-none overflow-y-auto leading-snug",
+          className,
+          rtl && "text-right"
+        )}
       />
     );
   }
