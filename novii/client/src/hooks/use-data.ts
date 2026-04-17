@@ -863,8 +863,15 @@ export function useToggleSaveReel() {
   return useMutation({
     mutationFn: (reelId: string) => api.toggleSaveReel(reelId),
     onMutate: async (reelId) => {
-      const updateReel = (r: any) =>
-        r?.id === reelId ? { ...r, is_saved: !r.is_saved } : r;
+      const updateReel = (r: any) => {
+        if (r?.id !== reelId) return r;
+        const wasSaved = !!r.is_saved;
+        return {
+          ...r,
+          is_saved: !wasSaved,
+          saves_count: Math.max(0, (r.saves_count ?? 0) + (wasSaved ? -1 : 1)),
+        };
+      };
 
       queryClient.setQueriesData({ queryKey: ['reels'] }, (old: any) => {
         if (!old) return old;

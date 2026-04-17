@@ -732,15 +732,16 @@ export const api = {
           const reels = await res.json();
           if (reels.length > 0) {
             const reelIds = reels.map((r: any) => r.id);
-            const { data: likesData } = await supabase
-              .from('likes')
-              .select('reel_id')
-              .eq('user_id', user.id)
-              .in('reel_id', reelIds);
+            const [{ data: likesData }, { data: savedData }] = await Promise.all([
+              supabase.from('likes').select('reel_id').eq('user_id', user.id).in('reel_id', reelIds),
+              supabase.from('saved_reels').select('reel_id').eq('user_id', user.id).in('reel_id', reelIds),
+            ]);
             const likedIds = new Set(likesData?.map((l: any) => l.reel_id) || []);
+            const savedIds = new Set(savedData?.map((s: any) => s.reel_id) || []);
             return reels.map((reel: any) => ({
               ...reel,
-              is_liked: likedIds.has(reel.id)
+              is_liked: likedIds.has(reel.id),
+              is_saved: savedIds.has(reel.id),
             })) as unknown as Reel[];
           }
         }
@@ -759,15 +760,16 @@ export const api = {
 
     if (user && reels.length > 0) {
       const reelIds = reels.map(r => r.id);
-      const { data: likesData } = await supabase
-        .from('likes')
-        .select('reel_id')
-        .eq('user_id', user.id)
-        .in('reel_id', reelIds);
+      const [{ data: likesData }, { data: savedData }] = await Promise.all([
+        supabase.from('likes').select('reel_id').eq('user_id', user.id).in('reel_id', reelIds),
+        supabase.from('saved_reels').select('reel_id').eq('user_id', user.id).in('reel_id', reelIds),
+      ]);
       const likedIds = new Set(likesData?.map(l => l.reel_id) || []);
+      const savedIds = new Set(savedData?.map((s: any) => s.reel_id) || []);
       return reels.map(reel => ({
         ...reel,
-        is_liked: likedIds.has(reel.id)
+        is_liked: likedIds.has(reel.id),
+        is_saved: savedIds.has(reel.id),
       })) as unknown as Reel[];
     }
 
