@@ -226,8 +226,16 @@ export function useDeleteReel() {
 
   return useMutation({
     mutationFn: (reelId: string) => api.deleteReel(reelId),
-    onSuccess: () => {
+    onSuccess: (_data, reelId) => {
+      queryClient.setQueriesData({ queryKey: ['reels-infinite'] }, (old: any) => {
+        if (!old?.pages) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any[]) => page.filter((r: any) => r.id !== reelId)),
+        };
+      });
       queryClient.invalidateQueries({ queryKey: ['reels'] });
+      queryClient.invalidateQueries({ queryKey: ['reels-infinite'] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       toast({ title: 'تم الحذف', description: 'تم حذف الريلز بنجاح' });
     },
