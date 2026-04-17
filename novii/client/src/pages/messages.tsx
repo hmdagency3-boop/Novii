@@ -194,7 +194,32 @@ export default function Messages() {
   const [communityMessageInput, setCommunityMessageInput] = useState("");
   const communityComposerRef = useRef<IsolatedChatInputHandle>(null);
   const [hasCommunityText, setHasCommunityText] = useState(false);
-  const messageComposerRef = useRef<IsolatedChatInputHandle>(null);
+  // Both desktop + mobile message inputs render simultaneously (one is hidden
+  // via CSS), so a single shared ref ends up pointing only to the last-mounted
+  // (mobile) instance. That meant clear/insert/getValue ran on the hidden input
+  // and the visible one kept its text after sending. Use one ref per layout
+  // and a proxy that broadcasts to both.
+  const messageComposerRefDesktop = useRef<IsolatedChatInputHandle>(null);
+  const messageComposerRefMobile = useRef<IsolatedChatInputHandle>(null);
+  const messageComposerRef: { current: IsolatedChatInputHandle } = {
+    current: {
+      clear: () => {
+        messageComposerRefDesktop.current?.clear();
+        messageComposerRefMobile.current?.clear();
+      },
+      getValue: () =>
+        messageComposerRefDesktop.current?.getValue() ||
+        messageComposerRefMobile.current?.getValue() ||
+        "",
+      insert: (text: string) => {
+        messageComposerRefDesktop.current?.insert(text);
+        messageComposerRefMobile.current?.insert(text);
+      },
+      focus: () => {
+        (messageComposerRefDesktop.current ?? messageComposerRefMobile.current)?.focus();
+      },
+    },
+  };
   const [hasMessageText, setHasMessageText] = useState(false);
   const [popoverTab, setPopoverTab] = useState<'chat' | 'community' | 'join'>('chat');
   const [newCommunityName, setNewCommunityName] = useState("");
@@ -2803,7 +2828,7 @@ export default function Messages() {
                               </div>
                             ) : (
                               <IsolatedChatInput
-                                ref={messageComposerRef}
+                                ref={messageComposerRefDesktop}
                                 rtl={isRTL}
                                 onHasTextChange={setHasMessageText}
                                 onTyping={() => {
@@ -2968,7 +2993,7 @@ export default function Messages() {
                   </div>
                 ) : (
                   <IsolatedChatInput
-                    ref={messageComposerRef}
+                    ref={messageComposerRefMobile}
                     rtl={isRTL}
                     onHasTextChange={setHasMessageText}
                     onTyping={() => {
