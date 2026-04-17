@@ -205,10 +205,17 @@ export default function PostCard({ post }: PostCardProps) {
               {post.location && (
                 <>
                   <span>•</span>
-                  <div className="flex items-center gap-1">
+                  <a
+                    href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(post.location)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 hover:text-primary transition-colors max-w-[200px]"
+                    title={post.location}
+                  >
                     <MapPin className="w-3 h-3" />
-                    <span className="truncate">{post.location}</span>
-                  </div>
+                    <span className="truncate underline-offset-2 hover:underline">{post.location}</span>
+                  </a>
                 </>
               )}
             </div>

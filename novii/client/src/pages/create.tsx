@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { CreateStoryModal } from "@/components/create-story-modal";
+import { LocationPicker } from "@/components/location-picker";
 
 type Tab = 'post' | 'story' | 'reel' | 'live';
 type FacingMode = 'environment' | 'user';
@@ -554,13 +555,12 @@ export default function CreatePage() {
           {(tab === 'post' || tab === 'story') && (
             <div className={cn("flex items-center gap-3 px-4 py-3 border-b border-border/30", isRTL && "flex-row-reverse")}>
               <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <input
-                type="text"
-                placeholder={isRTL ? "إضافة موقع" : "Add location"}
+              <LocationPicker
                 value={locationText}
-                onChange={e => setLocationText(e.target.value)}
-                dir={isRTL ? "rtl" : "ltr"}
-                className={cn("flex-1 text-sm bg-transparent border-0 outline-none placeholder:text-muted-foreground/60", isRTL && "text-right")}
+                onChange={setLocationText}
+                placeholder={isRTL ? "إضافة موقع" : "Add location"}
+                isRTL={isRTL}
+                langCode={language.code}
               />
             </div>
           )}
