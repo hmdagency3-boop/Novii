@@ -117,6 +117,7 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isCropping, setIsCropping] = useState(false);
 
   // Cooldown state
   const [cooldowns, setCooldowns] = useState<{
@@ -148,6 +149,7 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
     setSelectedFile(null);
     setPreviewUrl("");
     setUploadProgress(0);
+    setIsCropping(false);
     setUsernameError(null);
     setUsernameIsValid(true);
     setSuggestions([]);
@@ -243,6 +245,10 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCropping) {
+      toast.error(lang === "ar" ? "اضغطي على \"قص وحفظ\" أولاً قبل حفظ التعديلات" : "Please confirm the crop before saving");
+      return;
+    }
     if (formData.username !== profile.username) {
       if (!cooldowns.username.canChange) {
         toast.error(t.cooldownMsg(cooldowns.username.daysLeft, fieldNames.username));
@@ -315,6 +321,7 @@ export function EditProfileDialog({ profile, trigger, children, onProfileUpdate 
             uploadProgress={uploadProgress}
             isRTL={isRTL}
             lang={lang}
+            onCroppingChange={setIsCropping}
           />
 
           <div className="space-y-4">

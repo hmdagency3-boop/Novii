@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,6 +19,7 @@ interface AvatarUploaderProps {
   uploadProgress?: number;
   isRTL?: boolean;
   lang?: "ar" | "en";
+  onCroppingChange?: (isCropping: boolean) => void;
 }
 
 export function AvatarUploader({
@@ -32,12 +33,17 @@ export function AvatarUploader({
   uploadProgress = 0,
   isRTL = false,
   lang = "en",
+  onCroppingChange,
 }: AvatarUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [rawImageUrl, setRawImageUrl] = useState<string | null>(null);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [isCropping, setIsCropping] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    onCroppingChange?.(isCropping);
+  }, [isCropping, onCroppingChange]);
 
   const txt = {
     en: {
@@ -89,11 +95,29 @@ export function AvatarUploader({
   }, []);
 
   const handleCropConfirm = async () => {
-    if (!rawImageUrl || !croppedAreaPixels) return;
+    if (!rawImageUrl) return;
     try {
+      // Fallback: if user clicks confirm before react-easy-crop emitted onCropComplete,
+      // derive a centered square crop from the source image so we never silently no-op.
+      let pixels = croppedAreaPixels;
+      if (!pixels) {
+        const img = new Image();
+        img.src = rawImageUrl;
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("Image load failed"));
+        });
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        pixels = {
+          x: Math.round((img.naturalWidth - side) / 2),
+          y: Math.round((img.naturalHeight - side) / 2),
+          width: side,
+          height: side,
+        };
+      }
       const croppedFile = await getCroppedImg(
         rawImageUrl,
-        croppedAreaPixels,
+        pixels,
         AVATAR_ASPECT_RATIO.outputWidth,
         AVATAR_ASPECT_RATIO.outputHeight
       );
