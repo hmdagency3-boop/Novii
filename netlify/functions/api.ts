@@ -1,9 +1,31 @@
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
+import cors from "cors";
 import serverless from "serverless-http";
 import { registerRoutes } from "../../novii/server/routes";
 
 const app = express();
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const allowed = [
+      process.env.ADMIN_PANEL_URL,
+      process.env.VITE_ADMIN_PANEL_URL,
+    ].filter(Boolean);
+    const isNetlify = origin.endsWith(".netlify.app") || origin.endsWith(".netlify.live");
+    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)/.test(origin);
+    const isReplit = origin.includes(".replit.dev") || origin.includes(".repl.co");
+    if (allowed.includes(origin) || isNetlify || isLocalhost || isReplit) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "x-user-token", "x-user-id", "Authorization"],
+}));
 
 app.use(compression());
 app.use(express.json({
@@ -13,7 +35,6 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
-// Request logger
 app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   res.on("finish", () => {

@@ -646,6 +646,9 @@ importers:
       compression:
         specifier: ^1.8.1
         version: 1.8.1
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.6
       drizzle-orm:
         specifier: ^0.39.1
         version: 0.39.3(@neondatabase/serverless@0.10.4)(@types/pg@8.18.0)(pg@8.20.0)
@@ -659,6 +662,9 @@ importers:
       '@types/compression':
         specifier: ^1.7.5
         version: 1.8.1
+      '@types/cors':
+        specifier: ^2.8.19
+        version: 2.8.19
       '@types/express':
         specifier: 4.17.21
         version: 4.17.21
