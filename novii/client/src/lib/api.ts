@@ -1852,19 +1852,18 @@ export const api = {
     const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
-
-    const { error } = await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('sender_id', senderId)
-      .eq('receiver_id', user.id)
-      .or('is_read.eq.false,is_read.is.null');
+    // Use a SECURITY DEFINER RPC because the table's RLS policy only allows
+    // the sender to UPDATE rows. A direct UPDATE from the receiver silently
+    // affects 0 rows and the unread counter stays stuck.
+    // See novii/supabase/fix_mark_messages_as_read.sql.
+    const { error } = await supabase.rpc('mark_messages_as_read', {
+      p_sender_id: senderId,
+    });
 
     if (error) {
       console.error('❌ Error marking messages as read:', error);
       throw error;
     }
-    
   },
 
   async updateMessage(messageId: string, newContent: string): Promise<Message> {
