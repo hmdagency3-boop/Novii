@@ -142,3 +142,24 @@ VITE_NOVII_API_URL          → URL الـ backend (لازم يتحدد بعد �
 - قبل CORS: `74654ac` (إضافة render.yaml)
 - قبل CORS: `71ec1e9` (CORS middleware)
 - قبل تعديلات vite.config: `eea9f6a`
+
+---
+
+## 7. تطبيق Android (Novii Mobile)
+
+اتضاف artifact جديد منفصل تماماً في `artifacts/novii-mobile/` (Expo + React Native)، بيستخدم نفس Supabase backend.
+
+### المحتوى الحالي
+- **Auth**: شاشة دخول/تسجيل بـ Supabase email+password (جلسة محفوظة في AsyncStorage)
+- **Tabs**: Home / Search / Profile
+- **Home**: feed منشورات حقيقية من جدول `posts` مع likes
+- **Search**: بحث في `profiles` بالـ username أو الاسم
+- **Profile**: بروفايل المستخدم الحالي + جريد المنشورات + زر تسجيل خروج
+
+### Env vars (Shared)
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+### النشر
+- iOS: عبر زر **Publish** (Expo Launch) في Replit
+- Android: Replit مش بتدعم نشر Android مباشرة. لو عايز APK/Play Store هتحتاج EAS build خارج Replit أو نخلي التطبيق ك PWA.

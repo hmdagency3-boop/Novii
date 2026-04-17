@@ -66,6 +66,12 @@ uri = "file://attached_assets/generated_images/novii_lab_community.png"
 type = "image"
 title = "novii lab community avatar"
 
+[[generated]]
+id = "L4r7JmuVYqZ_1e9arxodO"
+uri = "file://artifacts/novii-mobile/assets/images/icon.png"
+type = "image"
+title = "novii app icon"
+
 [[outputs]]
 id = "Sxt43qrZdflnEo09LgUX4"
 uri = "file://attached_assets/generated_images/novii_beta_invite_9x16.png"

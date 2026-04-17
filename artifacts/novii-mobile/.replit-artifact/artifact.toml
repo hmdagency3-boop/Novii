@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/novii-mobile/"
+title = "Novii Mobile (Android)"
+version = "1.0.0"
+id = "artifacts/novii-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/novii-mobile/" ]
+localPort = 23279
+
+[services.development]
+run = "pnpm --filter @workspace/novii-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/novii-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/novii-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "23279"
+BASE_PATH = "/novii-mobile/"

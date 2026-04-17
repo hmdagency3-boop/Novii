@@ -93,6 +93,10 @@ localPort = 8082
 externalPort = 3002
 
 [[ports]]
+localPort = 8083
+externalPort = 8099
+
+[[ports]]
 localPort = 18877
 externalPort = 4200
 
@@ -107,6 +111,18 @@ externalPort = 6800
 [[ports]]
 localPort = 18880
 externalPort = 8000
+
+[[ports]]
+localPort = 18881
+externalPort = 8008
+
+[[ports]]
+localPort = 18882
+externalPort = 8081
+
+[[ports]]
+localPort = 23279
+externalPort = 9000
 
 [[ports]]
 localPort = 23846
@@ -133,3 +149,6 @@ VITE_SUPABASE_ANON_KEY = "sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX"
 CLOUDINARY_CLOUD_NAME = "ds3d1fqf3"
 CLOUDINARY_API_KEY = "727676898538336"
 CLOUDINARY_SECRET = "na9SeoyKoJPRHvba_MGDQ7wNHQA"
+EXPO_PUBLIC_SUPABASE_URL = "https://ldgbbbxqfwgufhvnvojy.supabase.co"
+EXPO_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_UysDSUzApROPKDURbh1IGw_46hO_6qX"
+EXPO_PUBLIC_NOVII_API_URL = "https://novii.netlify.app"
