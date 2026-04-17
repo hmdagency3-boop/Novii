@@ -1,0 +1,14 @@
+[build]
+  base = "artifacts/novii-admin"
+  command = "cd ../.. && pnpm install && BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/novii-admin run build"
+  publish = "dist/public"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NODE_ENV = "production"
+
+# SPA fallback — all routes → index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
