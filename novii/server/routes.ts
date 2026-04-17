@@ -3623,11 +3623,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatePayload: Record<string, any> = {
         updated_at: new Date().toISOString(),
       };
+      const countGraphemes = (s: string) => {
+        try {
+          // @ts-ignore
+          const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+          let n = 0;
+          // @ts-ignore
+          for (const _ of seg.segment(s)) n++;
+          return n;
+        } catch {
+          return [...s].length;
+        }
+      };
       if (display_name !== undefined) {
-        if (display_name && display_name.length > 50) return res.status(400).json({ error: 'الاسم الظاهر يجب أن يكون أقل من 50 حرف' });
+        if (display_name && countGraphemes(display_name) > 50) return res.status(400).json({ error: 'الاسم الظاهر يجب أن يكون أقل من 50 حرف' });
         updatePayload.full_name = display_name || null;
       } else if (full_name !== undefined) {
-        if (full_name && full_name.length > 50) return res.status(400).json({ error: 'الاسم يجب أن يكون أقل من 50 حرف' });
+        if (full_name && countGraphemes(full_name) > 50) return res.status(400).json({ error: 'الاسم يجب أن يكون أقل من 50 حرف' });
         updatePayload.full_name = full_name || null;
       }
       if (username !== undefined) {
