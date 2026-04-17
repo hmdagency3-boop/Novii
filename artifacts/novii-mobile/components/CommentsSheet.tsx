@@ -59,7 +59,7 @@ export default function CommentsSheet({
     }
   };
 
-  const sheetHeight = Math.min(height * 0.88, height - 60);
+  const sheetHeight = Math.round(height * 0.7);
 
   return (
     <Modal
