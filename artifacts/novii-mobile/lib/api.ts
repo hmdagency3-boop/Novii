@@ -13,6 +13,8 @@ export interface Profile {
   followers_count?: number | null;
   following_count?: number | null;
   posts_count?: number | null;
+  website?: string | null;
+  location?: string | null;
 }
 
 export interface Post {
@@ -94,7 +96,7 @@ export interface NotificationRow {
 }
 
 const PROFILE_CARD = `
-  id, username, full_name, avatar_url, bio,
+  id, username, full_name, avatar_url, bio, website, location,
   is_verified, is_official, is_private,
   followers_count, following_count, posts_count
 `;
@@ -276,6 +278,19 @@ export async function createPost(
 
 // ───────── Profiles ─────────
 
+export async function getCurrentProfile(): Promise<Profile | null> {
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth.user?.id;
+  if (!uid) return null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_CARD)
+    .eq("id", uid)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Profile | null;
+}
+
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from("profiles")
@@ -397,6 +412,31 @@ export async function createStory(mediaUrl: string, mediaType: "image" | "video"
 }
 
 // ───────── Reels ─────────
+
+export async function getSavedPosts(): Promise<Post[]> {
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth.user?.id;
+  if (!uid) return [];
+  const { data, error } = await supabase
+    .from("saved_posts")
+    .select(`post:posts(${POST_WITH_PROFILE})`)
+    .eq("user_id", uid)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return ((data ?? [])
+    .map((row: any) => row.post)
+    .filter(Boolean)) as unknown as Post[];
+}
+
+export async function getUserReels(userId: string): Promise<Reel[]> {
+  const { data, error } = await supabase
+    .from("reels")
+    .select(`*, profile:profiles(${PROFILE_CARD})`)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as Reel[];
+}
 
 export async function getReels(limit = 20, offset = 0): Promise<Reel[]> {
   const { data, error } = await supabase

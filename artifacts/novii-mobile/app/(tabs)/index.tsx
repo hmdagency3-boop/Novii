@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -65,30 +65,25 @@ export default function HomeScreen() {
           },
         ]}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <LinearGradient
-            colors={["#7c3aed", "#ec4899"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.logo}
-          >
-            <Text style={styles.logoText}>n</Text>
-          </LinearGradient>
+        <View style={styles.headerSide}>
+          <Pressable onPress={() => router.push("/messages")} hitSlop={8} style={styles.iconBtn}>
+            <Feather name="message-circle" size={22} color={colors.foreground} />
+          </Pressable>
+        </View>
+        <View style={styles.headerCenter}>
+          <Image
+            source={require("@/assets/images/novii_logo.png")}
+            style={styles.logoImg}
+            contentFit="contain"
+          />
           <Text style={[styles.brand, { color: colors.foreground }]}>Novii</Text>
         </View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
-          <Pressable onPress={() => router.push("/notifications")} hitSlop={8}>
-            <View>
-              <Feather name="heart" size={24} color={colors.foreground} />
-              {unread > 0 ? (
-                <View style={[styles.badge, { backgroundColor: "#ef4444" }]}>
-                  <Text style={styles.badgeText}>{unread > 9 ? "9+" : unread}</Text>
-                </View>
-              ) : null}
-            </View>
-          </Pressable>
-          <Pressable onPress={() => router.push("/messages")} hitSlop={8}>
-            <Feather name="message-circle" size={24} color={colors.foreground} />
+        <View style={[styles.headerSide, { justifyContent: "flex-end" }]}>
+          <Pressable onPress={() => router.push("/notifications")} hitSlop={8} style={styles.iconBtn}>
+            <Feather name="heart" size={22} color={colors.foreground} />
+            {unread > 0 ? (
+              <View style={[styles.badge, { backgroundColor: colors.destructive }]} />
+            ) : null}
           </Pressable>
         </View>
       </View>
@@ -150,27 +145,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  logo: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 18, lineHeight: 20 },
-  brand: { fontFamily: "Inter_700Bold", fontSize: 22 },
+  headerSide: { flex: 1, flexDirection: "row", alignItems: "center" },
+  headerCenter: { flexDirection: "row", alignItems: "center", gap: 6 },
+  iconBtn: { padding: 6 },
+  logoImg: { width: 24, height: 24 },
+  brand: { fontFamily: "Outfit_700Bold", fontSize: 20, lineHeight: 22 },
   badge: {
     position: "absolute",
-    top: -4,
-    right: -6,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    alignItems: "center",
-    justifyContent: "center",
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  badgeText: { color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
   muted: { fontFamily: "Inter_500Medium", fontSize: 14 },
 });

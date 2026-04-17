@@ -1,9 +1,43 @@
 import { Feather } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { BlurView } from "expo-blur";
+import { Image } from "expo-image";
 import { Tabs } from "expo-router";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { getCurrentProfile } from "@/lib/api";
+
+function ProfileTabIcon({ focused, color }: { focused: boolean; color: string }) {
+  const colors = useColors();
+  const { data: profile } = useQuery({
+    queryKey: ["currentProfile"],
+    queryFn: getCurrentProfile,
+    staleTime: 60_000,
+  });
+
+  return (
+    <View
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        borderWidth: 2,
+        borderColor: focused ? colors.primary : "transparent",
+        overflow: "hidden",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: colors.muted,
+      }}
+    >
+      {profile?.avatar_url ? (
+        <Image source={{ uri: profile.avatar_url }} style={{ width: 24, height: 24, borderRadius: 12 }} />
+      ) : (
+        <Feather name="user" size={16} color={color} />
+      )}
+    </View>
+  );
+}
 
 export default function TabLayout() {
   const colors = useColors();
@@ -15,17 +49,17 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.foreground,
+        tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarShowLabel: false,
         headerShown: false,
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.background,
+          backgroundColor: isIOS ? "transparent" : colors.background + "e6",
           borderTopWidth: isWeb ? 1 : StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
           elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          height: isWeb ? 84 : undefined,
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -34,20 +68,22 @@ export default function TabLayout() {
               tint={isDark ? "dark" : "light"}
               style={StyleSheet.absoluteFill}
             />
-          ) : isWeb ? (
+          ) : (
             <View
               style={[
                 StyleSheet.absoluteFill,
                 { backgroundColor: colors.background },
               ]}
             />
-          ) : null,
+          ),
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ color }) => <Feather name="home" size={26} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="home" size={26} color={color} style={focused ? { transform: [{ scale: 1.05 }] } : undefined} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -57,9 +93,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="create"
+        name="explore"
         options={{
-          tabBarIcon: ({ color }) => <Feather name="plus-square" size={26} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="compass" size={26} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -69,9 +105,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="create"
+        options={{
+          tabBarIcon: ({ color }) => <Feather name="plus-square" size={26} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
-          tabBarIcon: ({ color }) => <Feather name="user" size={26} color={color} />,
+          tabBarIcon: ({ color, focused }) => <ProfileTabIcon focused={focused} color={color} />,
         }}
       />
     </Tabs>
