@@ -16,6 +16,7 @@ import { VisitorDetector } from "@/components/visitor-detector";
 import { DeviceHeartbeat } from "@/components/device-heartbeat";
 import { GuestPromptProvider } from "@/components/guest-login-prompt";
 import { BanScreen } from "@/components/ban-screen";
+import { AntiDownload } from "@/components/anti-download";
 import ProtectedLayout from "@/components/protected-layout";
 import PublicRoute from "@/components/public-route";
 
@@ -270,6 +271,7 @@ function App() {
                     <VisitorDetector />
                     <DeviceHeartbeat />
                     <BanGuard />
+                    <AntiDownload />
                     {showSplash && <SplashOverlay />}
                     <Router />
                   </TooltipProvider>
