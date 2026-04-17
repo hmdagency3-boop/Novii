@@ -549,6 +549,24 @@ export function useUserStories(userId: string) {
   });
 }
 
+export function useHasUserStories(userId: string) {
+  return useQuery({
+    queryKey: ['hasUserStories', userId],
+    queryFn: async () => {
+      if (!userId) return false;
+      const { count } = await supabase
+        .from('stories')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gt('expires_at', new Date().toISOString());
+      return (count || 0) > 0;
+    },
+    enabled: !!userId,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function useCreateStory() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

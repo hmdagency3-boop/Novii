@@ -29,7 +29,7 @@ import { Link, useLocation } from "wouter";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLanguage } from "@/lib/language-context";
 import { useOnlineStatus } from "@/hooks/use-online-status";
-import { useUserStories } from "@/hooks/use-data";
+import { useUserStories, useHasUserStories } from "@/hooks/use-data";
 import { useSwipeTabs } from "@/hooks/use-swipe-tabs";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -170,6 +170,8 @@ export default function Profile() {
 
   // Fetch user stories
   const { data: userStories = [] } = useUserStories(user?.id || '');
+  const { data: hasStoriesQuick = false } = useHasUserStories(user?.id || '');
+  const hasStories = userStories.length > 0 || hasStoriesQuick;
   
   // Listen for double-click on Profile icon to refresh profile data
   useEffect(() => {
@@ -263,12 +265,12 @@ export default function Profile() {
                 isOfficialProfile && "before:absolute before:inset-0 before:rounded-full before:bg-gradient-to-r before:from-purple-500 before:to-pink-500 before:opacity-30 before:blur-xl md:before:blur-2xl before:-z-10 before:animate-pulse"
               )}
               onClick={() => {
-                if (userStories.length > 0) setStoryViewerOpen(true);
+                if (hasStories) setStoryViewerOpen(true);
               }}
             >
               <div className={cn(
                 "w-28 h-28 md:w-48 md:h-48 rounded-full p-1 shadow-xl group-hover:scale-105 transition-transform duration-300",
-                userStories.length > 0
+                hasStories
                   ? (isOfficialProfile
                       ? "bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500 ring-2 ring-purple-400/50 md:ring-purple-400/60"
                       : "bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500")

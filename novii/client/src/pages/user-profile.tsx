@@ -29,7 +29,7 @@ import { FollowersDialog } from "@/components/followers-dialog";
 import { PostViewerModal } from "@/components/post-viewer-modal";
 import { ReelViewerModal } from "@/components/reel-viewer-modal";
 import { StoryViewerModal } from "@/components/story-viewer-modal";
-import { useToggleFollow, useUserStories } from "@/hooks/use-data";
+import { useToggleFollow, useUserStories, useHasUserStories } from "@/hooks/use-data";
 import { OnlineIndicator } from "@/components/online-indicator";
 import { supabase } from "@/lib/supabase";
 import { ProfileShareModal } from "@/components/profile-share-modal";
@@ -238,6 +238,8 @@ export default function UserProfile() {
 
   // Fetch user stories
   const { data: userStories = [] } = useUserStories(userId || '');
+  const { data: hasStoriesQuick = false } = useHasUserStories(userId || '');
+  const hasStories = userStories.length > 0 || hasStoriesQuick;
   
   // Use the unified toggle follow hook
   const followMutation = useToggleFollow();
@@ -325,12 +327,12 @@ export default function UserProfile() {
                 isOfficialProfile && "before:absolute before:inset-0 before:rounded-full before:bg-gradient-to-r before:from-purple-500 before:to-pink-500 before:opacity-30 before:blur-lg md:before:blur-2xl before:-z-10 before:animate-pulse"
               )}
               onClick={() => {
-                if (userStories.length > 0) setStoryViewerOpen(true);
+                if (hasStories) setStoryViewerOpen(true);
               }}
             >
                 <div className={cn(
                   "w-28 h-28 md:w-36 md:h-36 rounded-full p-1 shadow-xl group-hover:scale-105 transition-transform duration-300",
-                  userStories.length > 0
+                  hasStories
                     ? (isOfficialProfile
                         ? "bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500 ring-2 ring-purple-400/50 md:ring-purple-400/60"
                         : "bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500")
