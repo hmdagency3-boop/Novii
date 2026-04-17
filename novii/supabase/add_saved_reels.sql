@@ -25,3 +25,25 @@ CREATE POLICY "Users can save reels"
 DROP POLICY IF EXISTS "Users can unsave reels" ON saved_reels;
 CREATE POLICY "Users can unsave reels"
   ON saved_reels FOR DELETE USING (auth.uid() = user_id);
+
+-- Trigger: تحديث عداد الحفظ على الريل
+CREATE OR REPLACE FUNCTION update_reel_saves_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    UPDATE reels SET saves_count = COALESCE(saves_count, 0) + 1 WHERE id = NEW.reel_id;
+  ELSIF TG_OP = 'DELETE' THEN
+    UPDATE reels SET saves_count = GREATEST(COALESCE(saves_count, 0) - 1, 0) WHERE id = OLD.reel_id;
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS trigger_update_reel_saves_count ON saved_reels;
+CREATE TRIGGER trigger_update_reel_saves_count
+  AFTER INSERT OR DELETE ON saved_reels
+  FOR EACH ROW EXECUTE FUNCTION update_reel_saves_count();
+
+-- إعادة احتساب القيمة الحالية لكل الريلز (مرة واحدة)
+UPDATE reels r
+SET saves_count = COALESCE((SELECT COUNT(*) FROM saved_reels s WHERE s.reel_id = r.id), 0);
