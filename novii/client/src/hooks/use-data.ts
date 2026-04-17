@@ -873,20 +873,28 @@ export function useToggleSaveReel() {
         };
       };
 
-      queryClient.setQueriesData({ queryKey: ['reels'] }, (old: any) => {
+      const patch = (old: any) => {
         if (!old) return old;
         if (old.pages) {
           return { ...old, pages: old.pages.map((p: any[]) => Array.isArray(p) ? p.map(updateReel) : p) };
         }
         return Array.isArray(old) ? old.map(updateReel) : old;
-      });
+      };
+      queryClient.setQueriesData({ queryKey: ['reels'] }, patch);
+      queryClient.setQueriesData({ queryKey: ['reels-infinite'] }, patch);
+      queryClient.setQueriesData({ queryKey: ['explore-reels'] }, patch);
+      queryClient.setQueriesData({ queryKey: ['userReels'] }, patch);
     },
     onError: () => {
       queryClient.invalidateQueries({ queryKey: ['reels'] });
+      queryClient.invalidateQueries({ queryKey: ['reels-infinite'] });
+      queryClient.invalidateQueries({ queryKey: ['explore-reels'] });
       queryClient.invalidateQueries({ queryKey: ['saved-reels'] });
+      queryClient.invalidateQueries({ queryKey: ['savedReels'] });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-reels'] });
+      queryClient.invalidateQueries({ queryKey: ['savedReels'] });
     },
   });
 }
