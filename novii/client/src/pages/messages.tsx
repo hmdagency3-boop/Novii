@@ -2533,7 +2533,7 @@ export default function Messages() {
                       <div className="hidden md:flex px-4 py-3 bg-background border-t border-border shrink-0 gap-2">
                         <div className="flex items-center gap-2 w-full">
                           <IsolatedChatInput
-                            ref={communityComposerRef}
+                            ref={setCommunityComposerRef}
                             disabled={userMuteStatus?.isMuted || userKickedStatus?.isKicked}
                             rtl={isRTL}
                             onHasTextChange={setHasCommunityText}
@@ -2774,7 +2774,7 @@ export default function Messages() {
                       {selectedCommunityId && (
                         <div className="flex items-end gap-1 w-full leading-none pb-1 m-0">
                           <IsolatedChatInput
-                            ref={communityComposerRef}
+                            ref={setCommunityComposerRef}
                             disabled={userMuteStatus?.isMuted || userKickedStatus?.isKicked}
                             rtl={isRTL}
                             onHasTextChange={setHasCommunityText}
@@ -2940,7 +2940,7 @@ export default function Messages() {
             {selectedCommunityId && (
             <div className="flex items-end gap-0 w-full leading-none pb-0 m-0 py-0">
               <IsolatedChatInput
-                ref={communityComposerRef}
+                ref={setCommunityComposerRef}
                 disabled={userMuteStatus?.isMuted || userKickedStatus?.isKicked}
                 rtl={isRTL}
                 onHasTextChange={setHasCommunityText}
