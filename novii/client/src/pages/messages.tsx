@@ -1021,10 +1021,15 @@ export default function Messages() {
   });
 
   // Fetch messages for selected user
+  // staleTime:0 + refetchOnMount ensures fresh messages every time a chat is opened,
+  // overriding the global staleTime:Infinity default in queryClient.
   const { data: messages = [], isLoading: messagesLoading } = useQuery({
     queryKey: ['messages', selectedUserId],
     queryFn: () => selectedUserId ? api.getMessages(selectedUserId) : Promise.resolve([]),
     enabled: !!selectedUserId && !!currentUser,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   // Fetch selected user profile (for when starting a new conversation)
@@ -1252,11 +1257,20 @@ export default function Messages() {
             // Increment unread count by 1 for this conversation (don't refetch all data)
             queryClient.setQueryData(['conversations', currentUser.id], (oldData: any) => {
               if (!oldData) return oldData;
-              return oldData.map((conv: any) => 
-                conv.user?.id === newMessage.sender_id 
+              return oldData.map((conv: any) =>
+                conv.user?.id === newMessage.sender_id
                   ? { ...conv, unreadCount: conv.unreadCount + 1, lastMessage: newMessage }
                   : conv
               );
+            });
+
+            // Append the new message into the messages cache for the sender so
+            // when the user opens that chat, the new message is already there
+            // (and we don't depend solely on a possibly-stale refetch).
+            queryClient.setQueryData(['messages', newMessage.sender_id], (oldData: any) => {
+              const existing = Array.isArray(oldData) ? oldData : [];
+              if (existing.some((m: any) => m.id === newMessage.id)) return existing;
+              return [...existing, newMessage];
             });
             
             // Play notification sound (only if conversation not muted)
