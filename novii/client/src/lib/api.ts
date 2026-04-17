@@ -2504,14 +2504,18 @@ export const api = {
 
     const newHideLikesStatus = !post.hide_likes;
 
-    const { error: updateError } = await supabase
+    const { data: updated, error: updateError } = await supabase
       .from('posts')
       .update({ hide_likes: newHideLikesStatus })
       .eq('id', postId)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select('id, hide_likes');
 
     if (updateError) throw updateError;
-    return newHideLikesStatus;
+    if (!updated || updated.length === 0) {
+      throw new Error('Update blocked by RLS — run novii/supabase/fix_posts_update_policy.sql');
+    }
+    return updated[0].hide_likes as boolean;
   },
 
   // Toggle Reply Settings
@@ -2531,14 +2535,18 @@ export const api = {
 
     const newRepliesDisabledStatus = !post.replies_disabled;
 
-    const { error: updateError } = await supabase
+    const { data: updated, error: updateError } = await supabase
       .from('posts')
       .update({ replies_disabled: newRepliesDisabledStatus })
       .eq('id', postId)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select('id, replies_disabled');
 
     if (updateError) throw updateError;
-    return newRepliesDisabledStatus;
+    if (!updated || updated.length === 0) {
+      throw new Error('Update blocked by RLS — run novii/supabase/fix_posts_update_policy.sql');
+    }
+    return updated[0].replies_disabled as boolean;
   },
 
   // Record Post View

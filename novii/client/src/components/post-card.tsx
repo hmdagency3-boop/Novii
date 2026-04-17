@@ -59,8 +59,8 @@ export default function PostCard({ post }: PostCardProps) {
   const [floatingHearts, setFloatingHearts] = useState<FloatingHeart[]>([]);
   const [shareSuccess, setShareSuccess] = useState(false);
   const [isPinned, setIsPinned] = useState(post.is_pinned ?? false);
-  const [hideLikes, setHideLikes] = useState(post.hide_likes ?? false);
-  const [repliesDisabled, setRepliesDisabled] = useState(post.replies_disabled ?? false);
+  const hideLikes = post.hide_likes ?? false;
+  const repliesDisabled = post.replies_disabled ?? false;
   const [showInsights, setShowInsights] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
   
@@ -258,7 +258,6 @@ export default function PostCard({ post }: PostCardProps) {
                 <DropdownMenuItem 
                   onClick={() => {
                     toggleHideLikes.mutate(post.id);
-                    setHideLikes(!hideLikes);
                   }}
                   className="cursor-pointer flex items-center justify-between gap-2"
                 >

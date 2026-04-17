@@ -63,8 +63,8 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
   const [shareSuccess, setShareSuccess] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isPinned, setIsPinned] = useState(post?.is_pinned ?? false);
-  const [hideLikes, setHideLikes] = useState(post?.hide_likes ?? false);
-  const [repliesDisabled, setRepliesDisabled] = useState(post?.replies_disabled ?? false);
+  const hideLikes = post?.hide_likes ?? false;
+  const repliesDisabled = post?.replies_disabled ?? false;
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
   const commentInputRef = useRef<HTMLInputElement>(null);
@@ -239,7 +239,6 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                 <DropdownMenuItem 
                   onClick={() => {
                     toggleHideLikes.mutate(post.id);
-                    setHideLikes(!hideLikes);
                   }}
                   className="cursor-pointer flex items-center justify-between gap-2"
                 >
@@ -251,7 +250,6 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                 <DropdownMenuItem 
                   onClick={() => {
                     toggleReplies.mutate(post.id);
-                    setRepliesDisabled(!repliesDisabled);
                   }}
                   className="cursor-pointer flex items-center justify-between gap-2"
                 >
