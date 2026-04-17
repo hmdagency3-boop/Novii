@@ -146,6 +146,7 @@ export default function Profile() {
         .from('reels')
         .select(`${REEL_COLUMNS}, user:profiles(${PROFILE_CARD})`)
         .eq('user_id', user.id)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
       
       if (!data) return [];

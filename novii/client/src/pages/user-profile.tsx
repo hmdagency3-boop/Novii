@@ -136,6 +136,7 @@ export default function UserProfile() {
         .from('reels')
         .select('*, user:profiles(*)')
         .eq('user_id', userId)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
       
       if (!data) return [];
