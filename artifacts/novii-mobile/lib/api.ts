@@ -128,6 +128,38 @@ async function getCurrentUserId(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
+export async function createProfile(
+  userId: string,
+  username: string,
+  gender?: string,
+  fullName?: string,
+  phone?: string,
+): Promise<Profile> {
+  const defaultAvatarUrl =
+    gender === "female"
+      ? "/assets/default_avatar_female.png"
+      : "/assets/default_avatar_male.png";
+  const updateData: Record<string, unknown> = {
+    username,
+    full_name: fullName || username,
+    gender: gender || null,
+    avatar_url: defaultAvatarUrl,
+    is_online: false,
+    last_seen: new Date().toISOString(),
+  };
+  if (phone && phone.trim()) {
+    updateData.phone_number = phone.trim();
+  }
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(updateData)
+    .eq("id", userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Profile;
+}
+
 // ───────── Posts / Feed ─────────
 
 export async function getFeed(limit = 20, offset = 0): Promise<Post[]> {
