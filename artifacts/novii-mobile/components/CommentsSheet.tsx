@@ -101,7 +101,7 @@ export default function CommentsSheet({
 
           {/* List */}
           {isLoading ? (
-            <View style={styles.center}>
+            <View style={[styles.center, { flex: 1 }]}>
               <ActivityIndicator color={colors.primary} />
             </View>
           ) : (
@@ -109,10 +109,15 @@ export default function CommentsSheet({
               data={comments}
               keyExtractor={(c) => c.id}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingVertical: 8 }}
+              style={{ flex: 1 }}
+              contentContainerStyle={
+                comments.length === 0
+                  ? { flexGrow: 1, justifyContent: "center" }
+                  : { paddingVertical: 8 }
+              }
               renderItem={({ item }) => <CommentRow comment={item} />}
               ListEmptyComponent={
-                <View style={[styles.center, { paddingVertical: 60 }]}>
+                <View style={styles.emptyWrap}>
                   <Feather name="message-circle" size={28} color={colors.mutedForeground} />
                   <Text
                     style={{
@@ -261,7 +266,8 @@ const styles = StyleSheet.create({
   },
   title: { fontFamily: "Inter_600SemiBold", fontSize: 16 },
   closeBtn: { position: "absolute", right: 12, padding: 4 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  center: { alignItems: "center", justifyContent: "center" },
+  emptyWrap: { alignItems: "center", justifyContent: "center", paddingVertical: 40 },
   commentRow: {
     flexDirection: "row",
     gap: 10,
