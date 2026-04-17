@@ -10,7 +10,7 @@ export default function PrivacyPolicy() {
   const BackIcon = isRtl ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="min-h-screen bg-background text-foreground" dir={direction}>
+    <div className="h-screen overflow-y-auto bg-background text-foreground" dir={direction}>
       <div className="max-w-3xl mx-auto px-4 py-10">
         <div className="mb-8">
           <Link href="/auth">
