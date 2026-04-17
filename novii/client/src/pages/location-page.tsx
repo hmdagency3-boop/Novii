@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, MapPin, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight, MapPin } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import PostCard from "@/components/post-card";
 import Layout from "@/components/layout";
@@ -48,31 +48,28 @@ export default function LocationPage() {
     enabled: !!name,
   });
 
-  const headings: Record<string, { posts: string; noPosts: string; openMap: string; loading: string }> = {
-    ar: { posts: "بوستات في هذا المكان", noPosts: "لا توجد بوستات بعد في هذا المكان", openMap: "افتح في الخريطة", loading: "جارٍ تحميل الخريطة..." },
-    en: { posts: "Posts at this location", noPosts: "No posts at this location yet", openMap: "Open in maps", loading: "Loading map..." },
-    es: { posts: "Publicaciones en este lugar", noPosts: "Aún no hay publicaciones en este lugar", openMap: "Abrir en mapas", loading: "Cargando mapa..." },
-    fr: { posts: "Publications à cet endroit", noPosts: "Aucune publication à cet endroit", openMap: "Ouvrir dans les cartes", loading: "Chargement de la carte..." },
-    de: { posts: "Beiträge an diesem Ort", noPosts: "Noch keine Beiträge an diesem Ort", openMap: "In Karten öffnen", loading: "Karte wird geladen..." },
-    it: { posts: "Post in questo luogo", noPosts: "Ancora nessun post in questo luogo", openMap: "Apri nelle mappe", loading: "Caricamento mappa..." },
-    pt: { posts: "Posts neste local", noPosts: "Ainda não há posts neste local", openMap: "Abrir no mapa", loading: "Carregando mapa..." },
-    ru: { posts: "Посты в этом месте", noPosts: "Пока нет постов в этом месте", openMap: "Открыть в картах", loading: "Загрузка карты..." },
-    zh: { posts: "此地点的帖子", noPosts: "此地点暂无帖子", openMap: "在地图中打开", loading: "正在加载地图..." },
-    ja: { posts: "この場所の投稿", noPosts: "この場所にはまだ投稿がありません", openMap: "地図で開く", loading: "地図を読み込み中..." },
-    ko: { posts: "이 위치의 게시물", noPosts: "아직 이 위치에 게시물이 없습니다", openMap: "지도에서 열기", loading: "지도 로딩 중..." },
-    hi: { posts: "इस स्थान पर पोस्ट", noPosts: "इस स्थान पर अभी तक कोई पोस्ट नहीं", openMap: "मानचित्र में खोलें", loading: "मानचित्र लोड हो रहा है..." },
-    tr: { posts: "Bu konumdaki gönderiler", noPosts: "Bu konumda henüz gönderi yok", openMap: "Haritada aç", loading: "Harita yükleniyor..." },
-    fa: { posts: "پست‌های این مکان", noPosts: "هنوز پستی در این مکان نیست", openMap: "در نقشه باز کن", loading: "در حال بارگذاری نقشه..." },
-    ur: { posts: "اس مقام پر پوسٹس", noPosts: "اس مقام پر ابھی کوئی پوسٹ نہیں", openMap: "نقشے میں کھولیں", loading: "نقشہ لوڈ ہو رہا ہے..." },
-    he: { posts: "פוסטים במיקום זה", noPosts: "אין עדיין פוסטים במיקום זה", openMap: "פתח במפות", loading: "טוען מפה..." },
+  const headings: Record<string, { posts: string; noPosts: string; loading: string }> = {
+    ar: { posts: "بوستات في هذا المكان", noPosts: "لا توجد بوستات بعد في هذا المكان", loading: "جارٍ تحميل الخريطة..." },
+    en: { posts: "Posts at this location", noPosts: "No posts at this location yet", loading: "Loading map..." },
+    es: { posts: "Publicaciones en este lugar", noPosts: "Aún no hay publicaciones en este lugar", loading: "Cargando mapa..." },
+    fr: { posts: "Publications à cet endroit", noPosts: "Aucune publication à cet endroit", loading: "Chargement de la carte..." },
+    de: { posts: "Beiträge an diesem Ort", noPosts: "Noch keine Beiträge an diesem Ort", loading: "Karte wird geladen..." },
+    it: { posts: "Post in questo luogo", noPosts: "Ancora nessun post in questo luogo", loading: "Caricamento mappa..." },
+    pt: { posts: "Posts neste local", noPosts: "Ainda não há posts neste local", loading: "Carregando mapa..." },
+    ru: { posts: "Посты в этом месте", noPosts: "Пока нет постов в этом месте", loading: "Загрузка карты..." },
+    zh: { posts: "此地点的帖子", noPosts: "此地点暂无帖子", loading: "正在加载地图..." },
+    ja: { posts: "この場所の投稿", noPosts: "この場所にはまだ投稿がありません", loading: "地図で読み込み中..." },
+    ko: { posts: "이 위치의 게시물", noPosts: "아직 이 위치에 게시물이 없습니다", loading: "지도 로딩 중..." },
+    hi: { posts: "इस स्थान पर पोस्ट", noPosts: "इस स्थान पर अभी तक कोई पोस्ट नहीं", loading: "मानचित्र लोड हो रहा है..." },
+    tr: { posts: "Bu konumdaki gönderiler", noPosts: "Bu konumda henüz gönderi yok", loading: "Harita yükleniyor..." },
+    fa: { posts: "پست‌های این مکان", noPosts: "هنوز پستی در این مکان نیست", loading: "در حال بارگذاری نقشه..." },
+    ur: { posts: "اس مقام پر پوسٹس", noPosts: "اس مقام پر ابھی کوئی پوسٹ نہیں", loading: "نقشہ لوڈ ہو رہا ہے..." },
+    he: { posts: "פוסטים במיקום זה", noPosts: "אין עדיין פוסטים במיקום זה", loading: "טוען מפה..." },
   };
   const t = headings[language.code] || headings.en;
 
   const bbox = geo ? `${geo.lon - 0.01},${geo.lat - 0.01},${geo.lon + 0.01},${geo.lat + 0.01}` : null;
   const embedUrl = bbox ? `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${geo!.lat},${geo!.lon}` : null;
-  const externalUrl = geo
-    ? `https://www.openstreetmap.org/?mlat=${geo.lat}&mlon=${geo.lon}#map=15/${geo.lat}/${geo.lon}`
-    : `https://www.openstreetmap.org/search?query=${encodeURIComponent(name)}`;
 
   return (
     <Layout>
@@ -90,20 +87,24 @@ export default function LocationPage() {
         </div>
 
         <div className="px-4 pt-4">
-          <div className="relative w-full aspect-[16/10] rounded-2xl overflow-hidden border border-border bg-muted">
+          <div className="relative w-full aspect-[16/10] rounded-2xl overflow-hidden border border-border bg-muted mb-4">
             {geoLoading && (
               <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
                 {t.loading}
               </div>
             )}
             {!geoLoading && embedUrl && (
-              <iframe
-                key={embedUrl}
-                src={embedUrl}
-                className="w-full h-full border-0"
-                loading="lazy"
-                title={name}
-              />
+              <>
+                <iframe
+                  key={embedUrl}
+                  src={embedUrl}
+                  className="absolute inset-x-0 top-0 w-full border-0"
+                  style={{ height: "calc(100% + 28px)" }}
+                  loading="lazy"
+                  title={name}
+                />
+                <div className="absolute inset-x-0 bottom-0 h-7 bg-muted pointer-events-none" />
+              </>
             )}
             {!geoLoading && !embedUrl && (
               <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground p-4 text-center">
@@ -111,17 +112,6 @@ export default function LocationPage() {
                 {name}
               </div>
             )}
-          </div>
-          <div className="mt-2 mb-4 text-end">
-            <a
-              href={externalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              {t.openMap}
-            </a>
           </div>
         </div>
 
