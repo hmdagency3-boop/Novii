@@ -649,7 +649,7 @@ export async function getPersonalizedExploreReels(
 
   const REEL_SELECT = `
     id, user_id, video_url, thumbnail_url, caption,
-    likes_count, comments_count, views_count, is_featured, created_at,
+    likes_count, comments_count, saves_count, views_count, is_featured, created_at,
     profile:profiles!reels_user_id_fkey(
       id, username, avatar_url, is_verified, is_official, is_featured, followers_count
     )
