@@ -11,7 +11,14 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
-import { useCreatePost } from "@/hooks/use-data";
+import { useCreatePost, useCurrentUser } from "@/hooks/use-data";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
+import { VerifiedUsername } from "@/components/ui/verified-username";
+import { OfficialBadge } from "@/components/ui/official-badge";
+import { CreatorBadge } from "@/components/ui/creator-badge";
+import { PremiumBadge } from "@/components/ui/premium-badge";
+import { PopularBadge } from "@/components/ui/popular-badge";
+import { ActiveBadge } from "@/components/ui/active-badge";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
   X, 
@@ -624,14 +631,26 @@ export function CreatePostModal({ open, onOpenChange, initialMediaType }: Create
                 <div className="p-4 space-y-4">
                   <div className="flex items-center gap-3">
                     <Avatar className="w-8 h-8">
-                      <AvatarImage src={user?.user_metadata?.avatar_url} />
+                      <AvatarImage src={myProfile?.avatar_url || user?.user_metadata?.avatar_url} />
                       <AvatarFallback className="text-xs font-semibold bg-primary text-primary-foreground">
-                        {user?.user_metadata?.username?.[0]?.toUpperCase() || 'U'}
+                        {(myProfile?.full_name || myProfile?.username || user?.user_metadata?.username || user?.email || "U")[0]?.toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="font-semibold text-sm">
-                      {user?.user_metadata?.username || user?.email?.split('@')[0] || 'User'}
-                    </span>
+                    <div className="flex items-center gap-1 flex-wrap min-w-0">
+                      <VerifiedUsername
+                        username={myProfile?.full_name || myProfile?.username || user?.user_metadata?.username || user?.email?.split('@')[0] || 'User'}
+                        isVerified={myProfile?.is_verified}
+                        className="font-semibold text-sm"
+                      />
+                      <div className="flex items-center gap-0.5 flex-wrap">
+                        {myProfile?.is_verified && <VerifiedBadge size="sm" verifiedAt={myProfile?.verified_at} />}
+                        {myProfile?.is_official && <OfficialBadge size="sm" showText={false} />}
+                        {myProfile?.is_creator && <CreatorBadge size="sm" />}
+                        {myProfile?.is_premium && <PremiumBadge size="sm" />}
+                        {myProfile?.is_popular && <PopularBadge size="sm" />}
+                        {myProfile?.is_active && <ActiveBadge size="sm" />}
+                      </div>
+                    </div>
                   </div>
 
                   <Textarea
