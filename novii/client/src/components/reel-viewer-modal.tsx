@@ -744,7 +744,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-white text-sm flex items-center gap-1">
-                    {localReel.user?.username}
+                    {localReel.user?.full_name || localReel.user?.username}
                     {localReel.user?.is_verified && <VerifiedBadge size="sm" />}
                   </p>
                   <p className="text-xs text-white/60">{formattedTime}</p>
@@ -773,7 +773,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-foreground group-hover:text-pink-400 transition-colors flex items-center gap-1.5 flex-wrap">
-                      {localReel.user?.username}
+                      {localReel.user?.full_name || localReel.user?.username}
                       {localReel.user?.is_verified && <VerifiedBadge size="sm" />}
                       {localReel.user?.is_official && <OfficialBadge size="sm" showText={false} />}
                       {localReel.user?.is_creator && <CreatorBadge size="sm" />}
