@@ -9,6 +9,8 @@ import { ReelViewerModal } from "@/components/reel-viewer-modal";
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import type { Post, Reel } from "@/lib/api";
+import { useLanguage } from "@/lib/language-context";
+import { getExploreTranslation } from "@/lib/explore-translations";
 
 interface TrendingHashtag {
   id: string;
@@ -44,6 +46,8 @@ function ExploreContent() {
   const [selectedReel, setSelectedReel] = useState<Reel | null>(null);
   const [trendingTags, setTrendingTags] = useState<TrendingHashtag[]>([]);
   const [, navigate] = useLocation();
+  const { language, direction } = useLanguage();
+  const exploreT = getExploreTranslation(language.code);
 
   useEffect(() => {
     fetch("/api/hashtags/trending")
@@ -104,7 +108,7 @@ function ExploreContent() {
         <div className="relative max-w-md mx-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Search Novii..."
+            placeholder={exploreT.searchPlaceholder}
             className="pl-10 bg-secondary/50 border-transparent focus-visible:bg-background focus-visible:border-primary transition-all rounded-xl"
             onFocus={!user ? showPrompt : undefined}
             readOnly={!user}
@@ -113,12 +117,12 @@ function ExploreContent() {
       </div>
 
       {trendingTags.length > 0 && (
-        <div className="px-4 py-3 border-b border-border">
+        <div className="px-4 py-3 border-b border-border" dir={direction}>
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="w-4 h-4 text-purple-500" />
-            <span className="text-sm font-semibold">هاشتاقات رائجة</span>
+            <span className="text-sm font-semibold">{exploreT.trendingHashtags}</span>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none" dir="rtl">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none" dir={direction}>
             {trendingTags.slice(0, 10).map((t) => (
               <button
                 key={t.id}
