@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -20,6 +21,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createProfile } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+
+const NOVII_LOGO = require("../assets/images/novii_logo.png");
 
 const COUNTRY_CODES = [
   { code: "+966", flag: "🇸🇦", name: "السعودية" },
@@ -272,14 +275,11 @@ export default function AuthScreen() {
                 {/* Logo with glow */}
                 <View style={styles.brandRow}>
                   <View style={styles.logoGlowOuter}>
-                    <LinearGradient
-                      colors={["#ec4899", "#a855f7", "#06b6d4"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
+                    <Image
+                      source={NOVII_LOGO}
                       style={styles.logoBox}
-                    >
-                      <Text style={styles.logoLetter}>n</Text>
-                    </LinearGradient>
+                      resizeMode="contain"
+                    />
                   </View>
                   <Text style={styles.brandText}>Novii</Text>
                   <LinearGradient
@@ -801,11 +801,9 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   logoBox: {
-    width: 80,
-    height: 80,
+    width: 84,
+    height: 84,
     borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
   },
   logoLetter: {
     color: "#fff",
