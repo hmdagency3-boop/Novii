@@ -590,7 +590,7 @@ const MobileReelCard = React.memo(function MobileReelCard({
         isRTL ? "text-right pr-4 pl-16" : "pl-4 pr-16")}>
         <Link href={`/user?id=${reel.profile?.id}`}>
           <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity drop-shadow">
-            @{reel.profile?.username}
+            {reel.profile?.full_name || reel.profile?.username}
           </p>
         </Link>
         {reel.caption && (
@@ -723,7 +723,7 @@ const DesktopReelCard = React.memo(function DesktopReelCard({
           <div className="absolute bottom-0 left-0 right-0 z-20 p-5">
             <Link href={`/user?id=${reel.profile?.id}`}>
               <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity drop-shadow">
-                @{reel.profile?.username}
+                {reel.profile?.full_name || reel.profile?.username}
               </p>
             </Link>
             {reel.caption && (

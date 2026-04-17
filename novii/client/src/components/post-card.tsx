@@ -187,7 +187,7 @@ export default function PostCard({ post }: PostCardProps) {
           <Link href={`/user?id=${post.user_id}`} className="flex flex-col leading-tight min-w-0 flex-1 hover:opacity-80 transition-opacity">
             <div className="flex items-center gap-1 flex-wrap">
               <VerifiedUsername
-                username={post.profile?.username || ""}
+                username={post.profile?.full_name || post.profile?.username || ""}
                 isVerified={post.profile?.is_verified}
                 className="text-sm sm:text-base lg:text-lg font-semibold truncate"
               />
@@ -438,7 +438,7 @@ export default function PostCard({ post }: PostCardProps) {
         <div className="text-sm space-y-2">
             <div className="flex items-start gap-1">
               <Link href={`/user?id=${post.user_id}`} className="inline-flex items-center gap-1 font-bold hover:opacity-80 transition-opacity flex-shrink-0">
-                {post.profile?.username}
+                {post.profile?.full_name || post.profile?.username}
                 {post.profile?.is_verified && <VerifiedBadge size="sm" verifiedAt={post.profile?.verified_at} />}
               </Link>
               <span className="flex-1">
