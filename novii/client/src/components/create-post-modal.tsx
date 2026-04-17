@@ -80,6 +80,7 @@ const FILTERS = [
 export function CreatePostModal({ open, onOpenChange, initialMediaType }: CreatePostModalProps) {
   const { direction, language } = useLanguage();
   const { user } = useAuth();
+  const { data: myProfile } = useCurrentUser();
   const { toast } = useToast();
   const createPostMutation = useCreatePost();
   const queryClient = useQueryClient();
