@@ -51,6 +51,7 @@ import {
 import { useState, useRef, useEffect, memo, forwardRef, useImperativeHandle } from "react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
+import { getPresenceTranslation } from "@/lib/presence-translations";
 import { getTranslation } from "@/lib/translations";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
@@ -2632,7 +2633,7 @@ export default function Messages() {
                                 {selectedConversation.user?.is_online ? (
                                   <span className="text-xs text-green-600 font-medium flex items-center gap-1">
                                     <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse"></span>
-                                    {isRTL ? "نشط الآن" : "Active now"}
+                                    {getPresenceTranslation(language.code).activeNow}
                                   </span>
                                 ) : selectedConversation.user?.last_seen ? (
                                   <span className="text-xs text-muted-foreground flex items-center gap-1">

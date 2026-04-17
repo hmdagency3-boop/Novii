@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { useLanguage } from '@/lib/language-context';
+import { formatLastSeen } from '@/lib/presence-translations';
 import './online-indicator.css';
 
 interface OnlineIndicatorProps {
@@ -13,6 +15,7 @@ export const OnlineIndicator = ({ userId, size = 'md', shouldShow = true }: Onli
   if (!shouldShow) return null;
   const [isOnline, setIsOnline] = useState(false);
   const [lastSeen, setLastSeen] = useState<string>('');
+  const { language } = useLanguage();
 
   useEffect(() => {
     const fetchOnlineStatus = async () => {
@@ -40,26 +43,7 @@ export const OnlineIndicator = ({ userId, size = 'md', shouldShow = true }: Onli
     lg: 'w-4 h-4',
   };
 
-  const getLastSeenText = (): string => {
-    if (isOnline) return 'نشط الآن';
-    
-    if (!lastSeen) return '';
-    
-    const now = new Date();
-    const lastSeenDate = new Date(lastSeen);
-    const diffMs = now.getTime() - lastSeenDate.getTime();
-    const diffSeconds = Math.floor(diffMs / 1000);
-    const diffMinutes = Math.floor(diffSeconds / 60);
-    const diffHours = Math.floor(diffMinutes / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffSeconds < 60) return 'نشط الآن';
-    if (diffMinutes < 60) return `قبل ${diffMinutes} دقيقة`;
-    if (diffHours < 24) return `قبل ${diffHours} ساعة`;
-    if (diffDays < 7) return `قبل ${diffDays} يوم`;
-    
-    return lastSeenDate.toLocaleDateString('ar-SA');
-  };
+  const getLastSeenText = (): string => formatLastSeen(lastSeen, language.code, isOnline);
 
   return (
     <div className="group relative">

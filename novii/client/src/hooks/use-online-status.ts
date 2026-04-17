@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { createPresenceDebouncer } from '@/lib/optimizations';
+import { formatLastSeen } from '@/lib/presence-translations';
 
 // Global debouncer for presence updates - reduces 21,805 calls to ~700 (96.7% reduction!)
 const presenceDebouncer = createPresenceDebouncer(30000); // 30 seconds max
@@ -58,19 +59,8 @@ export const useOnlineStatus = () => {
   }, [user]);
 };
 
-export const getLastSeenText = (lastSeen: string): string => {
-  const now = new Date();
-  const lastSeenDate = new Date(lastSeen);
-  const diffMs = now.getTime() - lastSeenDate.getTime();
-  const diffSeconds = Math.floor(diffMs / 1000);
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
+import { formatLastSeen } from '@/lib/presence-translations';
 
-  if (diffSeconds < 60) return 'نشط الآن';
-  if (diffMinutes < 60) return `قبل ${diffMinutes} دقيقة`;
-  if (diffHours < 24) return `قبل ${diffHours} ساعة`;
-  if (diffDays < 7) return `قبل ${diffDays} يوم`;
-  
-  return lastSeenDate.toLocaleDateString('ar-SA');
+export const getLastSeenText = (lastSeen: string, langCode: string = 'ar'): string => {
+  return formatLastSeen(lastSeen, langCode, false);
 };
