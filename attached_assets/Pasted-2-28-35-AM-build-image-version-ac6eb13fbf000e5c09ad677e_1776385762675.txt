@@ -1,0 +1,99 @@
+2:28:35 AM: build-image version: ac6eb13fbf000e5c09ad677efd8b7c3c2d0142b6 (noble-new-builds)
+2:28:35 AM: buildbot version: 8867f4b2604d4cbf5c3a806b3254c82128b2ca70
+2:28:35 AM: Building with cache
+2:28:35 AM: Starting to prepare the repo for build
+2:28:35 AM: Preparing Git Reference refs/heads/main
+2:28:37 AM: Installing dependencies
+2:28:37 AM: mise ~/.config/mise/config.toml tools: python@3.14.3
+2:28:37 AM: mise ~/.config/mise/config.toml tools: ruby@3.4.8
+2:28:37 AM: mise ~/.config/mise/config.toml tools: go@1.26.2
+2:28:38 AM: v20.20.2 is already installed.
+2:28:38 AM: Now using node v20.20.2 (npm v10.8.2)
+2:28:38 AM: Enabling Node.js Corepack
+2:28:38 AM: WARNING: The environment variable 'NODE_ENV' is set to 'production'. Any 'devDependencies' in package.json will not be installed
+2:28:39 AM: pnpm workspaces detected
+2:28:39 AM: Installing npm packages using pnpm version 10.30.3
+2:28:40 AM: Scope: all 11 workspace projects
+2:28:40 AM: Lockfile is up to date, resolution step is skipped
+2:28:40 AM: Already up to date
+2:28:42 AM: . preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac'
+2:28:42 AM: . preinstall: Done
+2:28:42 AM: ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2:28:42 AM: │                                                                              │
+2:28:42 AM: │   Ignored build scripts: bufferutil@4.1.0.                                   │
+2:28:42 AM: │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2:28:42 AM: │   to run scripts.                                                            │
+2:28:42 AM: │                                                                              │
+2:28:42 AM: ╰──────────────────────────────────────────────────────────────────────────────╯
+2:28:42 AM: Done in 2.9s using pnpm v10.30.3
+2:28:42 AM: npm packages installed using pnpm
+2:28:43 AM: Successfully installed dependencies
+2:28:43 AM: Detected 0 framework(s)
+2:28:43 AM: Starting build script
+2:28:44 AM: Section completed: initializing
+2:28:46 AM: ​
+2:28:46 AM: Netlify Build                                                 
+2:28:46 AM: ────────────────────────────────────────────────────────────────
+2:28:46 AM: ​
+2:28:46 AM: ❯ Version
+2:28:46 AM:   @netlify/build 35.13.1
+2:28:46 AM: ​
+2:28:46 AM: ❯ Flags
+2:28:46 AM:   accountId: 69e170cc7badbd44a14188ef
+2:28:46 AM:   baseRelDir: true
+2:28:46 AM:   buildId: 69e17eb2fcb15800088d76a8
+2:28:46 AM:   deployId: 69e17eb2fcb15800088d76aa
+2:28:46 AM:   packagePath: artifacts/novii-admin
+2:28:46 AM: ​
+2:28:46 AM: ❯ Current directory
+2:28:46 AM:   /opt/build/repo
+2:28:46 AM: ​
+2:28:46 AM: ❯ Config file
+2:28:46 AM:   /opt/build/repo/artifacts/novii-admin/netlify.toml
+2:28:46 AM: ​
+2:28:46 AM: ❯ Context
+2:28:46 AM:   production
+2:28:46 AM: ​
+2:28:46 AM: build.command from netlify.toml                               
+2:28:46 AM: ────────────────────────────────────────────────────────────────
+2:28:46 AM: ​
+2:28:46 AM: $ cd ../.. && pnpm install && BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/novii-admin run build
+2:28:47 AM: Failed during stage 'building site': Build script returned non-zero exit code: 2 (https://ntl.fyi/exit-code-2)
+2:28:47 AM:  ERR_PNPM_NO_PKG_MANIFEST  No package.json found in /opt
+2:28:47 AM: ​
+2:28:47 AM: "build.command" failed                                        
+2:28:47 AM: ────────────────────────────────────────────────────────────────
+2:28:47 AM: ​
+2:28:47 AM:   Error message
+2:28:47 AM:   Command failed with exit code 1: cd ../.. && pnpm install && BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/novii-admin run build (https://ntl.fyi/exit-code-1)
+2:28:47 AM: ​
+2:28:47 AM:   Error location
+2:28:47 AM:   In build.command from netlify.toml:
+2:28:47 AM:   cd ../.. && pnpm install && BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/novii-admin run build
+2:28:47 AM: ​
+2:28:47 AM:   Resolved config
+2:28:47 AM:   build:
+2:28:47 AM:     command: cd ../.. && pnpm install && BASE_PATH=/ NODE_ENV=production pnpm
+2:28:47 AM:       --filter @workspace/novii-admin run build
+2:28:47 AM:     commandOrigin: config
+2:28:47 AM:     environment:
+2:28:47 AM:       - CLOUDINARY_API_KEY
+2:28:47 AM:       - CLOUDINARY_API_SECRET
+2:28:47 AM:       - CLOUDINARY_CLOUD_NAME
+2:28:47 AM:       - SUPABASE_ANON_KEY
+2:28:47 AM:       - SUPABASE_SERVICE_ROLE_KEY
+2:28:47 AM:       - SUPABASE_URL
+2:28:47 AM:       - VITE_SUPABASE_ANON_KEY
+2:28:47 AM:       - VITE_SUPABASE_URL
+2:28:47 AM:       - NODE_VERSION
+2:28:47 AM:       - NODE_ENV
+2:28:47 AM:     publish: /opt/build/repo/dist/public
+2:28:47 AM:     publishOrigin: config
+2:28:47 AM:   redirects:
+2:28:47 AM:     - from: /*
+      status: 200
+      to: /index.html
+  redirectsOrigin: config
+2:28:47 AM: Build failed due to a user error: Build script returned non-zero exit code: 2
+2:28:47 AM: Failing build: Failed to build site
+2:28:48 AM: Finished processing build request in 12.45s
