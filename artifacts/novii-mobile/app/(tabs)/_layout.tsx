@@ -15,7 +15,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: colors.foreground,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarShowLabel: false,
         headerShown: false,
@@ -47,25 +47,31 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ color }) => (
-            <Feather name="home" size={24} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Feather name="home" size={26} color={color} />,
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
-          tabBarIcon: ({ color }) => (
-            <Feather name="search" size={24} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Feather name="search" size={26} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="create"
+        options={{
+          tabBarIcon: ({ color }) => <Feather name="plus-square" size={26} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="reels"
+        options={{
+          tabBarIcon: ({ color }) => <Feather name="film" size={26} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarIcon: ({ color }) => (
-            <Feather name="user" size={24} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Feather name="user" size={26} color={color} />,
         }}
       />
     </Tabs>

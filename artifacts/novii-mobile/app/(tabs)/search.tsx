@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   FlatList,
@@ -10,44 +11,33 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-import { supabase } from "@/lib/supabase";
-
-interface SearchProfile {
-  id: string;
-  username: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  is_verified: boolean | null;
-  followers_count: number | null;
-}
-
-async function searchProfiles(q: string): Promise<SearchProfile[]> {
-  const term = q.trim();
-  if (!term) return [];
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, username, full_name, avatar_url, is_verified, followers_count")
-    .or(`username.ilike.%${term}%,full_name.ilike.%${term}%`)
-    .limit(30);
-  if (error) throw error;
-  return (data ?? []) as SearchProfile[];
-}
+import { getExplorePosts, searchProfiles } from "@/lib/api";
 
 export default function SearchScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { width } = useWindowDimensions();
   const [q, setQ] = useState("");
 
-  const { data = [], isFetching } = useQuery({
+  const { data: results = [] } = useQuery({
     queryKey: ["search", q],
     queryFn: () => searchProfiles(q),
     enabled: q.trim().length > 0,
   });
 
+  const { data: explore = [] } = useQuery({
+    queryKey: ["explore"],
+    queryFn: () => getExplorePosts(45),
+    enabled: q.trim().length === 0,
+  });
+
+  const tile = (width - 4) / 3;
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const webBottomInset = Platform.OS === "web" ? 84 : 0;
 
@@ -63,7 +53,7 @@ export default function SearchScreen() {
         <TextInput
           value={q}
           onChangeText={setQ}
-          placeholder="Search users"
+          placeholder="Search"
           placeholderTextColor={colors.mutedForeground}
           autoCapitalize="none"
           autoCorrect={false}
@@ -76,58 +66,78 @@ export default function SearchScreen() {
         ) : null}
       </View>
 
-      <FlatList
-        data={data}
-        keyExtractor={(p) => p.id}
-        contentContainerStyle={{ paddingBottom: insets.bottom + webBottomInset + 16 }}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            {item.avatar_url ? (
-              <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
-            ) : (
-              <View
-                style={[
-                  styles.avatar,
-                  { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" },
-                ]}
-              >
-                <Feather name="user" size={20} color={colors.mutedForeground} />
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Text style={[styles.username, { color: colors.foreground }]}>
-                  {item.username}
-                </Text>
-                {item.is_verified ? (
-                  <Feather name="check-circle" size={12} color={colors.primary} />
+      {q.trim().length > 0 ? (
+        <FlatList
+          data={results}
+          keyExtractor={(p) => p.id}
+          contentContainerStyle={{ paddingBottom: insets.bottom + webBottomInset + 16 }}
+          renderItem={({ item }) => (
+            <Pressable onPress={() => router.push(`/user/${item.id}`)} style={styles.row}>
+              {item.avatar_url ? (
+                <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+              ) : (
+                <View
+                  style={[
+                    styles.avatar,
+                    { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" },
+                  ]}
+                >
+                  <Feather name="user" size={20} color={colors.mutedForeground} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Text style={[styles.username, { color: colors.foreground }]}>
+                    {item.username}
+                  </Text>
+                  {item.is_verified ? (
+                    <Feather name="check-circle" size={12} color={colors.primary} />
+                  ) : null}
+                </View>
+                {item.full_name ? (
+                  <Text style={[styles.fullName, { color: colors.mutedForeground }]}>
+                    {item.full_name}
+                  </Text>
                 ) : null}
               </View>
-              {item.full_name ? (
-                <Text style={[styles.fullName, { color: colors.mutedForeground }]}>
-                  {item.full_name}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-        )}
-        ListEmptyComponent={
-          q.trim().length === 0 ? (
-            <View style={styles.empty}>
-              <Feather name="search" size={28} color={colors.mutedForeground} />
-              <Text style={[styles.muted, { color: colors.mutedForeground }]}>
-                Search for people
-              </Text>
-            </View>
-          ) : isFetching ? null : (
+            </Pressable>
+          )}
+          ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={[styles.muted, { color: colors.mutedForeground }]}>
                 No results
               </Text>
             </View>
-          )
-        }
-      />
+          }
+        />
+      ) : (
+        <FlatList
+          data={explore}
+          keyExtractor={(p) => p.id}
+          numColumns={3}
+          contentContainerStyle={{ paddingBottom: insets.bottom + webBottomInset + 16 }}
+          renderItem={({ item, index }) => (
+            <Pressable
+              onPress={() => router.push(`/post/${item.id}`)}
+              style={{
+                width: tile,
+                height: tile,
+                marginRight: (index + 1) % 3 === 0 ? 0 : 2,
+                marginBottom: 2,
+                backgroundColor: colors.muted,
+              }}
+            >
+              {item.image_url ? (
+                <Image
+                  source={{ uri: item.image_url }}
+                  style={{ width: tile, height: tile }}
+                  contentFit="cover"
+                />
+              ) : null}
+            </Pressable>
+          )}
+        />
+      )}
     </View>
   );
 }
@@ -156,6 +166,6 @@ const styles = StyleSheet.create({
   avatar: { width: 44, height: 44, borderRadius: 22 },
   username: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   fullName: { fontFamily: "Inter_400Regular", fontSize: 13, marginTop: 2 },
-  empty: { alignItems: "center", gap: 8, paddingTop: 80 },
+  empty: { alignItems: "center", paddingTop: 80 },
   muted: { fontFamily: "Inter_500Medium", fontSize: 14 },
 });

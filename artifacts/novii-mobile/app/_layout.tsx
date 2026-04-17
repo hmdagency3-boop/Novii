@@ -44,6 +44,13 @@ function AuthGate() {
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="auth" options={{ headerShown: false }} />
+      <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
+      <Stack.Screen name="messages" options={{ title: "Messages" }} />
+      <Stack.Screen name="chat/[id]" options={{ title: "" }} />
+      <Stack.Screen name="post/[id]" options={{ title: "Post" }} />
+      <Stack.Screen name="user/[id]" options={{ title: "" }} />
+      <Stack.Screen name="story/[userId]" options={{ headerShown: false, presentation: "fullScreenModal" }} />
+      <Stack.Screen name="create-story" options={{ title: "New story" }} />
     </Stack>
   );
 }
