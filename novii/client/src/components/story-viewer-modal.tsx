@@ -126,6 +126,24 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   useEffect(() => () => { musicRef.current?.pause(); }, []);
   useEffect(() => { if (!open) musicRef.current?.pause(); }, [open]);
 
+  /* ─── Unlock audio on first user interaction inside the viewer ─── */
+  useEffect(() => {
+    if (!open || !musicBlocked) return;
+    const tryPlay = () => {
+      if (musicRef.current) {
+        musicRef.current.play()
+          .then(() => setMusicBlocked(false))
+          .catch(() => {});
+      }
+    };
+    window.addEventListener('pointerdown', tryPlay, { capture: true });
+    window.addEventListener('keydown', tryPlay, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', tryPlay, { capture: true } as any);
+      window.removeEventListener('keydown', tryPlay, { capture: true } as any);
+    };
+  }, [open, musicBlocked]);
+
   /* ─── Video mute sync ─── */
   useEffect(() => {
     if (videoRef.current) videoRef.current.muted = isMuted;
