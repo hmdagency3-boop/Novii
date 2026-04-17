@@ -109,10 +109,25 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
         musicRef.current.loop = true;
       }
       musicRef.current.muted = isMuted;
+      musicRef.current.volume = 1;
       if (!isPaused) {
-        musicRef.current.play()
+        const audio = musicRef.current;
+        audio.play()
           .then(() => setMusicBlocked(false))
-          .catch(() => setMusicBlocked(true));
+          .catch(() => {
+            // Browser blocked autoplay of unmuted audio — try muted, then unmute
+            if (!isMuted) {
+              audio.muted = true;
+              audio.play()
+                .then(() => {
+                  audio.muted = isMuted;
+                  setMusicBlocked(false);
+                })
+                .catch(() => setMusicBlocked(true));
+            } else {
+              setMusicBlocked(true);
+            }
+          });
       } else {
         musicRef.current.pause();
       }
