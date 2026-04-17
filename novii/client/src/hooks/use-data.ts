@@ -564,15 +564,21 @@ export function useCreateStory() {
       filterName?: string;
     }) =>
       api.createStory(mediaUrl, mediaType, music, filterName),
-    onSuccess: () => {
+    onSuccess: (newStory) => {
+      if (currentProfile?.id) {
+        queryClient.setQueryData(['userStories', currentProfile.id], (old: any[] = []) => {
+          const exists = old.some((s: any) => s.id === (newStory as any)?.id);
+          return exists ? old : [newStory, ...old];
+        });
+      }
+
       queryClient.invalidateQueries({ queryKey: ['stories'] });
       queryClient.refetchQueries({ queryKey: ['stories'] });
-      
+
       if (currentProfile?.id) {
         queryClient.invalidateQueries({ queryKey: ['userStories', currentProfile.id] });
-        queryClient.refetchQueries({ queryKey: ['userStories', currentProfile.id] });
       }
-      
+
       toast({
         title: 'تم النشر',
         description: 'تم نشر القصة بنجاح',
