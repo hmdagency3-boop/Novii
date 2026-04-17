@@ -21,6 +21,21 @@ type ExploreItem =
   | { kind: 'post'; data: Post }
   | { kind: 'reel'; data: Reel };
 
+// Cloudinary can generate a JPG poster from any uploaded video by swapping
+// the file extension and adding a `so_0` (start-offset 0s) transform. This
+// gives reels a real preview frame instead of an empty grey video tag.
+function cloudinaryVideoThumb(videoUrl: string | null | undefined): string | null {
+  if (!videoUrl) return null;
+  if (!videoUrl.includes("res.cloudinary.com") || !videoUrl.includes("/video/upload/")) {
+    return null;
+  }
+  const withTransform = videoUrl.replace(
+    "/video/upload/",
+    "/video/upload/so_0,q_auto,f_jpg/"
+  );
+  return withTransform.replace(/\.(mp4|mov|webm|m4v|avi|mkv)(\?.*)?$/i, ".jpg$2");
+}
+
 function ExploreContent() {
   const { data: explorePosts, isLoading: postsLoading } = useExplorePosts(50);
   const { data: exploreReels, isLoading: reelsLoading } = useExploreReels(20);
@@ -145,27 +160,37 @@ function ExploreContent() {
                       ${isTall ? "row-span-2" : ""}
                     `}
                   >
-                    {reel.thumbnail_url ? (
-                      <img
-                        src={reel.thumbnail_url}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        alt="Reel"
-                        loading={isAboveFold ? "eager" : "lazy"}
-                        decoding="async"
-                      />
-                    ) : reel.video_url ? (
-                      <video
-                        src={isAboveFold ? reel.video_url : undefined}
-                        data-src={!isAboveFold ? reel.video_url : undefined}
-                        className="w-full h-full object-cover"
-                        muted
-                        preload="none"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                        <Play className="w-10 h-10 text-primary/40" />
-                      </div>
-                    )}
+                    {(() => {
+                      const thumb = reel.thumbnail_url || cloudinaryVideoThumb(reel.video_url);
+                      if (thumb) {
+                        return (
+                          <img
+                            src={thumb}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            alt="Reel"
+                            loading={isAboveFold ? "eager" : "lazy"}
+                            decoding="async"
+                          />
+                        );
+                      }
+                      if (reel.video_url) {
+                        return (
+                          <video
+                            src={isAboveFold ? reel.video_url : undefined}
+                            data-src={!isAboveFold ? reel.video_url : undefined}
+                            className="w-full h-full object-cover"
+                            muted
+                            preload="metadata"
+                            playsInline
+                          />
+                        );
+                      }
+                      return (
+                        <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                          <Play className="w-10 h-10 text-primary/40" />
+                        </div>
+                      );
+                    })()}
                     <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/50 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-md">
                       <Play className="w-2.5 h-2.5 fill-white" />
                     </div>
