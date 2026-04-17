@@ -21,7 +21,7 @@ const FILTERS = [
 type FilterId = typeof FILTERS[number]['id'];
 import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
-import { useCreatePost } from "@/hooks/use-data";
+import { useCreatePost, useCurrentUser } from "@/hooks/use-data";
 import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -328,12 +328,7 @@ export default function CreatePage() {
   const createPostMutation = useCreatePost();
   const isRTL = direction === "rtl";
 
-  const { data: myProfile } = useQuery({
-    queryKey: ["my-profile", user?.id],
-    queryFn: () => (user?.id ? api.getProfileById(user.id) : null),
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: myProfile } = useCurrentUser();
 
   const [tab, setTab] = useState<Tab>('story');
   const [capturedMedia, setCapturedMedia] = useState<MediaItem | null>(null);
