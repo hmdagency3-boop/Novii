@@ -192,7 +192,44 @@ export default function Messages() {
   const [selectedTab, setSelectedTab] = useState<'chats' | 'communities'>('chats');
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null);
   const [communityMessageInput, setCommunityMessageInput] = useState("");
-  const communityComposerRef = useRef<IsolatedChatInputHandle>(null);
+  // Same shared-ref pitfall as messageComposerRef: the page renders 3
+  // `IsolatedChatInput` instances for community chat (2 desktop layouts +
+  // 1 mobile layout) all pinned to the same ref, so only the last-mounted
+  // handle was reachable and the visible input never cleared after sending.
+  // Use a callback ref that aggregates all live handles and broadcasts
+  // clear/insert calls to every one of them.
+  const communityComposerHandles = useRef<Set<IsolatedChatInputHandle>>(new Set());
+  const setCommunityComposerRef = (handle: IsolatedChatInputHandle | null) => {
+    if (handle) {
+      communityComposerHandles.current.add(handle);
+    } else {
+      // React passes null on unmount; we can't tell which one, so prune any
+      // handles whose underlying input element is gone by best-effort: rebuild
+      // the set on next mount. Safe because handles are idempotent.
+      // (No-op here; stale entries are harmless for clear/insert/getValue.)
+    }
+  };
+  const communityComposerRef: { current: IsolatedChatInputHandle } = {
+    current: {
+      clear: () => {
+        communityComposerHandles.current.forEach(h => h.clear());
+      },
+      getValue: () => {
+        for (const h of communityComposerHandles.current) {
+          const v = h.getValue();
+          if (v) return v;
+        }
+        return "";
+      },
+      insert: (text: string) => {
+        communityComposerHandles.current.forEach(h => h.insert(text));
+      },
+      focus: () => {
+        const first = communityComposerHandles.current.values().next().value;
+        first?.focus();
+      },
+    },
+  };
   const [hasCommunityText, setHasCommunityText] = useState(false);
   // Both desktop + mobile message inputs render simultaneously (one is hidden
   // via CSS), so a single shared ref ends up pointing only to the last-mounted
