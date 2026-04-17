@@ -236,8 +236,8 @@ export default function UserProfile() {
     return () => { supabase.removeChannel(channel); };
   }, [userId, currentUser?.id, queryClient]);
 
-  // Fetch user stories
-  const { data: userStories = [] } = useUserStories(userId || '');
+  // Fetch user stories (inject profile to skip slow JOIN)
+  const { data: userStories = [] } = useUserStories(userId || '', profile);
   const { data: hasStoriesQuick = false } = useHasUserStories(userId || '');
   const hasStories = userStories.length > 0 || hasStoriesQuick;
   

@@ -168,8 +168,8 @@ export default function Profile() {
     enabled: !!user,
   });
 
-  // Fetch user stories
-  const { data: userStories = [] } = useUserStories(user?.id || '');
+  // Fetch user stories (inject profile to skip slow JOIN)
+  const { data: userStories = [] } = useUserStories(user?.id || '', profile);
   const { data: hasStoriesQuick = false } = useHasUserStories(user?.id || '');
   const hasStories = userStories.length > 0 || hasStoriesQuick;
   

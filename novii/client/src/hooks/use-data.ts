@@ -538,10 +538,22 @@ export function useStories() {
   });
 }
 
-export function useUserStories(userId: string) {
+export function useUserStories(userId: string, profileForInjection?: any) {
   return useQuery({
     queryKey: ['userStories', userId],
-    queryFn: () => api.getUserStories(userId),
+    queryFn: async () => {
+      if (profileForInjection) {
+        const { data, error } = await supabase
+          .from('stories')
+          .select('id, user_id, media_url, media_type, views_count, expires_at, created_at, music_url, music_title, music_artist, music_artwork_url, filter_name')
+          .eq('user_id', userId)
+          .gt('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map((s: any) => ({ ...s, profile: profileForInjection }));
+      }
+      return api.getUserStories(userId);
+    },
     enabled: !!userId,
     staleTime: 3 * 60 * 1000,
     refetchOnWindowFocus: false,
