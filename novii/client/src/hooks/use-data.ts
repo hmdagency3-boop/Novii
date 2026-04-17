@@ -234,8 +234,21 @@ export function useDeleteReel() {
           pages: old.pages.map((page: any[]) => page.filter((r: any) => r.id !== reelId)),
         };
       });
+      queryClient.setQueriesData({ queryKey: ['userReels'] }, (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) return old.filter((r: any) => r.id !== reelId);
+        if (old?.pages) {
+          return {
+            ...old,
+            pages: old.pages.map((page: any[]) => page.filter((r: any) => r.id !== reelId)),
+          };
+        }
+        return old;
+      });
       queryClient.invalidateQueries({ queryKey: ['reels'] });
       queryClient.invalidateQueries({ queryKey: ['reels-infinite'] });
+      queryClient.invalidateQueries({ queryKey: ['userReels'] });
+      queryClient.invalidateQueries({ queryKey: ['explore-reels'] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       toast({ title: 'تم الحذف', description: 'تم حذف الريلز بنجاح' });
     },
