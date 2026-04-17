@@ -313,7 +313,7 @@ function useLiveCamera(active: boolean, filterCssRef: React.MutableRefObject<str
    Main component
 ───────────────────────────────────────── */
 export default function CreatePage() {
-  const { direction } = useLanguage();
+  const { direction, language } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
