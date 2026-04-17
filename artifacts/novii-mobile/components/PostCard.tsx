@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 
+import CommentsSheet from "@/components/CommentsSheet";
 import { useColors } from "@/hooks/useColors";
 import { toggleLike, toggleSave, type Post } from "@/lib/api";
 import { formatCount, timeAgo } from "@/lib/utils";
@@ -21,6 +22,8 @@ export default function PostCard({ post }: { post: Post }) {
   const [liked, setLiked] = useState(!!post.is_liked);
   const [saved, setSaved] = useState(!!post.is_saved);
   const [count, setCount] = useState(post.likes_count ?? 0);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsCount, setCommentsCount] = useState(post.comments_count ?? 0);
 
   const onLike = async () => {
     const next = !liked;
@@ -104,7 +107,7 @@ export default function PostCard({ post }: { post: Post }) {
               color={liked ? "#ef4444" : colors.foreground}
             />
           </Pressable>
-          <Pressable onPress={() => router.push(`/post/${post.id}`)} hitSlop={8}>
+          <Pressable onPress={() => setCommentsOpen(true)} hitSlop={8}>
             <Feather name="message-circle" size={26} color={colors.foreground} />
           </Pressable>
           <Pressable hitSlop={8}>
@@ -136,10 +139,10 @@ export default function PostCard({ post }: { post: Post }) {
         </Text>
       ) : null}
 
-      {post.comments_count > 0 ? (
-        <Pressable onPress={() => router.push(`/post/${post.id}`)}>
+      {commentsCount > 0 ? (
+        <Pressable onPress={() => setCommentsOpen(true)}>
           <Text style={[styles.viewComments, { color: colors.mutedForeground }]}>
-            View all {formatCount(post.comments_count)} comments
+            View all {formatCount(commentsCount)} comments
           </Text>
         </Pressable>
       ) : null}
@@ -147,6 +150,13 @@ export default function PostCard({ post }: { post: Post }) {
       <Text style={[styles.time, { color: colors.mutedForeground }]}>
         {timeAgo(post.created_at)}
       </Text>
+
+      <CommentsSheet
+        postId={post.id}
+        visible={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        onCommentAdded={() => setCommentsCount((c) => c + 1)}
+      />
     </View>
   );
 }
