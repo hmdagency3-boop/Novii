@@ -1,6 +1,9 @@
 -- جدول المحفوظات للريلز (مشابه لـ saved_posts)
 -- شغّل الملف ده مرة واحدة في Supabase Studio → SQL editor.
 
+-- تأكيد إن عمود saves_count موجود على جدول reels
+ALTER TABLE reels ADD COLUMN IF NOT EXISTS saves_count INTEGER DEFAULT 0;
+
 CREATE TABLE IF NOT EXISTS saved_reels (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
