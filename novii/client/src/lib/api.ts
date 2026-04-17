@@ -501,6 +501,13 @@ export const api = {
     return posts as unknown as Post[];
   },
 
+  async getPostsByLocation(name: string): Promise<Post[]> {
+    if (!name) return [];
+    const res = await fetch(`/api/posts/by-location?name=${encodeURIComponent(name)}`);
+    if (!res.ok) return [];
+    return (await res.json()) as Post[];
+  },
+
   async getHashtagPosts(tag: string, limit = 20, offset = 0): Promise<Post[]> {
     const res = await fetch(`/api/hashtags/${encodeURIComponent(tag)}/posts?limit=${limit}&page=${Math.floor(offset / limit)}`);
     if (!res.ok) return [];

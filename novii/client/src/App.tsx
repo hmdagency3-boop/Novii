@@ -43,6 +43,7 @@ import Help from "@/pages/help";
 import About from "@/pages/about";
 import ModerationNotice from "@/pages/moderation-notice";
 import HashtagPage from "@/pages/hashtag";
+import LocationPage from "@/pages/location-page";
 import MyActivity from "@/pages/my-activity";
 import UserPostsFeed from "@/pages/user-posts-feed";
 
@@ -238,6 +239,12 @@ function Router() {
       <Route path="/hashtag/:tag">
         <PublicRoute>
           <HashtagPage />
+        </PublicRoute>
+      </Route>
+
+      <Route path="/location/:name">
+        <PublicRoute>
+          <LocationPage />
         </PublicRoute>
       </Route>
 

@@ -5252,6 +5252,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/posts/by-location", async (req: Request, res: Response) => {
+    try {
+      const name = ((req.query.name as string) || "").trim();
+      if (!name) return res.json([]);
+      const queryDb = adminDb || db;
+      const { data: posts, error } = await queryDb
+        .from('posts')
+        .select('*, profiles!posts_user_id_fkey(id, username, full_name, avatar_url, is_verified, is_official, is_creator, is_premium, is_popular, is_active, verified_at)')
+        .ilike('location', name)
+        .neq('is_deleted', true)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      const mapped = (posts || []).map((p: any) => {
+        const { profiles, ...rest } = p;
+        return { ...rest, profile: profiles };
+      });
+      res.json(mapped);
+    } catch (error) {
+      console.error('Posts by location error:', error);
+      res.status(500).json({ error: 'Failed to fetch location posts' });
+    }
+  });
+
   app.get("/api/hashtags/:name/posts", async (req: Request, res: Response) => {
     try {
       const { name } = req.params;
