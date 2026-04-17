@@ -137,6 +137,13 @@ export default function Profile() {
     enabled: !!user,
   });
 
+  // Fetch saved reels
+  const { data: savedReels = [], isLoading: savedReelsLoading } = useQuery({
+    queryKey: ['savedReels', user?.id],
+    queryFn: () => api.getSavedReels(),
+    enabled: !!user,
+  });
+
   // Fetch user reels
   const { data: userReels = [], isLoading: reelsLoading } = useQuery({
     queryKey: ['userReels', user?.id],
@@ -185,6 +192,7 @@ export default function Profile() {
           refetchProfile(),
           queryClient.refetchQueries({ queryKey: ['userPosts', user?.id] }),
           queryClient.refetchQueries({ queryKey: ['savedPosts', user?.id] }),
+          queryClient.refetchQueries({ queryKey: ['savedReels', user?.id] }),
           queryClient.refetchQueries({ queryKey: ['userReels', user?.id] }),
           queryClient.refetchQueries({ queryKey: ['userStories', user?.id] })
         ]);
@@ -521,23 +529,30 @@ export default function Profile() {
                 </TabsContent>
                 
                 <TabsContent value="saved" className="p-1 md:p-4 max-w-4xl mx-auto mt-0 overflow-y-auto h-full">
-                    {savedLoading ? (
+                    {savedLoading || savedReelsLoading ? (
                       <div className="flex items-center justify-center py-10">
                         <Spinner className="w-6 h-6" />
                       </div>
-                    ) : savedPosts.length === 0 ? (
+                    ) : savedPosts.length === 0 && savedReels.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-20 text-center">
                         <Bookmark className="w-16 h-16 text-muted-foreground mb-4" />
-                        <h3 className="text-xl font-bold mb-2">No Saved Posts</h3>
-                        <p className="text-muted-foreground">Save posts to view them later</p>
+                        <h3 className="text-xl font-bold mb-2">{isRTL ? "لا يوجد محفوظات" : "No Saved Items"}</h3>
+                        <p className="text-muted-foreground">{isRTL ? "احفظ المنشورات والريلز لتشاهدها لاحقاً" : "Save posts and reels to view them later"}</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-3 gap-0 md:gap-1">
                         {savedPosts.map((post) => (
                           <ProfilePostCard
-                            key={post.id}
+                            key={`saved-post-${post.id}`}
                             post={post}
                             onClick={() => { setSelectedPost(post); setPostModalOpen(true); }}
+                          />
+                        ))}
+                        {savedReels.map((reel: any) => (
+                          <ProfileReelCard
+                            key={`saved-reel-${reel.id}`}
+                            reel={reel}
+                            onClick={() => { setSelectedReel(reel); setReelModalOpen(true); }}
                           />
                         ))}
                       </div>

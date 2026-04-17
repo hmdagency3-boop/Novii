@@ -2,7 +2,7 @@ import Layout from "@/components/layout";
 import { ReelCommentsSheet } from "@/components/reel-comments-sheet";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useLanguage } from "@/lib/language-context";
-import { useInfiniteReels, useToggleReelLike, useToggleFollow } from "@/hooks/use-data";
+import { useInfiniteReels, useToggleReelLike, useToggleFollow, useToggleSaveReel } from "@/hooks/use-data";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Heart, MessageCircle, Share2, Bookmark,
@@ -38,9 +38,9 @@ export default function Reels() {
   const { showPrompt } = useGuestPrompt();
   const toggleReelLike = useToggleReelLike();
   const toggleFollow   = useToggleFollow();
+  const toggleSaveReel = useToggleSaveReel();
 
   const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set());
-  const [savedReels, setSavedReels]       = useState<Set<string>>(new Set());
   const [muted, setMuted]                 = useState(false);
   const [commentReelId, setCommentReelId] = useState<string | null>(null);
   const guestViewCount   = useRef(0);
@@ -78,8 +78,8 @@ export default function Reels() {
     return () => obs.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const stableRefs = useRef({ toggleReelLike, toggleFollow, currentUser, showPrompt, followedUsers, savedReels, isRTL });
-  stableRefs.current = { toggleReelLike, toggleFollow, currentUser, showPrompt, followedUsers, savedReels, isRTL };
+  const stableRefs = useRef({ toggleReelLike, toggleFollow, toggleSaveReel, currentUser, showPrompt, followedUsers, isRTL });
+  stableRefs.current = { toggleReelLike, toggleFollow, toggleSaveReel, currentUser, showPrompt, followedUsers, isRTL };
 
   const handleLike = useCallback(async (reelId: string): Promise<boolean> => {
     const { currentUser: u, showPrompt: sp, toggleReelLike: trl } = stableRefs.current;
@@ -100,11 +100,15 @@ export default function Reels() {
     }
   }, []);
 
-  const handleSave = useCallback((id: string) => {
-    const { currentUser: u, showPrompt: sp, savedReels: sr, isRTL: rtl } = stableRefs.current;
+  const handleSave = useCallback(async (id: string) => {
+    const { currentUser: u, showPrompt: sp, toggleSaveReel: tsr, isRTL: rtl } = stableRefs.current;
     if (!u) { sp(); return; }
-    setSavedReels(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
-    toast.success(sr.has(id) ? (rtl ? "تمت الإزالة" : "Removed") : (rtl ? "تم الحفظ" : "Saved"));
+    try {
+      const nowSaved = await tsr.mutateAsync(id);
+      toast.success(nowSaved ? (rtl ? "تم الحفظ" : "Saved") : (rtl ? "تمت الإزالة" : "Removed"));
+    } catch {
+      toast.error(rtl ? "حدث خطأ" : "Something went wrong");
+    }
   }, []);
 
   const handleShare = useCallback((reel: any) => {
@@ -138,7 +142,7 @@ export default function Reels() {
     muted,
     setMuted,
     followed: followedUsers.has(reel.profile?.id),
-    saved: savedReels.has(reel.id),
+    saved: !!reel.is_saved,
     currentUserId: currentUser?.id,
     onLike: handleLike,
     onFollow: handleFollow,

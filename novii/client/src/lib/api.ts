@@ -180,6 +180,7 @@ export interface Reel {
   updated_at: string;
   profile?: Profile;
   is_liked?: boolean;
+  is_saved?: boolean;
 }
 
 export interface UserDevice {
@@ -2111,6 +2112,49 @@ export const api = {
       await supabase.from('saved_posts').insert({ post_id: postId, user_id: user.id });
       return true;
     }
+  },
+
+  // Saved Reels APIs
+  async toggleSaveReel(reelId: string): Promise<boolean> {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data: existing } = await supabase
+      .from('saved_reels')
+      .select('id')
+      .eq('reel_id', reelId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabase.from('saved_reels').delete().eq('id', existing.id);
+      if (error) throw error;
+      return false;
+    } else {
+      const { error } = await supabase.from('saved_reels').insert({ reel_id: reelId, user_id: user.id });
+      if (error) throw error;
+      return true;
+    }
+  },
+
+  async getSavedReels(): Promise<Reel[]> {
+    const user = await getCurrentUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('saved_reels')
+      .select(`
+        reel_id,
+        created_at,
+        reels!inner(
+          ${REEL_WITH_PROFILE}
+        )
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data?.map((item: any) => ({ ...item.reels, is_saved: true })) || [];
   },
 
   async getSavedPosts(): Promise<Post[]> {

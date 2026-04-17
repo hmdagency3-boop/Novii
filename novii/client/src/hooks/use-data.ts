@@ -850,6 +850,40 @@ export function useSavedPosts() {
   });
 }
 
+export function useSavedReels() {
+  return useQuery({
+    queryKey: ['saved-reels'],
+    queryFn: () => api.getSavedReels(),
+  });
+}
+
+export function useToggleSaveReel() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (reelId: string) => api.toggleSaveReel(reelId),
+    onMutate: async (reelId) => {
+      const updateReel = (r: any) =>
+        r?.id === reelId ? { ...r, is_saved: !r.is_saved } : r;
+
+      queryClient.setQueriesData({ queryKey: ['reels'] }, (old: any) => {
+        if (!old) return old;
+        if (old.pages) {
+          return { ...old, pages: old.pages.map((p: any[]) => Array.isArray(p) ? p.map(updateReel) : p) };
+        }
+        return Array.isArray(old) ? old.map(updateReel) : old;
+      });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ['reels'] });
+      queryClient.invalidateQueries({ queryKey: ['saved-reels'] });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['saved-reels'] });
+    },
+  });
+}
+
 // Post Settings hooks
 export function useTogglePinPost() {
   const queryClient = useQueryClient();
