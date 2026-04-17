@@ -1,5 +1,4 @@
 [build]
-  base = "artifacts/novii-admin"
   command = "cd ../.. && pnpm install && BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/novii-admin run build"
   publish = "dist/public"
 
