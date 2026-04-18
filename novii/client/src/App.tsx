@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { SettingsProvider } from "@/lib/settings-context";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { GlobalMessageListener } from "@/components/global-message-listener";
+import { GlobalNotificationListener } from "@/components/global-notification-listener";
 import { TimeTracker } from "@/components/time-tracker";
 import { VisitorDetector } from "@/components/visitor-detector";
 import { DeviceHeartbeat } from "@/components/device-heartbeat";
@@ -291,6 +292,7 @@ function App() {
                     <ShadcnToaster />
                     <Toaster richColors position="top-center" />
                     <GlobalMessageListener />
+                    <GlobalNotificationListener />
                     <TimeTracker />
                     <VisitorDetector />
                     <DeviceHeartbeat />

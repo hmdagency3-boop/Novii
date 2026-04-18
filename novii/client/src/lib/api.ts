@@ -1100,6 +1100,30 @@ export const api = {
       }
     }
 
+    // If this is a reply, notify the parent comment owner
+    if (parentCommentId) {
+      try {
+        const { data: parentComment } = await supabase
+          .from('comments')
+          .select('user_id')
+          .eq('id', parentCommentId)
+          .maybeSingle();
+        
+        if (parentComment && parentComment.user_id !== user.id && parentComment.user_id !== post?.user_id) {
+          await this.createNotification({
+            userId: parentComment.user_id,
+            actorId: user.id,
+            type: 'comment',
+            postId: postId,
+            commentId: data.id,
+            content: content.substring(0, 100),
+          });
+        }
+      } catch (replyNotifError) {
+        console.error('⚠️ Failed to create reply notification:', replyNotifError);
+      }
+    }
+
     // Create mention notifications
     if (mentions.length > 0) {
       const usernames = mentions.map(m => m.substring(1));
@@ -1147,6 +1171,27 @@ export const api = {
       return false;
     } else {
       await supabase.from('likes').insert({ comment_id: commentId, user_id: user.id });
+
+      // Notify comment owner
+      try {
+        const { data: comment } = await supabase
+          .from('comments')
+          .select('user_id, post_id')
+          .eq('id', commentId)
+          .maybeSingle();
+        if (comment && comment.user_id !== user.id) {
+          await this.createNotification({
+            userId: comment.user_id,
+            actorId: user.id,
+            type: 'like',
+            postId: comment.post_id,
+            commentId: commentId,
+          });
+        }
+      } catch (e) {
+        console.error('⚠️ Failed to create comment like notification:', e);
+      }
+
       return true;
     }
   },
