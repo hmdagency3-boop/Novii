@@ -6414,11 +6414,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ua = String(req.headers['user-agent'] || '');
       const isBot = SOCIAL_BOTS.test(ua);
 
-      // Regular browsers: let the SPA handle it
-      if (!isBot) return next();
+      const proto0 = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+      const host0 = req.headers['x-forwarded-host'] || req.headers.host;
+
+      // Helper: fetch and return the SPA index.html for regular browsers
+      const serveSpa = async () => {
+        try {
+          const indexUrl = `${proto0}://${host0}/index.html`;
+          const r = await fetch(indexUrl, { headers: { 'User-Agent': 'novii-og-proxy' } });
+          if (r.ok) {
+            const body = await r.text();
+            res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).send(body);
+            return true;
+          }
+        } catch {}
+        return false;
+      };
+
+      // Regular browsers: try to serve the SPA shell so React Router can handle the route
+      if (!isBot) {
+        if (await serveSpa()) return;
+        return next();
+      }
 
       const rawUsername = String(req.params.username || '').trim();
-      if (!rawUsername || !adminDb) return next();
+      if (!rawUsername || !adminDb) {
+        if (await serveSpa()) return;
+        return next();
+      }
 
       const { data: profile } = await adminDb
         .from('profiles')
@@ -6426,7 +6449,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .ilike('username', rawUsername)
         .maybeSingle();
 
-      if (!profile) return next();
+      if (!profile) {
+        if (await serveSpa()) return;
+        return next();
+      }
 
       const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
       const host = req.headers['x-forwarded-host'] || req.headers.host;
