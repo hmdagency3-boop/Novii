@@ -69,8 +69,8 @@ function VoiceMessagePlayer({ audioUrl, isMe, isRead, isRTL }: { audioUrl: strin
 
   return (
     <div className={cn(
-      "rounded-2xl px-3 py-2.5 shadow-sm max-w-[260px] flex items-center gap-2.5 border",
-      isMe ? "bg-white text-gray-900 border-gray-200" : "bg-muted text-foreground border-transparent"
+      "rounded-2xl px-3 py-2.5 shadow-sm max-w-[260px] flex items-center gap-2.5",
+      isMe ? "bg-primary text-white" : "bg-muted text-foreground"
     )}>
       <Button
         size="icon"
@@ -384,7 +384,7 @@ export function MessageBubble({
               {timeAgo(new Date(message.created_at), language.code)}
             </div>
           </button>
-          <div className={cn("rounded-2xl px-4 py-2 text-sm shadow-sm max-w-xs border", isMe ? "bg-white text-gray-900 border-gray-200" : "bg-muted text-foreground border-transparent")}>
+          <div className={cn("rounded-2xl px-4 py-2 text-sm shadow-sm max-w-xs", isMe ? "bg-primary text-white" : "bg-muted text-foreground")}>
             <p className={cn("leading-relaxed break-words", isRTL && "text-right")}>{message.content}</p>
           </div>
           {currentUserId === message.sender_id && (
@@ -471,7 +471,7 @@ export function MessageBubble({
                 <div className={cn(
                   "rounded-xl px-3 py-1.5 text-xs border-l-4 mb-0.5 max-w-sm opacity-80",
                   isMe
-                    ? "bg-gray-100 border-gray-400 text-gray-700"
+                    ? "bg-white/20 border-white/50 text-white/90"
                     : "bg-muted/60 border-muted-foreground/40 text-muted-foreground"
                 )}>
                   <p className="font-semibold text-[10px] mb-0.5 opacity-70">
@@ -541,8 +541,8 @@ export function MessageBubble({
                   {message.content && message.content !== '🎤' && message.content !== '🎬' && (
                     <div>
                       <div className={cn(
-                        "rounded-2xl px-4 py-2.5 text-sm relative max-w-sm border",
-                        isMe ? "bg-white text-gray-900 border-gray-200 shadow-sm" : "bg-muted text-foreground border-transparent"
+                        "rounded-2xl px-4 py-2.5 text-sm relative max-w-sm",
+                        isMe ? "bg-primary text-white" : "bg-muted text-foreground"
                       )}>
                         <p className={cn("leading-relaxed break-words text-sm font-light", isRTL && "text-right")}>{message.content}</p>
                         <div className={cn("flex items-center gap-1 mt-0.5 text-xs", isRTL && "flex-row-reverse justify-start", !isRTL && "justify-end")}>
