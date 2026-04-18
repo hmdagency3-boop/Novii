@@ -2353,6 +2353,47 @@ export const api = {
     });
   },
 
+  async getProfileByUsername(username: string): Promise<Profile | null> {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('username', username)
+      .single();
+
+    if (error) return null;
+    if (!profile) return null;
+
+    const currentUser = await getCurrentUser();
+
+    const { count: followersCount } = await supabase
+      .from('follows')
+      .select('*', { count: 'exact', head: true })
+      .eq('following_id', profile.id);
+
+    const { count: followingCount } = await supabase
+      .from('follows')
+      .select('*', { count: 'exact', head: true })
+      .eq('follower_id', profile.id);
+
+    let isFollowedBy = false;
+    if (currentUser) {
+      const { data: followData } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', profile.id)
+        .eq('following_id', currentUser.id)
+        .maybeSingle();
+      isFollowedBy = !!followData;
+    }
+
+    return {
+      ...profile,
+      followers_count: followersCount || 0,
+      following_count: followingCount || 0,
+      is_followed_by: isFollowedBy,
+    };
+  },
+
   async getProfileById(userId: string): Promise<Profile | null> {
     const { data: profile, error } = await supabase
       .from('profiles')

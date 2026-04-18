@@ -2639,7 +2639,7 @@ export default function Messages() {
                             >
                                 <ChevronLeft className={cn("w-4 h-4", isRTL && "rotate-180")} />
                             </Button>
-                            <Link href={`/user?id=${selectedConversation.user?.id}`}>
+                            <Link href={`/@${selectedConversation.user?.username}`}>
                                 <Avatar className="w-10 h-10 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all ring-2 ring-primary/20">
                                     <AvatarImage src={selectedConversation.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedConversation.user?.username}`} />
                                     <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-white font-bold text-xs">{selectedConversation.user?.username?.[0]?.toUpperCase()}</AvatarFallback>
@@ -2647,7 +2647,7 @@ export default function Messages() {
                             </Link>
                             <div className="flex flex-col min-w-0 flex-1">
                                 <div className="flex items-center gap-2 min-w-0">
-                                    <Link href={`/user?id=${selectedConversation.user?.id}`} className="font-semibold text-sm truncate hover:text-primary transition-colors">
+                                    <Link href={`/@${selectedConversation.user?.username}`} className="font-semibold text-sm truncate hover:text-primary transition-colors">
                                         {selectedConversation.user?.full_name || selectedConversation.user?.username}
                                     </Link>
                                     <div className="flex items-center gap-1 flex-shrink-0">
@@ -2735,7 +2735,7 @@ export default function Messages() {
                                 @{selectedConversation.user?.username}
                               </p>
                               
-                              <Link href={`/user?id=${selectedConversation.user?.id}`}>
+                              <Link href={`/@${selectedConversation.user?.username}`}>
                                 <Button variant="outline" className="rounded-full px-6 sm:px-8 border-primary/30 hover:bg-primary/10 text-xs sm:text-sm">
                                   {isRTL ? "عرض الملف الشخصي" : "View Profile"}
                                 </Button>

@@ -47,10 +47,7 @@ export function CreateStoryModal({ open, onOpenChange, isRTL, initialPreview, in
     }
   }, [initialPreview, initialMediaType]);
 
-  const toProxyUrl = (url: string) =>
-    url.includes('dzcdn.net') || url.includes('deezer.com')
-      ? `/api/music/proxy?url=${encodeURIComponent(url)}`
-      : url;
+  const toProxyUrl = (url: string) => url;
 
   // Play / stop background music while in editor
   useEffect(() => {

@@ -322,7 +322,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
           <div className="w-full md:w-1/3 bg-background flex flex-col border-t md:border-t-0 md:border-l border-border overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between p-2 sm:p-4 border-b border-border flex-shrink-0">
-              <Link href={`/user?id=${post.user_id}`} className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity min-w-0 flex-1">
+              <Link href={`/@${post.profile?.username}`} className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity min-w-0 flex-1">
                 <Avatar className="w-8 h-8 sm:w-10 sm:h-10 border border-border/50 flex-shrink-0">
                   <AvatarImage src={post.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + post.user_id} />
                   <AvatarFallback>{post.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
@@ -348,14 +348,14 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
               {/* User Info & Caption */}
               <div className="space-y-2 sm:space-y-3 pb-2 sm:pb-3 border-b border-border flex-shrink-0">
                 <div className="flex gap-2 sm:gap-3">
-                  <Link href={`/user?id=${post.user_id}`}>
+                  <Link href={`/@${post.profile?.username}`}>
                     <Avatar className="w-7 h-7 sm:w-8 sm:h-8 border border-border/50 flex-shrink-0">
                       <AvatarImage src={post.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + post.user_id} />
                       <AvatarFallback>{post.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
                     </Avatar>
                   </Link>
                   <div className="flex-1 min-w-0">
-                    <Link href={`/user?id=${post.user_id}`} className="font-bold text-xs sm:text-sm hover:opacity-80 transition-opacity block truncate">
+                    <Link href={`/@${post.profile?.username}`} className="font-bold text-xs sm:text-sm hover:opacity-80 transition-opacity block truncate">
                       {post.profile?.username}
                     </Link>
                     <p className="text-xs sm:text-sm text-foreground/80 mt-1 break-words">{post.caption}</p>
@@ -399,7 +399,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                         
                         {/* Main Comment */}
                         <div className="flex gap-3 group">
-                          <Link href={`/user?id=${comment.user_id}`}>
+                          <Link href={`/@${comment.profile?.username}`}>
                             <Avatar className={cn(
                               "flex-shrink-0 border transition-all duration-200",
                               comment.profile?.is_official ? "w-8 h-8 border-primary/40 ring-2 ring-primary/10" : "w-8 h-8 border-border/50 group-hover:border-primary/40 group-hover:ring-2 group-hover:ring-primary/10"
@@ -411,7 +411,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 justify-between flex-wrap">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <Link href={`/user?id=${comment.user_id}`} className={cn(
+                                <Link href={`/@${comment.profile?.username}`} className={cn(
                                   "hover:opacity-80 transition-opacity",
                                   comment.profile?.is_official ? "official-username text-sm font-bold" : "font-bold text-sm"
                                 )}>
@@ -509,7 +509,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                             return true;
                           }).map((reply) => (
                             <div key={reply.id} className="flex gap-2 group">
-                              <Link href={`/user?id=${reply.user_id}`}>
+                              <Link href={`/@${reply.profile?.username}`}>
                                 <Avatar className="w-6 h-6 border border-border/50 flex-shrink-0 group-hover:border-primary/40 transition-all duration-200">
                                   <AvatarImage src={reply.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + reply.user_id} />
                                   <AvatarFallback>{reply.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
@@ -518,7 +518,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 justify-between flex-wrap">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <Link href={`/user?id=${reply.user_id}`} className="font-bold text-xs hover:opacity-80 transition-opacity">
+                                    <Link href={`/@${reply.profile?.username}`} className="font-bold text-xs hover:opacity-80 transition-opacity">
                                       {reply.profile?.username}
                                     </Link>
                                     <div className="flex items-center gap-0.5">

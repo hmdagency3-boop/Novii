@@ -81,7 +81,7 @@ export default function Search() {
           ) : results.length > 0 ? (
             <div className="space-y-2">
               {results.filter(user => !blockedIds.has(user.id)).map((user) => (
-                <Link key={user.id} href={`/user?id=${user.id}`}>
+                <Link key={user.id} href={`/@${user.username}`}>
                   <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent/50 transition-colors cursor-pointer group">
                     {user.avatar_url ? (
                       <img

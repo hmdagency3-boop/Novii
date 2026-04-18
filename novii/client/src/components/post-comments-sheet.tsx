@@ -144,7 +144,7 @@ export function PostCommentsSheet({ postId, open, onClose }: PostCommentsSheetPr
     return (
       <div key={reply.id}>
         <div className={cn("flex gap-2 group", isRTL && "flex-row-reverse")}>
-          <Link href={`/user?id=${reply.user_id}`}>
+          <Link href={`/@${reply.profile?.username}`}>
             <Avatar className="w-7 h-7 flex-shrink-0 border border-border/50 group-hover:border-primary/40 transition-all">
               <AvatarImage src={reply.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + reply.user_id} />
               <AvatarFallback>{reply.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
@@ -152,7 +152,7 @@ export function PostCommentsSheet({ postId, open, onClose }: PostCommentsSheetPr
           </Link>
           <div className="flex-1 min-w-0">
             <div className={cn("flex items-center gap-1 flex-wrap", isRTL && "flex-row-reverse")}>
-              <Link href={`/user?id=${reply.user_id}`} className="font-bold text-xs text-foreground hover:opacity-80">
+              <Link href={`/@${reply.profile?.username}`} className="font-bold text-xs text-foreground hover:opacity-80">
                 {reply.profile?.username}
               </Link>
               <div className="flex items-center gap-0.5">
@@ -265,7 +265,7 @@ export function PostCommentsSheet({ postId, open, onClose }: PostCommentsSheetPr
                       <div className="official-comment-badge mb-2 text-xs">الحساب الرسمي</div>
                     )}
                     <div className={cn("flex gap-2 group", isRTL && "flex-row-reverse")}>
-                      <Link href={`/user?id=${comment.user_id}`}>
+                      <Link href={`/@${comment.profile?.username}`}>
                         <Avatar className={cn(
                           "flex-shrink-0 border transition-all duration-200",
                           comment.profile?.is_official
@@ -278,7 +278,7 @@ export function PostCommentsSheet({ postId, open, onClose }: PostCommentsSheetPr
                       </Link>
                       <div className="flex-1 min-w-0">
                         <div className={cn("flex items-center gap-1 flex-wrap", isRTL && "flex-row-reverse")}>
-                          <Link href={`/user?id=${comment.user_id}`}
+                          <Link href={`/@${comment.profile?.username}`}
                             className={cn("hover:opacity-80 transition-opacity text-sm font-bold", comment.profile?.is_official && "official-username")}>
                             {comment.profile?.username}
                           </Link>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation as useWouterLocation } from "wouter";
+import { api } from "@/lib/api";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as ShadcnToaster } from "@/components/ui/toaster";
@@ -46,6 +47,19 @@ import HashtagPage from "@/pages/hashtag";
 import LocationPage from "@/pages/location-page";
 import MyActivity from "@/pages/my-activity";
 import UserPostsFeed from "@/pages/user-posts-feed";
+
+// Redirect /user?id=UUID → /@username for backward compatibility
+function UserRedirect() {
+  const [, setLocation] = useWouterLocation();
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('id');
+    if (!id) { setLocation('/profile'); return; }
+    api.getProfileById(id).then(p => {
+      setLocation(p?.username ? `/@${p.username}` : '/profile');
+    }).catch(() => setLocation('/profile'));
+  }, []);
+  return null;
+}
 
 function BanGuard() {
   const { isBanned } = useAuth();
@@ -159,6 +173,9 @@ function Router() {
         </ProtectedLayout>
       </Route>
       <Route path="/user">
+        <UserRedirect />
+      </Route>
+      <Route path="/@:username">
         <ProtectedLayout>
           <UserProfile />
         </ProtectedLayout>

@@ -296,7 +296,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
   /* ── Link destination ── */
   const getHref = () => {
     if (isModeration) return `/moderation/${notif.id}`;
-    if (notif.type === 'follow' || notif.type === 'follow_request') return `/user?id=${actorId}`;
+    if (notif.type === 'follow' || notif.type === 'follow_request') return actor?.username ? `/@${actor.username}` : null;
     if (notif.post_id) {
       if (notif.comment_id) return `/post/${notif.post_id}?commentId=${notif.comment_id}`;
       return `/post/${notif.post_id}`;
@@ -348,7 +348,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
           </div>
         </div>
       ) : (
-        <Link href={`/user?id=${actorId}`} onClick={e => e.stopPropagation()} className="relative flex-shrink-0">
+        <Link href={`/@${actor?.username}`} onClick={e => e.stopPropagation()} className="relative flex-shrink-0">
           <Avatar className="w-11 h-11">
             <AvatarImage src={actor?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${actor?.username}`} />
             <AvatarFallback className="text-xs font-bold">{actor?.username?.[0]?.toUpperCase() || '?'}</AvatarFallback>
@@ -378,7 +378,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
           <>
             <p className="text-[13.5px] leading-snug text-foreground">
               <Link
-                href={`/user?id=${actorId}`}
+                href={`/@${actor?.username}`}
                 className="font-bold hover:underline"
                 onClick={e => e.stopPropagation()}
               >

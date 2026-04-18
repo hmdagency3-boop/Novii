@@ -159,7 +159,7 @@ export function UserHoverCard({ userId, children, disabled = false }: UserHoverC
               <div className="flex items-start justify-between p-4 pb-3">
                 {/* Left: name, bio, stats */}
                 <div className="flex-1 min-w-0 pr-3">
-                  <Link href={`/user?id=${userId}`} className="flex items-center gap-1 flex-wrap mb-0.5 hover:opacity-80 transition-opacity">
+                  <Link href={`/@${profile?.username}`} className="flex items-center gap-1 flex-wrap mb-0.5 hover:opacity-80 transition-opacity">
                     <span className="font-bold text-[15px] text-foreground truncate max-w-[150px]">
                       {profile.username}
                     </span>
@@ -206,7 +206,7 @@ export function UserHoverCard({ userId, children, disabled = false }: UserHoverC
                   disabled={!hasStory}
                 >
                   {!hasStory ? (
-                    <Link href={`/user?id=${userId}`} className="block">
+                    <Link href={`/@${profile?.username}`} className="block">
                       <div className="w-[62px] h-[62px] rounded-full overflow-hidden border-2 border-primary/20">
                         <img
                           src={profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`}

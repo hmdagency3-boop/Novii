@@ -52,10 +52,7 @@ export function MusicPicker({ open, onOpenChange, onSelect, selectedTrack, isRTL
     return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
   }, [query, searchMusic]);
 
-  const toProxyUrl = (url: string) =>
-    url.includes('dzcdn.net') || url.includes('deezer.com')
-      ? `/api/music/proxy?url=${encodeURIComponent(url)}`
-      : url;
+  const toProxyUrl = (url: string) => url;
 
   const togglePreview = (track: MusicTrack) => {
     if (playingId === track.id) {

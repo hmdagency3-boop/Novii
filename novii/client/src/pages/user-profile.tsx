@@ -22,7 +22,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { getUserBadges } from "@/lib/badge-utils";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { useLanguage } from "@/lib/language-context";
 import { useState, useEffect, useMemo } from "react";
 import { FollowersDialog } from "@/components/followers-dialog";
@@ -79,36 +79,36 @@ export default function UserProfile() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
   
-  // Get userId from URL query params - use window.location.search instead
-  const searchParams = new URLSearchParams(window.location.search);
-  const rawId = searchParams.get('id');
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const userId = rawId && UUID_RE.test(rawId) ? rawId : null;
-  
-  if (!userId) {
+  // Get username from route params (/@:username)
+  const { username } = useParams<{ username: string }>();
+
+  if (!username) {
     setLocation('/profile');
     return null;
   }
-  
+
+  // Fetch user profile by username
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ['profile-by-username', username],
+    queryFn: () => api.getProfileByUsername(username),
+    enabled: !!username,
+    staleTime: 0,
+  });
+
+  // Derive userId from the fetched profile
+  const userId = profile?.id ?? null;
+
   // Check if viewing own profile
   const isOwnProfile = userId === currentUser?.id;
 
   // Invalidate queries when userId changes
   useEffect(() => {
     if (userId) {
-      queryClient.invalidateQueries({ queryKey: ['profile', userId] });
+      queryClient.invalidateQueries({ queryKey: ['profile-by-username', username] });
       queryClient.invalidateQueries({ queryKey: ['userPosts', userId] });
       queryClient.invalidateQueries({ queryKey: ['isFollowing', userId] });
     }
   }, [userId, queryClient]);
-
-  // Fetch user profile
-  const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ['profile', userId],
-    queryFn: () => api.getProfileById(userId),
-    enabled: !!userId,
-    staleTime: 0,
-  });
 
   // Fetch user posts
   const { data: userPosts = [], isLoading: postsLoading } = useQuery({
