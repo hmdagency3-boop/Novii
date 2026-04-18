@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StoryViewerModal } from "@/components/story-viewer-modal";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,8 +69,8 @@ function VoiceMessagePlayer({ audioUrl, isMe, isRead, isRTL }: { audioUrl: strin
 
   return (
     <div className={cn(
-      "rounded-2xl px-3 py-2.5 shadow-sm max-w-[260px] flex items-center gap-2.5",
-      isMe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+      "rounded-2xl px-3 py-2.5 shadow-sm max-w-[260px] flex items-center gap-2.5 border",
+      isMe ? "bg-white text-gray-900 border-gray-200" : "bg-muted text-foreground border-transparent"
     )}>
       <Button
         size="icon"
@@ -140,6 +141,15 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const { direction, language } = useLanguage();
   const isRTL = direction === "rtl";
+  const { user: authUser } = useAuth();
+  const { data: myProfile } = useQuery<Profile | null>({
+    queryKey: ['profile', authUser?.id],
+    queryFn: () => authUser?.id ? api.getProfileById(authUser.id) : Promise.resolve(null),
+    enabled: !!authUser?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+  const myAvatarUrl = myProfile?.avatar_url || (authUser as any)?.user_metadata?.avatar_url;
+  const myUsername = myProfile?.username || (authUser as any)?.user_metadata?.username || 'me';
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(message.content);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -339,6 +349,12 @@ export function MessageBubble({
           <Trash2 className="w-3 h-3 opacity-50" />
           {isRTL ? "تم حذف هذه الرسالة" : "This message was deleted"}
         </div>
+        {isMe && (
+          <Avatar className="w-8 h-8 shrink-0 mt-0.5">
+            <AvatarImage src={myAvatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${myUsername}`} />
+            <AvatarFallback className="text-xs">{myUsername?.[0]?.toUpperCase()}</AvatarFallback>
+          </Avatar>
+        )}
       </div>
     );
   }
@@ -368,7 +384,7 @@ export function MessageBubble({
               {timeAgo(new Date(message.created_at), language.code)}
             </div>
           </button>
-          <div className={cn("rounded-2xl px-4 py-2 text-sm shadow-sm max-w-xs", isMe ? "bg-blue-500 text-white" : "bg-muted text-foreground")}>
+          <div className={cn("rounded-2xl px-4 py-2 text-sm shadow-sm max-w-xs border", isMe ? "bg-white text-gray-900 border-gray-200" : "bg-muted text-foreground border-transparent")}>
             <p className={cn("leading-relaxed break-words", isRTL && "text-right")}>{message.content}</p>
           </div>
           {currentUserId === message.sender_id && (
@@ -455,7 +471,7 @@ export function MessageBubble({
                 <div className={cn(
                   "rounded-xl px-3 py-1.5 text-xs border-l-4 mb-0.5 max-w-sm opacity-80",
                   isMe
-                    ? "bg-primary/20 border-primary-foreground/50 text-primary-foreground/80"
+                    ? "bg-gray-100 border-gray-400 text-gray-700"
                     : "bg-muted/60 border-muted-foreground/40 text-muted-foreground"
                 )}>
                   <p className="font-semibold text-[10px] mb-0.5 opacity-70">
@@ -525,8 +541,8 @@ export function MessageBubble({
                   {message.content && message.content !== '🎤' && message.content !== '🎬' && (
                     <div>
                       <div className={cn(
-                        "rounded-2xl px-4 py-2.5 text-sm relative max-w-sm",
-                        isMe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+                        "rounded-2xl px-4 py-2.5 text-sm relative max-w-sm border",
+                        isMe ? "bg-white text-gray-900 border-gray-200 shadow-sm" : "bg-muted text-foreground border-transparent"
                       )}>
                         <p className={cn("leading-relaxed break-words text-sm font-light", isRTL && "text-right")}>{message.content}</p>
                         <div className={cn("flex items-center gap-1 mt-0.5 text-xs", isRTL && "flex-row-reverse justify-start", !isRTL && "justify-end")}>
@@ -654,6 +670,13 @@ export function MessageBubble({
           </DropdownMenu>
         </div>
       </div>
+
+      {isMe && (
+        <Avatar className="w-8 h-8 shrink-0 mt-0.5">
+          <AvatarImage src={myAvatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${myUsername}`} />
+          <AvatarFallback className="text-xs">{myUsername?.[0]?.toUpperCase()}</AvatarFallback>
+        </Avatar>
+      )}
 
       {/* Image Modal */}
       {message.image_url && !message.image_url.startsWith('[voice]') && !message.image_url.startsWith('[video]') && (
