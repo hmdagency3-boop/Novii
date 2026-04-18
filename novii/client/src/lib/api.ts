@@ -1817,12 +1817,16 @@ export const api = {
     return this._uploadToCloudinary(file, "messages");
   },
 
+  async uploadMessageVideo(file: File): Promise<string> {
+    return this._uploadToCloudinary(file, "messages");
+  },
+
   async uploadAudio(blob: Blob): Promise<string> {
     const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type });
     return this._uploadToCloudinary(file, 'audio');
   },
 
-  async sendMessage(receiverId: string, content: string, imageUrl?: string, replyToId?: string, audioUrl?: string): Promise<Message> {
+  async sendMessage(receiverId: string, content: string, imageUrl?: string, replyToId?: string, audioUrl?: string, videoUrl?: string): Promise<Message> {
     const user = await getCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
@@ -1838,9 +1842,9 @@ export const api = {
       .insert({
         sender_id: user.id,
         receiver_id: receiverId,
-        content: content || (audioUrl ? '🎤' : ''),
-        // Store audio with a special prefix in image_url (no DB migration needed)
-        image_url: audioUrl ? `[voice]${audioUrl}` : (imageUrl || null),
+        content: content || (audioUrl ? '🎤' : videoUrl ? '🎬' : ''),
+        // Store audio/video with a special prefix in image_url (no DB migration needed)
+        image_url: audioUrl ? `[voice]${audioUrl}` : videoUrl ? `[video]${videoUrl}` : (imageUrl || null),
         // reply_to_id: replyToId || null, // requires DB migration — skipping for now
       })
       .select(`

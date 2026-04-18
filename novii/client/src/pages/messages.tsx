@@ -183,8 +183,11 @@ export default function Messages() {
   const [isTyping, setIsTyping] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const chatChannelRef = useRef<any>(null);
   const isRTL = direction === "rtl";
@@ -1109,9 +1112,9 @@ export default function Messages() {
 
   // Send message mutation (with optimistic update so the sender's bubble shows instantly)
   const sendMessageMutation = useMutation({
-    mutationFn: async ({ receiverId, content, imageUrl, replyToId, audioUrl }: { receiverId: string; content: string; imageUrl?: string; replyToId?: string; audioUrl?: string }) =>
-      api.sendMessage(receiverId, content, imageUrl, replyToId, audioUrl),
-    onMutate: async ({ receiverId, content, imageUrl, replyToId, audioUrl }) => {
+    mutationFn: async ({ receiverId, content, imageUrl, replyToId, audioUrl, videoUrl }: { receiverId: string; content: string; imageUrl?: string; replyToId?: string; audioUrl?: string; videoUrl?: string }) =>
+      api.sendMessage(receiverId, content, imageUrl, replyToId, audioUrl, videoUrl),
+    onMutate: async ({ receiverId, content, imageUrl, replyToId, audioUrl, videoUrl }) => {
       const queryKey = ['messages', receiverId];
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<any[]>(queryKey) || [];
@@ -1121,7 +1124,7 @@ export default function Messages() {
         sender_id: currentUser?.id,
         receiver_id: receiverId,
         content,
-        image_url: imageUrl || null,
+        image_url: audioUrl ? `[voice]${audioUrl}` : videoUrl ? `[video]${videoUrl}` : (imageUrl || null),
         audio_url: audioUrl || null,
         reply_to_id: replyToId || null,
         created_at: new Date().toISOString(),
@@ -1137,6 +1140,8 @@ export default function Messages() {
       setHasMessageText(false);
       setSelectedImage(null);
       setPreviewUrl(null);
+      setSelectedVideo(null);
+      setVideoPreviewUrl(null);
       setReplyingTo(null);
       setShowEmojiPicker(false);
       return { previous, queryKey };
@@ -1622,12 +1627,16 @@ export default function Messages() {
 
   const handleSendMessage = async (overrideText?: string) => {
     const text = (overrideText ?? messageComposerRef.current?.getValue() ?? "").trim();
-    if ((text || selectedImage) && selectedUserId) {
+    if ((text || selectedImage || selectedVideo) && selectedUserId) {
       sendTypingEvent(false);
       
       let imageUrl: string | undefined;
+      let videoUrl: string | undefined;
       if (selectedImage) {
         imageUrl = await api.uploadMessageImage(selectedImage);
+      }
+      if (selectedVideo) {
+        videoUrl = await api.uploadMessageVideo(selectedVideo);
       }
       
       sendMessageMutation.mutate({
@@ -1635,6 +1644,7 @@ export default function Messages() {
         content: text,
         imageUrl,
         replyToId: replyingTo?.id,
+        videoUrl,
       });
     }
   };
@@ -1648,6 +1658,14 @@ export default function Messages() {
         setPreviewUrl(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedVideo(file);
+      setVideoPreviewUrl(URL.createObjectURL(file));
     }
   };
 
@@ -2182,6 +2200,8 @@ export default function Messages() {
                             )}>
                               {conv.lastMessage?.image_url?.startsWith('[voice]')
                                 ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message")
+                                : conv.lastMessage?.image_url?.startsWith('[video]')
+                                ? (isRTL ? "🎬 فيديو" : "🎬 Video")
                                 : conv.lastMessage?.image_url
                                 ? (isRTL ? "📷 صورة" : "📷 Image")
                                 : (conv.lastMessage?.content?.substring(0, 40) || (isRTL ? "ابدأ محادثة..." : "Start chatting..."))}
@@ -2831,7 +2851,7 @@ export default function Messages() {
                               <div className="flex-1 min-w-0">
                                 <p className="text-[10px] text-primary font-semibold">{isRTL ? "ردًا على" : "Replying to"} {replyingTo.sender?.username || (replyingTo.sender_id === currentUser?.id ? (isRTL ? "أنت" : "You") : "")}</p>
                                 <p className="text-xs text-muted-foreground truncate">
-                                  {replyingTo.image_url?.startsWith('[voice]') ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message") : replyingTo.image_url ? (isRTL ? "📷 صورة" : "📷 Image") : replyingTo.content}
+                                  {replyingTo.image_url?.startsWith('[voice]') ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message") : replyingTo.image_url?.startsWith('[video]') ? (isRTL ? "🎬 فيديو" : "🎬 Video") : replyingTo.image_url ? (isRTL ? "📷 صورة" : "📷 Image") : replyingTo.content}
                                 </p>
                               </div>
                               <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => setReplyingTo(null)}>
@@ -2851,10 +2871,27 @@ export default function Messages() {
                             </div>
                           )}
 
+                          {/* Video Preview - Desktop */}
+                          {videoPreviewUrl && (
+                            <div className="px-1 py-1">
+                              <div className="inline-block relative">
+                                <video src={videoPreviewUrl} className="max-h-20 rounded-lg shadow-md" muted />
+                                <button
+                                  onClick={() => { setSelectedVideo(null); setVideoPreviewUrl(null); if (videoInputRef.current) videoInputRef.current.value = ''; }}
+                                  className="absolute -top-2 -right-2 bg-destructive text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-destructive/90 shadow-lg"
+                                >×</button>
+                              </div>
+                            </div>
+                          )}
+
                           <div className="flex items-end gap-1 w-full leading-none pb-1 m-0">
                             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                            <input ref={videoInputRef} type="file" accept="video/*" onChange={handleVideoSelect} className="hidden" />
                             <Button variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-9 w-9 p-0 m-0 text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
                               <ImageIcon className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-9 w-9 p-0 m-0 text-muted-foreground" onClick={() => videoInputRef.current?.click()} title={isRTL ? "إرسال فيديو" : "Send video"}>
+                              <Video className="w-4 h-4" />
                             </Button>
                             <Button variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-9 w-9 p-0 m-0 text-muted-foreground" onClick={() => setShowEmojiPicker(p => !p)}>
                               <Smile className="w-4 h-4" />
@@ -2886,7 +2923,7 @@ export default function Messages() {
                             )}
 
                             {/* Mic or Send */}
-                            {(hasMessageText || selectedImage) ? (
+                            {(hasMessageText || selectedImage || selectedVideo) ? (
                               <Button onClick={() => handleSendMessage()} disabled={sendMessageMutation.isPending} className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg h-9 w-9 p-0 m-0" size="icon">
                                 {sendMessageMutation.isPending ? <Spinner className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                               </Button>
@@ -3000,7 +3037,7 @@ export default function Messages() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] text-primary font-semibold">{isRTL ? "ردًا على" : "Replying to"} {replyingTo.sender?.username || (replyingTo.sender_id === currentUser?.id ? (isRTL ? "أنت" : "You") : "")}</p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {replyingTo.image_url?.startsWith('[voice]') ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message") : replyingTo.image_url ? (isRTL ? "📷 صورة" : "📷 Image") : replyingTo.content}
+                      {replyingTo.image_url?.startsWith('[voice]') ? (isRTL ? "🎤 رسالة صوتية" : "🎤 Voice message") : replyingTo.image_url?.startsWith('[video]') ? (isRTL ? "🎬 فيديو" : "🎬 Video") : replyingTo.image_url ? (isRTL ? "📷 صورة" : "📷 Image") : replyingTo.content}
                     </p>
                   </div>
                   <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => setReplyingTo(null)}>
@@ -3018,10 +3055,26 @@ export default function Messages() {
                   ))}
                 </div>
               )}
+              {/* Video Preview - Mobile */}
+              {videoPreviewUrl && (
+                <div className="px-1 py-0.5">
+                  <div className="inline-block relative">
+                    <video src={videoPreviewUrl} className="max-h-12 rounded-lg shadow-md" muted />
+                    <button
+                      onClick={() => { setSelectedVideo(null); setVideoPreviewUrl(null); if (videoInputRef.current) videoInputRef.current.value = ''; }}
+                      className="absolute -top-2 -right-2 bg-destructive text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-destructive/90 shadow-lg"
+                    >×</button>
+                  </div>
+                </div>
+              )}
               <div className="flex items-end gap-0 w-full leading-none pb-0 m-0 py-0">
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                <input ref={videoInputRef} type="file" accept="video/*" onChange={handleVideoSelect} className="hidden" />
                 <Button variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-8 w-8 p-0 m-0 text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
                   <ImageIcon className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-8 w-8 p-0 m-0 text-muted-foreground" onClick={() => videoInputRef.current?.click()} title={isRTL ? "إرسال فيديو" : "Send video"}>
+                  <Video className="w-4 h-4" />
                 </Button>
                 <Button variant="ghost" size="icon" className="hover:bg-accent/50 flex-shrink-0 h-8 w-8 p-0 m-0 text-muted-foreground" onClick={() => setShowEmojiPicker(p => !p)}>
                   <Smile className="w-4 h-4" />
@@ -3050,7 +3103,7 @@ export default function Messages() {
                   />
                 )}
 
-                {(hasMessageText || selectedImage) ? (
+                {(hasMessageText || selectedImage || selectedVideo) ? (
                   <Button onClick={() => handleSendMessage()} disabled={sendMessageMutation.isPending} className="rounded-full flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 shadow-lg h-8 w-8 p-0 m-0 ml-1" size="icon">
                     {sendMessageMutation.isPending ? <Spinner className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
                   </Button>

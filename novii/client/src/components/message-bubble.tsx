@@ -463,6 +463,8 @@ export function MessageBubble({
                   </p>
                   {message.reply_to.image_url?.startsWith('[voice]') ? (
                     <span className="flex items-center gap-1"><Mic className="w-3 h-3" />{isRTL ? "رسالة صوتية" : "Voice message"}</span>
+                  ) : message.reply_to.image_url?.startsWith('[video]') ? (
+                    <span className="flex items-center gap-1">🎬 {isRTL ? "فيديو" : "Video"}</span>
                   ) : message.reply_to.image_url ? (
                     <span className="flex items-center gap-1">📷 {isRTL ? "صورة" : "Image"}</span>
                   ) : (
@@ -479,10 +481,27 @@ export function MessageBubble({
                   isRead={message.is_read}
                   isRTL={isRTL}
                 />
+              ) : message.image_url?.startsWith('[video]') ? (
+                /* Video Message — detected by [video] prefix in image_url */
+                <div className="max-w-sm rounded-2xl overflow-hidden shadow-md">
+                  <video
+                    src={message.image_url.replace('[video]', '')}
+                    controls
+                    className="w-full max-h-80 rounded-2xl object-cover"
+                    preload="metadata"
+                  />
+                  {isMe && (
+                    <div className="flex justify-end px-2 pb-1">
+                      <span className="text-[10px] opacity-50 flex items-center gap-0.5 text-gray-300">
+                        {message.is_read ? <CheckCheck className="w-3 h-3" /> : <CheckCheck className="w-3 h-3 opacity-50" />}
+                      </span>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <>
                   {/* Regular Image */}
-                  {message.image_url && !message.image_url.startsWith('[voice]') && (
+                  {message.image_url && (
                     <img
                       src={message.image_url}
                       alt="Message image"
@@ -492,7 +511,7 @@ export function MessageBubble({
                   )}
 
                   {/* Text Bubble */}
-                  {message.content && message.content !== '🎤' && (
+                  {message.content && message.content !== '🎤' && message.content !== '🎬' && (
                     <div>
                       <div className={cn(
                         "rounded-2xl px-4 py-2.5 text-sm relative max-w-sm",
