@@ -431,7 +431,21 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
                 {/* Mute / unmute (video or music) */}
                 {(currentStory.media_type === 'video' || (currentStory as any).music_url) && (
                   <button
-                    onClick={() => setIsMuted(m => !m)}
+                    onClick={() => {
+                      const newMuted = !isMuted;
+                      setIsMuted(newMuted);
+                      if (!newMuted && musicRef.current) {
+                        if (musicRef.current.paused) {
+                          musicRef.current.muted = false;
+                          musicRef.current.play()
+                            .then(() => setMusicBlocked(false))
+                            .catch(() => setMusicBlocked(true));
+                        } else {
+                          musicRef.current.muted = false;
+                          setMusicBlocked(false);
+                        }
+                      }
+                    }}
                     className="text-white p-2 rounded-full hover:bg-white/10 active:bg-white/20 transition-colors"
                   >
                     {isMuted
@@ -500,14 +514,26 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
 
           {/* ══════════ MUSIC BLOCKED PROMPT ══════════ */}
           {(currentStory as any).music_url && !showViews && musicBlocked && (
-            <div className="absolute z-30 pointer-events-none"
+            <div className="absolute z-40 pointer-events-none"
               style={{ bottom: isOwnStory ? '28px' : '90px', left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}
             >
               <button
                 className="pointer-events-auto flex items-center gap-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full px-4 py-2 animate-pulse"
-                onClick={(e) => { e.stopPropagation(); musicRef.current?.play().then(() => setMusicBlocked(false)).catch(() => {}); }}
+                onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                onPointerUp={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  if (musicRef.current) {
+                    musicRef.current.muted = false;
+                    setIsMuted(false);
+                    musicRef.current.play()
+                      .then(() => setMusicBlocked(false))
+                      .catch(() => {});
+                  }
+                }}
               >
-                <VolumeX className="w-4 h-4 text-white" />
+                <Volume2 className="w-4 h-4 text-white" />
                 <span className="text-white text-xs font-semibold">{isRTL ? 'اضغط لتشغيل الصوت' : 'Tap to play sound'}</span>
               </button>
             </div>
