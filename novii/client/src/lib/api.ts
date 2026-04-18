@@ -2054,9 +2054,13 @@ export const api = {
     content?: string;
   }): Promise<{id: string}> {
     // Use server endpoint to bypass Supabase RLS restrictions
+    const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch('/api/notifications', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session?.access_token ? { 'x-user-token': session.access_token } : {}),
+      },
       body: JSON.stringify({
         userId: params.userId,
         actorId: params.actorId,
