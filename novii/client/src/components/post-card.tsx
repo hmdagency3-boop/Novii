@@ -183,7 +183,7 @@ export default function PostCard({ post }: PostCardProps) {
           />
           {/* Username + time + location — HoverCard triggers on the name */}
           <UserHoverCard userId={post.user_id}>
-          <Link href={`/@${post.profile?.username}`} className="flex flex-col leading-tight min-w-0 flex-1 hover:opacity-80 transition-opacity">
+          <Link href={`/u/${post.profile?.username}`} className="flex flex-col leading-tight min-w-0 flex-1 hover:opacity-80 transition-opacity">
             <div className="flex items-center gap-1 flex-wrap">
               <VerifiedUsername
                 username={post.profile?.full_name || post.profile?.username || ""}
@@ -441,7 +441,7 @@ export default function PostCard({ post }: PostCardProps) {
         {/* Caption */}
         <div className="text-sm space-y-2">
             <div className="flex items-start gap-1">
-              <Link href={`/@${post.profile?.username}`} className="inline-flex items-center gap-1 font-bold hover:opacity-80 transition-opacity flex-shrink-0">
+              <Link href={`/u/${post.profile?.username}`} className="inline-flex items-center gap-1 font-bold hover:opacity-80 transition-opacity flex-shrink-0">
                 {post.profile?.full_name || post.profile?.username}
                 {post.profile?.is_verified && <VerifiedBadge size="sm" verifiedAt={post.profile?.verified_at} />}
               </Link>

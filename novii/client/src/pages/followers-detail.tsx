@@ -131,7 +131,7 @@ export default function FollowersDetailPage() {
         "flex items-center justify-between p-3 hover:bg-accent rounded-lg transition-colors",
         isRTL && "flex-row-reverse"
       )}>
-        <Link href={`/@${user.username}`} className="flex items-center gap-3 flex-1 min-w-0">
+        <Link href={`/u/${user.username}`} className="flex items-center gap-3 flex-1 min-w-0">
           <Avatar className="w-12 h-12">
             <AvatarImage src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
             <AvatarFallback>{user.username?.[0]?.toUpperCase()}</AvatarFallback>

@@ -43,7 +43,7 @@ export function ProfileShareModal({
     if (!open) setActiveTab("share");
   }, [open]);
 
-  const profileUrl = `${window.location.origin}/@${username}`;
+  const profileUrl = `${window.location.origin}/u/${username}`;
   const displayName = fullName && fullName !== username ? fullName : null;
 
   const handleCopy = async () => {

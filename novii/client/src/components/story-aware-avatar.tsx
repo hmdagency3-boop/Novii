@@ -74,7 +74,7 @@ export function StoryAwareAvatar({
         </button>
       ) : (
         <Link
-          href={`/@${username}`}
+          href={`/u/${username}`}
           className={cn("rounded-full flex-shrink-0 block", className)}
         >
           <div className={cn("rounded-full overflow-hidden bg-muted border-2 border-primary/30 ring-2 ring-primary/10 hover:opacity-80 transition-opacity", sizeClass)}>

@@ -279,7 +279,7 @@ function ActionColumn({ reel, isRTL, followed, saved, currentUserId, isLiked, li
   return (
     <div className="flex flex-col items-center gap-5">
       <div className="relative">
-        <Link href={`/@${reel.profile?.username}`}>
+        <Link href={`/u/${reel.profile?.username}`}>
           <Avatar className={cn("ring-2 ring-white cursor-pointer", size === "sm" ? "w-10 h-10" : "w-12 h-12")}>
             <AvatarImage src={reel.profile?.avatar_url} />
             <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white font-bold text-sm">
@@ -588,7 +588,7 @@ const MobileReelCard = React.memo(function MobileReelCard({
 
       <div className={cn("absolute bottom-0 z-20 px-4 w-full", hasNav ? "pb-4" : "pb-20",
         isRTL ? "text-right pr-4 pl-16" : "pl-4 pr-16")}>
-        <Link href={`/@${reel.profile?.username}`}>
+        <Link href={`/u/${reel.profile?.username}`}>
           <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity drop-shadow">
             {reel.profile?.full_name || reel.profile?.username}
           </p>
@@ -721,7 +721,7 @@ const DesktopReelCard = React.memo(function DesktopReelCard({
           )}
 
           <div className="absolute bottom-0 left-0 right-0 z-20 p-5">
-            <Link href={`/@${reel.profile?.username}`}>
+            <Link href={`/u/${reel.profile?.username}`}>
               <p className="text-white font-bold text-base mb-1 cursor-pointer hover:opacity-80 transition-opacity drop-shadow">
                 {reel.profile?.full_name || reel.profile?.username}
               </p>

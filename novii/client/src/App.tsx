@@ -55,7 +55,7 @@ function UserRedirect() {
     const id = new URLSearchParams(window.location.search).get('id');
     if (!id) { setLocation('/profile'); return; }
     api.getProfileById(id).then(p => {
-      setLocation(p?.username ? `/@${p.username}` : '/profile');
+      setLocation(p?.username ? `/u/${p.username}` : '/profile');
     }).catch(() => setLocation('/profile'));
   }, []);
   return null;
@@ -175,7 +175,7 @@ function Router() {
       <Route path="/user">
         <UserRedirect />
       </Route>
-      <Route path="/@:username">
+      <Route path="/u/:username">
         <ProtectedLayout>
           <UserProfile />
         </ProtectedLayout>

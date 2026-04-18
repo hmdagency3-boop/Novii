@@ -81,7 +81,7 @@ export default function SuggestionsSidebar() {
 
     return (
       <div className="relative group">
-        <Link key={user.id} href={`/@${user.username}`}>
+        <Link key={user.id} href={`/u/${user.username}`}>
           <div className={`flex items-center justify-between ${compact ? 'p-2' : 'p-3'} hover:bg-accent/50 rounded-lg transition-colors cursor-pointer`}>
             <div className="hover:opacity-80 transition-opacity flex items-center gap-3 flex-1 min-w-0">
               <Avatar className={`${compact ? 'w-9 h-9' : 'w-10 h-10'} flex-shrink-0`}>

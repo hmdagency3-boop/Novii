@@ -422,7 +422,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
       <div key={reply.id}>
         {/* Reply */}
         <div className={cn("flex gap-2 group", isRTL && "flex-row-reverse")}>
-          <Link href={`/@${reply.profile?.username}`}>
+          <Link href={`/u/${reply.profile?.username}`}>
             <Avatar className="w-6 h-6 border border-border/50 flex-shrink-0 group-hover:border-primary/40 transition-all duration-200">
               <AvatarImage src={reply.profile?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + reply.user_id} />
               <AvatarFallback>{reply.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
@@ -430,7 +430,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
           </Link>
           <div className="flex-1 min-w-0">
             <div className={cn("flex items-center gap-1.5 flex-wrap", isRTL && "flex-row-reverse")}>
-              <Link href={`/@${reply.profile?.username}`} className="font-bold text-xs hover:opacity-80 transition-opacity">
+              <Link href={`/u/${reply.profile?.username}`} className="font-bold text-xs hover:opacity-80 transition-opacity">
                 {reply.profile?.username}
               </Link>
               <div className="flex items-center gap-0.5">
@@ -732,7 +732,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
 
           {/* User Info & Caption - Mobile Bottom Overlay */}
           <div className="absolute bottom-0 left-0 right-0 md:hidden bg-gradient-to-t from-black via-black/80 to-transparent p-4 space-y-3">
-            <Link href={`/@${localReel.profile?.username}`}>
+            <Link href={`/u/${localReel.profile?.username}`}>
               <div className={cn("flex items-center gap-2 cursor-pointer group", isRTL && "flex-row-reverse")}>
                 <Avatar className="w-10 h-10 ring-2 ring-pink-500/30 group-hover:ring-pink-500/60 transition-all">
                   <AvatarImage src={localReel.user?.avatar_url} />
@@ -761,7 +761,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
         )}>
             {/* User Info & Caption */}
             <div className="flex-none p-6 border-b border-border space-y-4">
-              <Link href={`/@${localReel.profile?.username}`}>
+              <Link href={`/u/${localReel.profile?.username}`}>
                 <div className={cn("flex items-center gap-3 cursor-pointer group", isRTL && "flex-row-reverse")}>
                   <Avatar className="w-12 h-12 ring-2 ring-pink-500/30 group-hover:ring-pink-500/60 transition-all">
                     <AvatarImage src={localReel.user?.avatar_url} />
@@ -823,7 +823,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                         
                         {/* Main Comment */}
                         <div className="flex gap-3 group">
-                          <Link href={`/@${comment.profile?.username}`}>
+                          <Link href={`/u/${comment.profile?.username}`}>
                             <Avatar className={cn(
                               "flex-shrink-0 border transition-all duration-200",
                               comment.profile?.is_official ? "w-8 h-8 border-primary/40 ring-2 ring-primary/10" : "w-8 h-8 border-border/50 group-hover:border-primary/40 group-hover:ring-2 group-hover:ring-primary/10"
@@ -835,7 +835,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 justify-between flex-wrap">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <Link href={`/@${comment.profile?.username}`} className={cn(
+                                <Link href={`/u/${comment.profile?.username}`} className={cn(
                                   "hover:opacity-80 transition-opacity",
                                   comment.profile?.is_official ? "official-username text-sm font-bold" : "font-bold text-sm"
                                 )}>
@@ -1083,7 +1083,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                       
                       {/* Main Comment */}
                       <div className={cn("flex gap-2 group", isRTL && "flex-row-reverse")}>
-                        <Link href={`/@${comment.profile?.username}`}>
+                        <Link href={`/u/${comment.profile?.username}`}>
                           <Avatar className={cn(
                             "flex-shrink-0 border transition-all duration-200",
                             comment.profile?.is_official ? "w-9 h-9 border-primary/40 ring-2 ring-primary/10" : "w-9 h-9 border-border/50 group-hover:border-primary/40 group-hover:ring-2 group-hover:ring-primary/10"
@@ -1094,7 +1094,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
                         </Link>
                         <div className="flex-1 min-w-0">
                           <div className={cn("flex items-center gap-1 flex-wrap", isRTL && "flex-row-reverse")}>
-                            <Link href={`/@${comment.profile?.username}`} className={cn(
+                            <Link href={`/u/${comment.profile?.username}`} className={cn(
                               "hover:opacity-80 transition-opacity text-sm font-bold",
                               comment.profile?.is_official ? "official-username" : ""
                             )}>
