@@ -6395,5 +6395,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // Open Graph / Social Media Preview for /u/:username
+  // Serves rich HTML previews to crawlers (WhatsApp, Telegram, Facebook, Twitter, etc.)
+  // ============================================
+  const SOCIAL_BOTS = /facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|slackbot|linkedinbot|discordbot|pinterest|skypeuripreview|google-inspectiontool|googlebot|bingbot|embedly|outbrain|nuzzel|vkshare|w3c_validator|redditbot|applebot|yandex|bytespider|duckduckbot|petalbot|qwantify/i;
+
+  const escapeHtml = (s: string) =>
+    String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  app.get('/u/:username', async (req: Request, res: Response, next: Function) => {
+    try {
+      const ua = String(req.headers['user-agent'] || '');
+      const isBot = SOCIAL_BOTS.test(ua);
+
+      // Regular browsers: let the SPA handle it
+      if (!isBot) return next();
+
+      const rawUsername = String(req.params.username || '').trim();
+      if (!rawUsername || !adminDb) return next();
+
+      const { data: profile } = await adminDb
+        .from('profiles')
+        .select('id, username, full_name, avatar_url, bio, followers_count, posts_count, is_verified')
+        .ilike('username', rawUsername)
+        .maybeSingle();
+
+      if (!profile) return next();
+
+      const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      const fullUrl = `${proto}://${host}${req.originalUrl}`;
+
+      const displayName = profile.full_name || profile.username;
+      const verifiedMark = profile.is_verified ? ' ✓' : '';
+      const titleAr = `${escapeHtml(displayName)}${verifiedMark} (@${escapeHtml(profile.username)}) — Novii`;
+      const followers = profile.followers_count ?? 0;
+      const postsCount = profile.posts_count ?? 0;
+      const bio = profile.bio ? String(profile.bio).slice(0, 140) : '';
+      const description = bio
+        ? `${escapeHtml(bio)} • ${followers} متابع • ${postsCount} منشور`
+        : `${followers} متابع • ${postsCount} منشور • شاهد ملف ${escapeHtml(displayName)} على Novii`;
+      const image = profile.avatar_url
+        ? escapeHtml(profile.avatar_url)
+        : `${proto}://${host}/assets/novii_logo_new.png`;
+
+      const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${titleAr}</title>
+<meta name="description" content="${description}" />
+<link rel="canonical" href="${escapeHtml(fullUrl)}" />
+
+<meta property="og:type" content="profile" />
+<meta property="og:site_name" content="Novii" />
+<meta property="og:title" content="${titleAr}" />
+<meta property="og:description" content="${description}" />
+<meta property="og:image" content="${image}" />
+<meta property="og:image:width" content="400" />
+<meta property="og:image:height" content="400" />
+<meta property="og:url" content="${escapeHtml(fullUrl)}" />
+<meta property="og:locale" content="ar_AR" />
+<meta property="profile:username" content="${escapeHtml(profile.username)}" />
+
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="${titleAr}" />
+<meta name="twitter:description" content="${description}" />
+<meta name="twitter:image" content="${image}" />
+</head>
+<body>
+<main style="font-family:sans-serif;max-width:600px;margin:2rem auto;text-align:center;direction:rtl">
+<img src="${image}" alt="${escapeHtml(displayName)}" style="width:120px;height:120px;border-radius:50%;object-fit:cover" />
+<h1>${escapeHtml(displayName)}${verifiedMark}</h1>
+<p style="color:#888">@${escapeHtml(profile.username)}</p>
+${bio ? `<p>${escapeHtml(bio)}</p>` : ''}
+<p><strong>${followers}</strong> متابع · <strong>${postsCount}</strong> منشور</p>
+<p><a href="${escapeHtml(fullUrl)}">عرض الملف الشخصي على Novii</a></p>
+</main>
+</body>
+</html>`;
+
+      res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' }).send(html);
+    } catch (err) {
+      console.error('OG preview error:', err);
+      next();
+    }
+  });
+
   return httpServer;
 }
