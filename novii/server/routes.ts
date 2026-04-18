@@ -6356,5 +6356,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Notifications: create via server to bypass RLS ──────────────────────
+  app.post("/api/notifications", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { userId, actorId, type, postId, commentId, content } = req.body;
+
+      if (!userId || !actorId || !type) {
+        return res.status(400).json({ error: "userId, actorId and type are required" });
+      }
+
+      // Prevent self-notification
+      if (userId === actorId) {
+        return res.json({ success: true, skipped: true });
+      }
+
+      const db = adminDb;
+      if (!db) return res.status(503).json({ error: "Service unavailable" });
+
+      const { data, error } = await db
+        .from("notifications")
+        .insert({
+          user_id: userId,
+          actor_id: actorId,
+          type,
+          post_id: postId || null,
+          comment_id: commentId || null,
+          content: content || null,
+          is_read: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json({ success: true, id: data.id });
+    } catch (error) {
+      console.error("Create notification error:", error);
+      res.status(500).json({ error: "Failed to create notification" });
+    }
+  });
+
   return httpServer;
 }

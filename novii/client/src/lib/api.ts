@@ -1471,14 +1471,10 @@ export const api = {
       });
       if (reqError) { console.error('❌ Follow request insert error:', reqError); throw reqError; }
 
-      // Create notification directly (bypassing createNotification for reliability)
-      const { error: notifError } = await supabase.from('notifications').insert({
-        user_id: targetUserId,
-        actor_id: user.id,
-        type: 'follow_request',
-        is_read: false,
-      });
-      if (notifError) {
+      // Create follow_request notification via server to bypass RLS
+      try {
+        await this.createNotification({ userId: targetUserId, actorId: user.id, type: 'follow_request' });
+      } catch (notifError) {
         console.error('❌ Follow request notification error:', notifError);
       }
 
@@ -2056,37 +2052,29 @@ export const api = {
     postId?: string;
     commentId?: string;
     content?: string;
-  }): Promise<{id: string; actor: Profile}> {
-    // Get actor profile to check if official
-    const { data: actor, error: actorError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', params.actorId)
-      .single();
-
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({
-        user_id: params.userId,
-        actor_id: params.actorId,
+  }): Promise<{id: string}> {
+    // Use server endpoint to bypass Supabase RLS restrictions
+    const res = await fetch('/api/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: params.userId,
+        actorId: params.actorId,
         type: params.type,
-        post_id: params.postId || null,
-        comment_id: params.commentId || null,
-        content: params.content || null,
-        is_read: false,
-      })
-      .select()
-      .single();
+        postId: params.postId,
+        commentId: params.commentId,
+        content: params.content,
+      }),
+    });
 
-    if (error) {
-      console.error('❌ Error creating notification:', error);
-      throw error;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('❌ Error creating notification:', err);
+      throw new Error(err.error || 'Failed to create notification');
     }
-    
-    return {
-      id: data.id,
-      actor: actor || { id: params.actorId, is_official: false, is_verified: false } as Profile
-    };
+
+    const data = await res.json();
+    return { id: data.id };
   },
 
   async addMessageReaction(messageId: string, reaction: string): Promise<void> {
