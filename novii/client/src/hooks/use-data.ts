@@ -382,8 +382,11 @@ export function useComments(postId: string) {
   useEffect(() => {
     if (!postId) return;
 
+    // Use a unique suffix to avoid "already subscribed" errors when the same
+    // postId is used by multiple mounted components at the same time.
+    const channelName = `comments:${postId}:${Math.random().toString(36).slice(2)}`;
     const subscription = supabase
-      .channel(`comments:${postId}`)
+      .channel(channelName)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -394,7 +397,7 @@ export function useComments(postId: string) {
       })
       .subscribe();
 
-    return () => { subscription.unsubscribe(); };
+    return () => { supabase.removeChannel(subscription); };
   }, [postId, queryClient]);
 
   return query;
