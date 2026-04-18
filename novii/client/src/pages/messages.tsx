@@ -1285,8 +1285,15 @@ export default function Messages() {
 
   useEffect(() => {
     if (isInitialScrollRef.current) {
-      scrollToBottom("auto");
-      isInitialScrollRef.current = false;
+      if (messages && messages.length > 0) {
+        const doScroll = () => scrollToBottom("auto");
+        requestAnimationFrame(() => requestAnimationFrame(doScroll));
+        const t1 = setTimeout(doScroll, 100);
+        const t2 = setTimeout(doScroll, 300);
+        const t3 = setTimeout(doScroll, 600);
+        isInitialScrollRef.current = false;
+        return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+      }
     } else {
       scrollToBottom("smooth");
     }
