@@ -145,6 +145,7 @@ export function MessageBubble({
   const [editedContent, setEditedContent] = useState(message.content);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
   const [showStoryViewer, setShowStoryViewer] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [showForwardDialog, setShowForwardDialog] = useState(false);
@@ -482,22 +483,33 @@ export function MessageBubble({
                   isRTL={isRTL}
                 />
               ) : message.image_url?.startsWith('[video]') ? (
-                /* Video Message — detected by [video] prefix in image_url */
-                <div className="max-w-sm rounded-2xl overflow-hidden shadow-md">
+                /* Video Message — thumbnail that opens fullscreen modal on click */
+                <button
+                  type="button"
+                  onClick={() => setShowVideoModal(true)}
+                  className="relative rounded-2xl overflow-hidden shadow-md max-w-[280px] w-full block group/video bg-black border-none p-0"
+                >
                   <video
                     src={message.image_url.replace('[video]', '')}
-                    controls
-                    className="w-full max-h-80 rounded-2xl object-cover"
+                    className="w-full max-h-56 object-cover rounded-2xl"
                     preload="metadata"
+                    muted
                   />
+                  <div className="absolute inset-0 bg-black/30 group-hover/video:bg-black/50 transition-colors flex items-center justify-center rounded-2xl">
+                    <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-xl group-hover/video:scale-110 transition-transform">
+                      <svg className="w-6 h-6 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    </div>
+                  </div>
                   {isMe && (
-                    <div className="flex justify-end px-2 pb-1">
-                      <span className="text-[10px] opacity-50 flex items-center gap-0.5 text-gray-300">
-                        {message.is_read ? <CheckCheck className="w-3 h-3" /> : <CheckCheck className="w-3 h-3 opacity-50" />}
+                    <div className="absolute bottom-2 right-2">
+                      <span className="opacity-70 flex items-center gap-0.5 text-white drop-shadow">
+                        {message.is_read ? <CheckCheck className="w-3.5 h-3.5" /> : <CheckCheck className="w-3.5 h-3.5 opacity-50" />}
                       </span>
                     </div>
                   )}
-                </div>
+                </button>
               ) : (
                 <>
                   {/* Regular Image */}
@@ -645,7 +657,7 @@ export function MessageBubble({
       </div>
 
       {/* Image Modal */}
-      {message.image_url && !message.image_url.startsWith('[voice]') && (
+      {message.image_url && !message.image_url.startsWith('[voice]') && !message.image_url.startsWith('[video]') && (
         <Dialog open={showImageModal} onOpenChange={setShowImageModal}>
           <DialogContent className="max-w-4xl p-0 bg-black border-0">
             <div className="relative w-full flex flex-col items-center justify-center">
@@ -656,6 +668,49 @@ export function MessageBubble({
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Video Modal — fullscreen dark overlay with video player */}
+      {message.image_url?.startsWith('[video]') && showVideoModal && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 backdrop-blur-sm"
+          onClick={() => setShowVideoModal(false)}
+        >
+          <div
+            className="relative w-full max-w-3xl flex flex-col items-center justify-center px-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowVideoModal(false)}
+              className="absolute -top-12 right-4 text-white/80 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Video Player */}
+            <video
+              src={message.image_url.replace('[video]', '')}
+              controls
+              autoPlay
+              className="w-full max-h-[80vh] rounded-xl shadow-2xl object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+
+            {/* Download Button */}
+            <a
+              href={message.image_url.replace('[video]', '')}
+              download
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 flex items-center gap-2 text-white/70 hover:text-white text-sm transition-colors px-4 py-2 rounded-full hover:bg-white/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download className="w-4 h-4" />
+              {isRTL ? "تحميل الفيديو" : "Download video"}
+            </a>
+          </div>
+        </div>
       )}
 
       {/* Delete Confirmation Dialog */}
