@@ -1322,7 +1322,23 @@ export const api = {
     };
 
     if (music) {
-      insertData.music_url = music.url;
+      // Persist the Deezer preview URL to Cloudinary so it never expires.
+      // Falls back to the original URL if the upload fails.
+      let finalMusicUrl = music.url;
+      try {
+        const persistRes = await communityFetch('/api/music/persist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: music.url }),
+        });
+        if (persistRes.ok) {
+          const { cloudinaryUrl } = await persistRes.json();
+          if (cloudinaryUrl) finalMusicUrl = cloudinaryUrl;
+        }
+      } catch {
+        // keep original URL as fallback
+      }
+      insertData.music_url = finalMusicUrl;
       insertData.music_title = music.title;
       insertData.music_artist = music.artist;
       insertData.music_artwork_url = music.artwork_url;

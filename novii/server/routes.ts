@@ -868,6 +868,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Persist Deezer preview audio to Cloudinary so the URL never expires
+  app.post("/api/music/persist", requireAuth as any, async (req: Request, res: Response) => {
+    try {
+      const { url } = req.body;
+      if (!url || typeof url !== 'string') return res.status(400).json({ error: 'Missing url' });
+
+      let parsed: URL;
+      try { parsed = new URL(url); } catch { return res.status(400).json({ error: 'Invalid url' }); }
+      const allowed = ['dzcdn.net', 'deezer.com', 'cdns-preview-'];
+      const isAllowed = allowed.some(d => parsed.hostname.includes(d) || parsed.hostname.endsWith(d));
+      if (!isAllowed) return res.status(403).json({ error: 'Domain not allowed' });
+
+      // Fetch with browser-like headers so Akamai CDN allows the request
+      const upstream = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+          'Accept': 'audio/mpeg,audio/*;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Referer': 'https://www.deezer.com/',
+          'Origin': 'https://www.deezer.com',
+        },
+      });
+
+      if (!upstream.ok) {
+        console.warn(`[music/persist] Deezer returned ${upstream.status} for ${parsed.hostname}`);
+        return res.json({ cloudinaryUrl: null });
+      }
+
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      const cloudinaryUrl = await uploadToCloudinary(buffer, 'story-music', 'raw');
+      res.json({ cloudinaryUrl });
+    } catch (error) {
+      console.error('[music/persist] error:', error);
+      res.json({ cloudinaryUrl: null }); // graceful fallback — client keeps original URL
+    }
+  });
+
   // Music audio proxy — avoids CORS issues with Deezer CDN URLs
   app.get("/api/music/proxy", async (req: Request, res: Response) => {
     try {
