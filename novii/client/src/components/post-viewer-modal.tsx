@@ -23,8 +23,7 @@ import { ActiveBadge } from "@/components/ui/active-badge";
 import { useToggleLike, useToggleSave, useComments, useCreateComment, useToggleCommentLike, useDeleteComment, useCurrentUser, useTogglePinPost, useToggleHideLikes, useToggleRepliesDisabled, useDeletePost, useTypingIndicator } from "@/hooks/use-data";
 import { useLanguage } from "@/lib/language-context";
 import { useSettings } from "@/lib/settings-context";
-import { formatDistanceToNow } from "date-fns";
-import { ar } from "date-fns/locale";
+import { timeAgo } from "@/lib/time-ago";
 import { MentionAutocomplete } from "./mention-autocomplete";
 import { GifPicker } from "./gif-picker";
 import "@/components/official-comment.css";
@@ -81,7 +80,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
   const { data: comments = [], isLoading: commentsLoading } = useComments(post?.id || "");
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(post?.id || "", currentUser?.id || "");
   const createComment = useCreateComment();
-  const { direction } = useLanguage();
+  const { direction, language } = useLanguage();
   const { blockedIds, restrictedIds, settings } = useSettings();
   const t = direction === "rtl";
 
@@ -148,7 +147,7 @@ export function PostViewerModal({ post, open, onOpenChange, isRTL }: PostViewerM
 
   const formatTime = (dateString: string) => {
     try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true, locale: ar });
+      return timeAgo(new Date(dateString), language.code);
     } catch {
       return dateString;
     }

@@ -12,8 +12,8 @@ import { useNotifications, useMarkNotificationAsRead, useMarkAllNotificationsAsR
 import { api } from "@/lib/api";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { formatDistanceToNow, isToday, isThisWeek, isThisMonth } from "date-fns";
-import { ar } from "date-fns/locale";
+import { isToday, isThisWeek, isThisMonth } from "date-fns";
+import { timeAgo as formatTimeAgo } from "@/lib/time-ago";
 import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -236,10 +236,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
     },
   });
 
-  const timeAgo = formatDistanceToNow(new Date(notif.created_at), {
-    addSuffix: false,
-    locale: isAr ? ar : undefined,
-  });
+  const timeAgo = formatTimeAgo(new Date(notif.created_at), language.code);
 
   /* ── Icon badge ── */
   const iconMap: Record<string, { icon: React.ReactNode; bg: string }> = {

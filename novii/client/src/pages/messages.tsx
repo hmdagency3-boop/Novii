@@ -64,8 +64,7 @@ import { StoryViewerModal } from "@/components/story-viewer-modal";
 import { useStories } from "@/hooks/use-data";
 import { toast } from "sonner";
 import Cropper, { type Area } from "react-easy-crop";
-import { formatDistanceToNow } from "date-fns";
-import { ar } from "date-fns/locale";
+import { timeAgo } from "@/lib/time-ago";
 
 export type IsolatedChatInputHandle = {
   getValue: () => string;
@@ -2669,7 +2668,7 @@ export default function Messages() {
                                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                                     <Clock className="w-3 h-3" />
                                     {isRTL ? "آخر ظهور " : "Last seen "}
-                                    {formatDistanceToNow(new Date(selectedConversation.user.last_seen), { addSuffix: true, locale: isRTL ? ar : undefined })}
+                                    {timeAgo(new Date(selectedConversation.user.last_seen), language.code)}
                                   </span>
                                 ) : null}
                             </div>

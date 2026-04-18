@@ -16,8 +16,7 @@ import { PremiumBadge } from "@/components/ui/premium-badge";
 import { PopularBadge } from "@/components/ui/popular-badge";
 import { ActiveBadge } from "@/components/ui/active-badge";
 import { useLanguage } from "@/lib/language-context";
-import { formatDistanceToNow } from "date-fns";
-import { ar } from "date-fns/locale";
+import { timeAgo } from "@/lib/time-ago";
 import { useToggleReelLike, useCreateComment, useToggleCommentLike, useDeleteComment, useCurrentUser, useDeleteReel } from "@/hooks/use-data";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -112,7 +111,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
   const videoRef = useRef<HTMLVideoElement>(null);
   const centerButtonTimeoutRef = useRef<NodeJS.Timeout>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout>(null);
-  const { direction } = useLanguage();
+  const { direction, language } = useLanguage();
   const isRTL = direction === "rtl";
   const { data: currentUser } = useCurrentUser();
   
@@ -364,10 +363,7 @@ export function ReelViewerModal({ reel, open, onOpenChange, allReels = [], onNav
     }
   };
 
-  const formattedTime = formatDistanceToNow(new Date(reel.created_at), {
-    addSuffix: true,
-    locale: isRTL ? ar : undefined,
-  });
+  const formattedTime = timeAgo(new Date(reel.created_at), language.code);
 
   const handleDeleteComment = (commentId: string) => {
     deleteComment.mutate(commentId, {

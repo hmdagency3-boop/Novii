@@ -19,8 +19,7 @@ import { PremiumBadge } from "@/components/ui/premium-badge";
 import { PopularBadge } from "@/components/ui/popular-badge";
 import { ActiveBadge } from "@/components/ui/active-badge";
 import { useToggleLike, useToggleSave, useCurrentUser, useDeletePost, useTogglePinPost, useToggleHideLikes, useToggleRepliesDisabled, useRecordPostView, usePostInsights } from "@/hooks/use-data";
-import { formatDistanceToNow } from "date-fns";
-import { ar } from "date-fns/locale";
+import { timeAgo } from "@/lib/time-ago";
 import { Link } from "wouter";
 import { PostViewerModal } from "./post-viewer-modal";
 import { PostCommentsSheet } from "./post-comments-sheet";
@@ -74,7 +73,7 @@ export default function PostCard({ post }: PostCardProps) {
   const { data: insights } = usePostInsights(showInsights ? post.id : '');
   
   const { data: currentUser } = useCurrentUser();
-  const { direction } = useLanguage();
+  const { direction, language } = useLanguage();
   const isMobile = useIsMobile();
   const { containerRef, overlay } = usePinchZoom();
   const { settings } = useSettings();
@@ -163,7 +162,7 @@ export default function PostCard({ post }: PostCardProps) {
 
   const formatTime = (dateString: string) => {
     try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true, locale: ar });
+      return timeAgo(new Date(dateString), language.code);
     } catch {
       return dateString;
     }

@@ -32,8 +32,7 @@ import { useLanguage } from "@/lib/language-context";
 import { api, type Message, type Profile } from "@/lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
-import { ar } from "date-fns/locale";
+import { timeAgo } from "@/lib/time-ago";
 
 // ---------- Voice Message Player Sub-Component ----------
 function VoiceMessagePlayer({ audioUrl, isMe, isRead, isRTL }: { audioUrl: string; isMe: boolean; isRead: boolean; isRTL: boolean }) {
@@ -139,7 +138,7 @@ export function MessageBubble({
   onForward,
   allUsers = [],
 }: MessageBubbleProps) {
-  const { direction } = useLanguage();
+  const { direction, language } = useLanguage();
   const isRTL = direction === "rtl";
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(message.content);
@@ -366,7 +365,7 @@ export function MessageBubble({
               <span className="text-white text-xs font-semibold">📸 {isRTL ? "عرض الاستوري" : "View Story"}</span>
             </div>
             <div className={cn("absolute top-1 px-2 py-1 text-xs rounded-full bg-black/60 text-white/70", isRTL ? "left-1" : "right-1")}>
-              {formatDistanceToNow(new Date(message.created_at), { addSuffix: false, locale: isRTL ? ar : undefined })}
+              {timeAgo(new Date(message.created_at), language.code)}
             </div>
           </button>
           <div className={cn("rounded-2xl px-4 py-2 text-sm shadow-sm max-w-xs", isMe ? "bg-blue-500 text-white" : "bg-muted text-foreground")}>
@@ -532,7 +531,7 @@ export function MessageBubble({
                         <p className={cn("leading-relaxed break-words text-sm font-light", isRTL && "text-right")}>{message.content}</p>
                         <div className={cn("flex items-center gap-1 mt-0.5 text-xs", isRTL && "flex-row-reverse justify-start", !isRTL && "justify-end")}>
                           {message.is_edited && (
-                            <span className="opacity-50 text-gray-300" title={message.edited_at ? formatDistanceToNow(new Date(message.edited_at), { addSuffix: true, locale: isRTL ? ar : undefined }) : ''}>
+                            <span className="opacity-50 text-gray-300" title={message.edited_at ? timeAgo(new Date(message.edited_at), language.code) : ''}>
                               {isRTL ? "محررة" : "edited"}
                             </span>
                           )}

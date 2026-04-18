@@ -3,8 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { X, Heart, Send, Pause, Play, Eye, Trash2, Music2, VolumeX, Volume2, MoreHorizontal, ChevronDown, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { formatDistanceToNow } from "date-fns";
-import { ar } from "date-fns/locale";
+import { timeAgo } from "@/lib/time-ago";
 import { api, type Story, type Profile } from "@/lib/api";
 import { getFilterById } from "@/lib/story-filters";
 import { useLanguage } from "@/lib/language-context";
@@ -265,7 +264,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   };
 
   const formatTime = (d: string) => {
-    try { return formatDistanceToNow(new Date(d), { addSuffix: true, locale: ar }); }
+    try { return timeAgo(new Date(d), language.code); }
     catch { return d; }
   };
 
