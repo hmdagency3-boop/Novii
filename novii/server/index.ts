@@ -157,7 +157,7 @@ app.use((req, res, next) => {
 
       const { data: stories, error } = await adminDb
         .from('stories')
-        .select('id, music_url')
+        .select('id, music_url, music_title, music_artist')
         .gt('expires_at', new Date().toISOString())
         .not('music_url', 'is', null);
 
@@ -173,20 +173,48 @@ app.use((req, res, next) => {
       if (deezerStories.length === 0) return;
       log(`🎵 Migrating ${deezerStories.length} stories with expiring Deezer music URLs...`);
 
+      const AUDIO_HEADERS = {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'Accept': 'audio/mpeg,audio/*;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Referer': 'https://www.deezer.com/',
+        'Origin': 'https://www.deezer.com',
+      };
+
+      // Re-search Deezer by title+artist and return a fresh preview URL
+      async function refetchPreviewUrl(title: string, artist: string): Promise<string | null> {
+        try {
+          const q = encodeURIComponent(`${title} ${artist}`.trim());
+          const res = await fetch(`https://api.deezer.com/search?q=${q}&limit=5&output=json`);
+          if (!res.ok) return null;
+          const json: any = await res.json();
+          const tracks: any[] = json?.data || [];
+          // Prefer exact title match, fall back to first result
+          const match = tracks.find((t: any) =>
+            t.preview && t.title?.toLowerCase() === title.toLowerCase()
+          ) || tracks.find((t: any) => t.preview);
+          return match?.preview || null;
+        } catch { return null; }
+      }
+
       let migrated = 0;
       let failed = 0;
 
       for (const story of deezerStories) {
         try {
-          const upstream = await fetch(story.music_url, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-              'Accept': 'audio/mpeg,audio/*;q=0.9,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.5',
-              'Referer': 'https://www.deezer.com/',
-              'Origin': 'https://www.deezer.com',
-            },
-          });
+          // 1. Try the existing URL first (might still be valid)
+          let audioUrl: string | null = story.music_url;
+          let upstream = await fetch(audioUrl, { headers: AUDIO_HEADERS });
+
+          // 2. If expired/forbidden, re-search Deezer for a fresh URL
+          if (!upstream.ok && story.music_title) {
+            log(`  ↻ Re-searching Deezer for: ${story.music_title} - ${story.music_artist}`);
+            const freshUrl = await refetchPreviewUrl(story.music_title, story.music_artist || '');
+            if (freshUrl) {
+              audioUrl = freshUrl;
+              upstream = await fetch(audioUrl, { headers: AUDIO_HEADERS });
+            }
+          }
 
           if (!upstream.ok) { failed++; continue; }
 
@@ -199,12 +227,13 @@ app.use((req, res, next) => {
             .eq('id', story.id);
 
           migrated++;
+          log(`  ✓ Story ${story.id}: music saved to Cloudinary`);
         } catch {
           failed++;
         }
       }
 
-      log(`✅ Music migration done: ${migrated} migrated, ${failed} skipped (expired/unreachable)`);
+      log(`✅ Music migration done: ${migrated} migrated, ${failed} skipped`);
     } catch (err) {
       console.error('Music migration error:', err);
     }
