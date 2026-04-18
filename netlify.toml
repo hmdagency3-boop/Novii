@@ -16,6 +16,14 @@
   status = 200
   force = true
 
+# روابط البروفايل /u/:username - تمر بالـ Function لتقديم معاينة OG لبوتات السوشيال ميديا
+# الـ Function يفحص User-Agent: لو بوت يرجّع HTML بـ OG tags، لو متصفح عادي يكمل للـ SPA
+[[redirects]]
+  from = "/u/*"
+  to = "/.netlify/functions/api"
+  status = 200
+  force = true
+
 # ملفات ثابتة — تُخدَم مباشرة بدون redirect
 [[redirects]]
   from = "/robots.txt"
