@@ -211,6 +211,7 @@ function NotificationRow({ notif, isAr, onRead }: { notif: any; isAr: boolean; o
   const post = (notif as any).post;
   const actorId = actor?.id;
   const queryClient = useQueryClient();
+  const { language } = useLanguage();
 
   const isModerationNotif = MODERATION_TYPES.includes(notif.type);
   const { data: isFollowing = false } = useIsFollowing(isModerationNotif ? '' : (actorId || ''));
