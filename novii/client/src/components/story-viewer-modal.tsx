@@ -97,52 +97,53 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
     else setIsPaused(false);
   }, [showViews, inputFocused, showMenu]);
 
-  /* ─── Music ─── */
+  /* ─── Music helpers ─── */
+  const tryPlayMusic = () => {
+    const audio = musicRef.current;
+    if (!audio || !audio.paused) return; // already playing
+    audio.play()
+      .then(() => setMusicBlocked(false))
+      .catch(() => setMusicBlocked(true));
+  };
+
+  /* ─── Music setup: runs only when story or open state changes ─── */
   useEffect(() => {
     if (!open || !currentStory) { musicRef.current?.pause(); return; }
-    const rawMusicUrl = (currentStory as any).music_url;
-    const musicUrl = rawMusicUrl || null;
-    if (musicUrl) {
-      if (!musicRef.current) musicRef.current = new Audio();
-      if (musicRef.current.src !== musicUrl) {
-        musicRef.current.src = musicUrl;
-        musicRef.current.loop = true;
-      }
-      musicRef.current.muted = isMuted;
-      musicRef.current.volume = 1;
-      if (!isPaused) {
-        musicRef.current.play()
-          .then(() => setMusicBlocked(false))
-          .catch(() => setMusicBlocked(true));
-      } else {
-        musicRef.current.pause();
-      }
-    } else {
-      musicRef.current?.pause();
-      setMusicBlocked(false);
+    const musicUrl = (currentStory as any).music_url || null;
+    if (!musicUrl) { musicRef.current?.pause(); setMusicBlocked(false); return; }
+
+    if (!musicRef.current) musicRef.current = new Audio();
+    const audio = musicRef.current;
+    if (audio.src !== musicUrl) {
+      audio.src = musicUrl;
+      audio.loop = true;
+      audio.preload = 'auto';
     }
-  }, [open, currentStory?.id, isPaused, isMuted]);
+    audio.muted = isMuted;
+    audio.volume = 1;
+    if (!isPaused) {
+      audio.play()
+        .then(() => setMusicBlocked(false))
+        .catch(() => setMusicBlocked(true));
+    }
+  }, [open, currentStory?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ─── Sync mute state without restarting audio ─── */
+  useEffect(() => {
+    if (musicRef.current) musicRef.current.muted = isMuted;
+  }, [isMuted]);
+
+  /* ─── Pause/resume audio with isPaused (pause only — play is handled in handlers) ─── */
+  useEffect(() => {
+    if (!musicRef.current) return;
+    if (isPaused) {
+      musicRef.current.pause();
+    }
+    // Note: play() is NOT called here — it must be called directly in user gesture handlers
+  }, [isPaused]);
 
   useEffect(() => () => { musicRef.current?.pause(); }, []);
   useEffect(() => { if (!open) musicRef.current?.pause(); }, [open]);
-
-  /* ─── Unlock audio on first user interaction inside the viewer ─── */
-  useEffect(() => {
-    if (!open || !musicBlocked) return;
-    const tryPlay = () => {
-      if (musicRef.current) {
-        musicRef.current.play()
-          .then(() => setMusicBlocked(false))
-          .catch(() => {});
-      }
-    };
-    window.addEventListener('pointerdown', tryPlay, { capture: true });
-    window.addEventListener('keydown', tryPlay, { capture: true });
-    return () => {
-      window.removeEventListener('pointerdown', tryPlay, { capture: true } as any);
-      window.removeEventListener('keydown', tryPlay, { capture: true } as any);
-    };
-  }, [open, musicBlocked]);
 
   /* ─── Video mute sync ─── */
   useEffect(() => {
@@ -199,7 +200,12 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
 
   const handlePointerUp = (e: React.PointerEvent, side: 'left' | 'right') => {
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    if (isHoldingRef.current) { setIsPaused(false); isHoldingRef.current = false; return; }
+    if (isHoldingRef.current) {
+      setIsPaused(false);
+      isHoldingRef.current = false;
+      tryPlayMusic(); // resume directly inside user gesture
+      return;
+    }
     // short tap = navigate (right = next, left = previous — same for both RTL and LTR)
     side === 'right' ? handleNext() : handlePrevious();
   };
@@ -458,7 +464,11 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
 
                 {/* Pause / play */}
                 <button
-                  onClick={() => setIsPaused(p => !p)}
+                  onClick={() => {
+                    const resuming = isPaused;
+                    setIsPaused(p => !p);
+                    if (resuming) tryPlayMusic(); // resume directly in user gesture
+                  }}
                   className="text-white p-2 rounded-full hover:bg-white/10 active:bg-white/20 transition-colors"
                 >
                   {isPaused
@@ -470,7 +480,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
                 {/* More menu (own story) */}
                 {isOwnStory && (
                   <button
-                    onClick={() => setShowMenu(m => !m)}
+                    onClick={() => { const wasOpen = showMenu; setShowMenu(m => !m); if (wasOpen) tryPlayMusic(); }}
                     className="text-white p-2 rounded-full hover:bg-white/10 active:bg-white/20 transition-colors"
                   >
                     <MoreHorizontal className="w-5 h-5 drop-shadow" />
@@ -571,7 +581,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   onFocus={() => setInputFocused(true)}
-                  onBlur={() => setInputFocused(false)}
+                  onBlur={() => { setInputFocused(false); tryPlayMusic(); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleSendReply(); }}
                   className="flex-1 bg-transparent text-white placeholder:text-white/50 border-none outline-none text-sm"
                   onClick={(e) => e.stopPropagation()}
@@ -601,7 +611,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
           {showViews && isOwnStory && (
             <div className="absolute inset-0 z-50 flex flex-col justify-end">
               {/* Backdrop */}
-              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowViews(false)} />
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowViews(false); tryPlayMusic(); }} />
 
               {/* Panel */}
               <div className="relative bg-zinc-900/95 backdrop-blur-xl rounded-t-3xl max-h-[65vh] flex flex-col border-t border-white/10 shadow-2xl">
@@ -621,7 +631,7 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
                       {storyViews.length}
                     </span>
                   </div>
-                  <button onClick={() => setShowViews(false)} className="text-white/60 hover:text-white p-1 transition-colors">
+                  <button onClick={() => { setShowViews(false); tryPlayMusic(); }} className="text-white/60 hover:text-white p-1 transition-colors">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
