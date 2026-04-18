@@ -63,6 +63,23 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    // Proxy all non-mockup traffic to the Novii platform and related services
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        ws: true,
+      },
+      "/novii-admin": {
+        target: "http://localhost:18877",
+        changeOrigin: true,
+      },
+      "^/(?!__mockup).*": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        ws: true,
+      },
+    },
   },
   preview: {
     port,
