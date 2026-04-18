@@ -4,7 +4,7 @@ import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { adminDb } from "./storage";
-import { extractPublicId, deleteFromCloudinary } from "./cloudinary";
+import { extractPublicId, deleteFromCloudinary, uploadToCloudinary } from "./cloudinary";
 
 const app = express();
 
@@ -149,4 +149,67 @@ app.use((req, res, next) => {
 
   cleanupExpiredStories();
   setInterval(cleanupExpiredStories, 30 * 60 * 1000);
+
+  // Migrate existing active stories: replace expiring Deezer URLs with permanent Cloudinary URLs
+  async function migrateDeezerMusicUrls() {
+    try {
+      const DEEZER_PATTERNS = ['dzcdn.net', 'deezer.com', 'cdns-preview-'];
+
+      const { data: stories, error } = await adminDb
+        .from('stories')
+        .select('id, music_url')
+        .gt('expires_at', new Date().toISOString())
+        .not('music_url', 'is', null);
+
+      if (error || !stories || stories.length === 0) return;
+
+      const deezerStories = stories.filter((s: any) => {
+        try {
+          const host = new URL(s.music_url).hostname;
+          return DEEZER_PATTERNS.some(p => host.includes(p));
+        } catch { return false; }
+      });
+
+      if (deezerStories.length === 0) return;
+      log(`🎵 Migrating ${deezerStories.length} stories with expiring Deezer music URLs...`);
+
+      let migrated = 0;
+      let failed = 0;
+
+      for (const story of deezerStories) {
+        try {
+          const upstream = await fetch(story.music_url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+              'Accept': 'audio/mpeg,audio/*;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.5',
+              'Referer': 'https://www.deezer.com/',
+              'Origin': 'https://www.deezer.com',
+            },
+          });
+
+          if (!upstream.ok) { failed++; continue; }
+
+          const buffer = Buffer.from(await upstream.arrayBuffer());
+          const cloudinaryUrl = await uploadToCloudinary(buffer, 'story-music', 'raw');
+
+          await adminDb
+            .from('stories')
+            .update({ music_url: cloudinaryUrl })
+            .eq('id', story.id);
+
+          migrated++;
+        } catch {
+          failed++;
+        }
+      }
+
+      log(`✅ Music migration done: ${migrated} migrated, ${failed} skipped (expired/unreachable)`);
+    } catch (err) {
+      console.error('Music migration error:', err);
+    }
+  }
+
+  // Run migration in background — don't block server startup
+  setTimeout(migrateDeezerMusicUrls, 5000);
 })();
