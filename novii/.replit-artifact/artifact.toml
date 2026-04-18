@@ -11,7 +11,7 @@ paths = ["/"]
 localPort = 5000
 
 [services.development]
-run = "cd novii && pnpm run dev"
+run = "pnpm run dev"
 
 [services.production]
 

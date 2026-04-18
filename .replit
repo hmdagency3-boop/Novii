@@ -9,60 +9,6 @@ args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
 
 [workflows]
-runButton = "Project"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Novii Platform"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Novii Admin"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "API Server"
-
-[[workflows.workflow]]
-name = "Novii Platform"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd novii && PORT=5000 pnpm run dev"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Novii Admin"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=18877 BASE_PATH=/novii-admin/ pnpm --filter @workspace/novii-admin run dev"
-waitForPort = 18877
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow]]
-name = "API Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=8080 pnpm --filter @workspace/api-server run dev"
-waitForPort = 8080
 
 [agent]
 stack = "PNPM_WORKSPACE"
