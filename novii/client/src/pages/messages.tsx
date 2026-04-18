@@ -188,6 +188,7 @@ export default function Messages() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const isInitialScrollRef = useRef(true);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const chatChannelRef = useRef<any>(null);
   const isRTL = direction === "rtl";
@@ -1284,8 +1285,17 @@ export default function Messages() {
   }, [location]);
 
   useEffect(() => {
-    scrollToBottom();
+    if (isInitialScrollRef.current) {
+      scrollToBottom("auto");
+      isInitialScrollRef.current = false;
+    } else {
+      scrollToBottom("smooth");
+    }
   }, [messages]);
+
+  useEffect(() => {
+    isInitialScrollRef.current = true;
+  }, [selectedUserId]);
 
   // Real-time subscription for ALL new messages (to update conversations list)
   useEffect(() => {
@@ -1621,8 +1631,8 @@ export default function Messages() {
       });
   }, [selectedUserId, currentUser, queryClient]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
   const handleSendMessage = async (overrideText?: string) => {
