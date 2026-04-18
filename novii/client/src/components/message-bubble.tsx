@@ -160,7 +160,30 @@ export function MessageBubble({
   const [showForwardDialog, setShowForwardDialog] = useState(false);
   const [reactions, setReactions] = useState<{ [key: string]: number }>({});
   const [userReaction, setUserReaction] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleTouchStart = () => {
+    longPressFiredRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      try {
+        if (typeof navigator !== 'undefined' && (navigator as any).vibrate) (navigator as any).vibrate(40);
+      } catch {}
+      setMenuOpen(true);
+    }, 450);
+  };
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+  };
+  const handleTouchMove = handleTouchEnd;
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setMenuOpen(true);
+  };
   const queryClient = useQueryClient();
 
   const reactions_list = ['❤️', '😂', '😮', '😢', '👍', '🔥', '😍', '👏'];
@@ -444,7 +467,15 @@ export function MessageBubble({
       )}
 
       <div className={cn("flex items-start gap-1", isMe && "flex-row-reverse")}>
-        <div className="flex flex-col gap-1">
+        <div
+          className="flex flex-col gap-1 select-none"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchMove={handleTouchMove}
+          onTouchCancel={handleTouchEnd}
+          onContextMenu={handleContextMenu}
+          style={{ WebkitTouchCallout: 'none' as any }}
+        >
           {isEditing ? (
             <div className={cn("flex items-center gap-1 bg-secondary rounded-2xl px-3 py-1.5 border-2 border-primary", isRTL && "flex-row-reverse")}>
               <Input
@@ -616,7 +647,7 @@ export function MessageBubble({
             <Smile className="w-3.5 h-3.5" />
           </Button>
 
-          <DropdownMenu>
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
