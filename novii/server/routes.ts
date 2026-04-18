@@ -868,6 +868,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Music audio proxy — avoids CORS issues with Deezer CDN URLs
+  app.get("/api/music/proxy", async (req: Request, res: Response) => {
+    try {
+      const { url } = req.query;
+      if (!url || typeof url !== 'string') return res.status(400).json({ error: 'Missing url' });
+
+      // Only allow Deezer CDN domains for security
+      let parsed: URL;
+      try { parsed = new URL(url); } catch { return res.status(400).json({ error: 'Invalid url' }); }
+      const allowed = ['dzcdn.net', 'deezer.com', 'cdns-preview-'];
+      const isAllowed = allowed.some(d => parsed.hostname.includes(d) || parsed.hostname.endsWith(d));
+      if (!isAllowed) return res.status(403).json({ error: 'Domain not allowed' });
+
+      const upstream = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'audio/*,*/*' },
+      });
+      if (!upstream.ok) return res.status(upstream.status).end();
+
+      const contentType = upstream.headers.get('content-type') || 'audio/mpeg';
+      const contentLength = upstream.headers.get('content-length');
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      if (contentLength) res.setHeader('Content-Length', contentLength);
+
+      const reader = upstream.body?.getReader();
+      if (!reader) return res.status(500).end();
+      const pump = async () => {
+        const { done, value } = await reader.read();
+        if (done) { res.end(); return; }
+        res.write(value);
+        await pump();
+      };
+      await pump();
+    } catch (error) {
+      console.error("Music proxy error:", error);
+      res.status(500).end();
+    }
+  });
+
   // ========================================
   // PERSONALIZED FEED ALGORITHM
   // ========================================

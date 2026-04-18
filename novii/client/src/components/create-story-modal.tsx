@@ -47,6 +47,11 @@ export function CreateStoryModal({ open, onOpenChange, isRTL, initialPreview, in
     }
   }, [initialPreview, initialMediaType]);
 
+  const toProxyUrl = (url: string) =>
+    url.includes('dzcdn.net') || url.includes('deezer.com')
+      ? `/api/music/proxy?url=${encodeURIComponent(url)}`
+      : url;
+
   // Play / stop background music while in editor
   useEffect(() => {
     if (!bgAudioRef.current) {
@@ -56,8 +61,9 @@ export function CreateStoryModal({ open, onOpenChange, isRTL, initialPreview, in
     const audio = bgAudioRef.current;
 
     if (selectedMusic?.preview_url) {
-      if (audio.src !== selectedMusic.preview_url) {
-        audio.src = selectedMusic.preview_url;
+      const proxiedUrl = toProxyUrl(selectedMusic.preview_url);
+      if (audio.src !== proxiedUrl) {
+        audio.src = proxiedUrl;
       }
       audio.play().catch(() => {});
     } else {

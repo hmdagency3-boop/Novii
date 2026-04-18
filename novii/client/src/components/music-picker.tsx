@@ -52,6 +52,11 @@ export function MusicPicker({ open, onOpenChange, onSelect, selectedTrack, isRTL
     return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
   }, [query, searchMusic]);
 
+  const toProxyUrl = (url: string) =>
+    url.includes('dzcdn.net') || url.includes('deezer.com')
+      ? `/api/music/proxy?url=${encodeURIComponent(url)}`
+      : url;
+
   const togglePreview = (track: MusicTrack) => {
     if (playingId === track.id) {
       audioRef.current?.pause();
@@ -59,7 +64,7 @@ export function MusicPicker({ open, onOpenChange, onSelect, selectedTrack, isRTL
     } else {
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.src = track.preview_url;
+        audioRef.current.src = toProxyUrl(track.preview_url);
         audioRef.current.play().catch(() => {});
       }
       setPlayingId(track.id);

@@ -100,7 +100,13 @@ export function StoryViewerModal({ stories, initialIndex, open, onOpenChange, is
   /* ─── Music ─── */
   useEffect(() => {
     if (!open || !currentStory) { musicRef.current?.pause(); return; }
-    const musicUrl = (currentStory as any).music_url;
+    const rawMusicUrl = (currentStory as any).music_url;
+    // Route Deezer CDN URLs through our server proxy to avoid CORS restrictions
+    const musicUrl = rawMusicUrl
+      ? (rawMusicUrl.includes('dzcdn.net') || rawMusicUrl.includes('deezer.com')
+        ? `/api/music/proxy?url=${encodeURIComponent(rawMusicUrl)}`
+        : rawMusicUrl)
+      : null;
     if (musicUrl) {
       if (!musicRef.current) musicRef.current = new Audio();
       if (musicRef.current.src !== musicUrl) {
